@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Macross.Json.Extensions" Version="3.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Quartz" Version="3.11.0" />
+    <PackageReference Include="Quartz.Extensions.DependencyInjection" Version="3.11.0" />
+    <PackageReference Include="Quartz.Extensions.Hosting" Version="3.11.0" />
+    <PackageReference Include="Quartz.Plugins" Version="3.11.0" />
+    <PackageReference Include="Quartz.Serialization.SystemTextJson" Version="3.11.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="6.5.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Data.MySql.Regjstry\Data.MySql.Regjstry.csproj" />
+    <ProjectReference Include="..\Elavon.Registry\Elavon.Registry.csproj" />
+    <ProjectReference Include="..\Email.Registry\Email.Registry.csproj" />
+    <ProjectReference Include="..\InternalContracts.Registry\InternalContracts.Registry.csproj" />
+    <ProjectReference Include="..\Resiliency.Registry\Resiliency.Registry.csproj" />
+    <ProjectReference Include="..\Application.Users.Registry\Users.Registry.csproj" />
+    <ProjectReference Include="..\Sedat.Registry\Sedat.Registry.csproj" />
+    <ProjectReference Include="..\WebMsgSender.Registry\WebMsgSender.Registry.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="MaktabDataContracts">
+      <HintPath>..\ExternalContracts\MaktabDataContracts.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Properties\PublishProfiles\" />
+    <Folder Include="Services\" />
+  </ItemGroup>
+
+</Project>

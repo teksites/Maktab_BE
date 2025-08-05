@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Elavon\Elavon.csproj" />
+    <ProjectReference Include="..\InternalContracts.Implementation\InternalContracts.Implementation.csproj" />
+    <ProjectReference Include="..\InternalContracts\InternalContracts.csproj" />
+    <ProjectReference Include="..\WebMsgSender\WebMsgSender.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="MaktabDataContracts">
+      <HintPath>..\ExternalContracts\MaktabDataContracts.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
