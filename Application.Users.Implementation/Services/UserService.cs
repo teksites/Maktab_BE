@@ -20,8 +20,6 @@ namespace Application.Users.Implementation
         private readonly IUserCardsService _userCardsService;
         private readonly IUserChildrenService _userChildsService;
         private readonly ISendEmailService _sendEmailService;
-        //private readonly IUserTransactionsService _userTransactionsService;
-       // private readonly IExtendedUserInformationService _extendedUserInformationService;
 
         public UserService(IConfiguration configuration, IUserRepository repository, ITempUserRepository tempUserRepository, IAddressService addressService, 
             IUserCardsService userCardsService, IUserChildrenService userChildsService, ISendEmailService sendEmailService) 
@@ -33,8 +31,6 @@ namespace Application.Users.Implementation
             _userCardsService = userCardsService;
             _userChildsService = userChildsService;
            _sendEmailService = sendEmailService;
-          //  _userTransactionsService = userTransactionsService;
-          //  _extendedUserInformationService = extendedUserInformationService;
         }
         public async Task<UserInformationResponse> AddTemporaryUser(AddUserInformation userInformation)
         {
@@ -280,6 +276,7 @@ namespace Application.Users.Implementation
                 CreatedAt = DateTime.Now,
                 EmailVerificationCode = GenerateRandomVerificationCode(),
                 PhoneVerificationCode = GenerateRandomVerificationCode(),
+                FamilyId = addUserInformation.FamilyId
             };
         }
 
@@ -354,6 +351,19 @@ namespace Application.Users.Implementation
         public async Task<bool> CheckIfTempUser(string userName)
         {
             return  await _repository.CheckIfUserNameExisit(userName).ConfigureAwait(false);
+        }
+
+        public async Task<IEnumerable<UserInformationResponse>> GetAllFamilyUsersInformation(Guid familyId, bool ifOnlyActive = true)
+        {
+            var users = (await _repository.GetAllFamilyUsersInformation(familyId, ifOnlyActive).ConfigureAwait(false)).
+               Select(user => MapToUserInformationResponse(user, false)).ToList();
+
+            return users;
+        }
+
+        public async Task<UserInformationResponse> LinkUserToAFamily(Guid userId, Guid familyId)
+        {
+            return MapToUserInformationResponse(await _repository.LinkUserToAFamily(userId, familyId).ConfigureAwait(false), false);
         }
 
         /*public async Task<MaktabApiResult<UserTransactionsDetails>> CreateUserTransaction(AddUserTransaction addUserTransactions)

@@ -25,7 +25,6 @@
     <ProjectReference Include="..\InternalContracts.Registry\InternalContracts.Registry.csproj" />
     <ProjectReference Include="..\Resiliency.Registry\Resiliency.Registry.csproj" />
     <ProjectReference Include="..\Application.Users.Registry\Users.Registry.csproj" />
-    <ProjectReference Include="..\Sedat.Registry\Sedat.Registry.csproj" />
     <ProjectReference Include="..\WebMsgSender.Registry\WebMsgSender.Registry.csproj" />
   </ItemGroup>
 

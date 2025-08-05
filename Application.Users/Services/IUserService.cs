@@ -21,6 +21,8 @@ namespace Users.Services
         Task<bool> ForgotPassword(string userName, string? password);
         Task<bool> ResetUserPassword(UpdateUserPassword updateUserPassword);
         Task<bool> CheckIfTempUser(string userName);
+        Task<IEnumerable<UserInformationResponse>> GetAllFamilyUsersInformation(Guid familyId, bool ifOnlyActive = true);
+        Task<UserInformationResponse> LinkUserToAFamily(Guid userId, Guid familyId);
         //Task<MaktabApiResult<UserTransactionsDetails>> CreateUserTransaction(AddUserTransaction addUserTransactions);
 
     }

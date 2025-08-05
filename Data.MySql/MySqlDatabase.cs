@@ -12,7 +12,23 @@ namespace Data.MySql
         }
         protected override DbConnection CreateConnection()
         {
-            return new MySqlConnection(ConnectionString);
+            //return new MySqlConnection(ConnectionString);
+            string[] possiblePaths =
+            {
+                Path.Combine(AppContext.BaseDirectory, "Content", "DigiCertGlobalRootCA.crt.pem"),
+                Path.Combine(Directory.GetCurrentDirectory(), "Content", "DigiCertGlobalRootCA.crt.pem")
+            };
+
+            string certPath = possiblePaths.FirstOrDefault(File.Exists)
+                ?? throw new FileNotFoundException("SSL Certificate not found in expected paths.");
+
+            var builder = new MySqlConnectionStringBuilder(ConnectionString)
+            {
+                SslMode = MySqlSslMode.VerifyCA,
+                SslCa = certPath
+            };
+
+            return new MySqlConnection(builder.ConnectionString);
         }
         public override DbCommand CreateCommand()
         {

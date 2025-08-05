@@ -1,6 +1,7 @@
 ﻿using Application.Users.Contracts;
 using Cumulus.Data;
 using Data;
+using MaktabDataContracts.Enums;
 using Users.Contracts;
 using Users.Repository;
 using Users.Utils.Implementation;
@@ -19,8 +20,8 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"insert into user_info (UserId, FamilyId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin)"
-                    + "Values(@userId, @familyId, @firstName, @lastName, @email, @phone, @userName, @password, @isActive, @createdAt, @updatedOn, @isAdmin)";
+                    cmd.CommandText = @"insert into user_info (UserId, FamilyId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, Relationship)"
+                    + "Values(@userId, @familyId, @firstName, @lastName, @email, @phone, @userName, @password, @isActive, @createdAt, @updatedOn, @isAdmin, @relationship)";
 
                     //var password = PasswordHelper.HashPassword(userInformation.Password);
                     cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
@@ -35,7 +36,8 @@ namespace Application.Users.Repository.Implementation
                     cmd.AddParameter("@createdAt", userInformation.CreatedAt);
                     cmd.AddParameter("@updatedOn", userInformation.UpdatedOn);
                     cmd.AddParameter("@isAdmin", userInformation.IsAdmin);
-
+                    cmd.AddParameter("@@relationship", userInformation.Relationship);
+                    
                     if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
                     {
                         return new UserInformation
@@ -52,6 +54,8 @@ namespace Application.Users.Repository.Implementation
                             CreatedAt = userInformation.CreatedAt,
                             UpdatedOn = userInformation.UpdatedOn,
                             IsAdmin = userInformation.IsAdmin,
+                            Relationship = userInformation.Relationship
+
                         };
                     }
                     else
@@ -147,7 +151,7 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId from user_info";
+                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId, Relationship from user_info";
 
                     if (ifOnlyActive)
                     {
@@ -171,6 +175,8 @@ namespace Application.Users.Repository.Implementation
                         var isAdmin = reader.GetBoolean(10);
                         var isTempPassword = reader.GetBoolean(11);
                         var familyId = reader.GetGuidFromByteArray(12);
+                        var relationship = (Relationship)reader.GetInt32(13);
+
 
                         results.Add(new UserInformation
                         {
@@ -186,7 +192,8 @@ namespace Application.Users.Repository.Implementation
                             CreatedAt = CreatedAt,
                             UpdatedOn = UpdatedOn,
                             IsAdmin = isAdmin,
-                            IsTempPassword = isTempPassword
+                            IsTempPassword = isTempPassword,
+                            Relationship = relationship
                         });
                     }
                 }
@@ -202,7 +209,7 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId from user_info where FamilyId = @familyId";
+                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId, Relationship from user_info where FamilyId = @familyId";
 
                     cmd.AddParameter("@familyId", id.ToByteArray());
 
@@ -228,6 +235,7 @@ namespace Application.Users.Repository.Implementation
                         var isAdmin = reader.GetBoolean(10);
                         var isTempPassword = reader.GetBoolean(11);
                         var familyId = reader.GetGuidFromByteArray(12);
+                        var relationship = (Relationship)reader.GetInt32(13);
 
                         results.Add(new UserInformation
                         {
@@ -243,7 +251,8 @@ namespace Application.Users.Repository.Implementation
                             CreatedAt = CreatedAt,
                             UpdatedOn = UpdatedOn,
                             IsAdmin = isAdmin,
-                            IsTempPassword = isTempPassword
+                            IsTempPassword = isTempPassword,
+                            Relationship = relationship
                         });
                     }
                 }
@@ -257,7 +266,7 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId from user_info" +
+                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId, Relationship from user_info" +
                         " where UserId = @userId";
 
                     cmd.AddParameter("@userId", userId.ToByteArray());
@@ -281,6 +290,7 @@ namespace Application.Users.Repository.Implementation
                     var isAdmin = reader.GetBoolean(10);
                     var isTempPassword = reader.GetBoolean(11);
                     var familyId = reader.GetGuidFromByteArray(12);
+                    var relationship = (Relationship)reader.GetInt32(13);
 
                     return new UserInformation
                     {
@@ -297,6 +307,7 @@ namespace Application.Users.Repository.Implementation
                         UpdatedOn = UpdatedOn,
                         IsAdmin = isAdmin,
                         IsTempPassword = isTempPassword,
+                        Relationship = relationship
                     };
                 }
             }
@@ -355,7 +366,7 @@ namespace Application.Users.Repository.Implementation
                 {
                     // 1. Fetch full user info including password hash
                     cmd.CommandText = @"
-                    SELECT UserId, FirstName, LastName, Email, Phone, UserName, IsAdmin, IsTempPassword, Password, FamilyId
+                    SELECT UserId, FirstName, LastName, Email, Phone, UserName, IsAdmin, IsTempPassword, Password, FamilyId, Relationship
                     FROM user_info
                     WHERE (UPPER(UserName) = UPPER(@userName) OR UPPER(Email) = UPPER(@userName)) 
                       AND IsActive = TRUE";
@@ -380,6 +391,7 @@ namespace Application.Users.Repository.Implementation
                     var isTempPassword = reader.GetBoolean(7);
                     var storedPasswordHash = reader.GetString(8); // index of Password
                     var familyId = reader.GetGuidFromByteArray(9);
+                    var relationship = (Relationship)reader.GetInt32(10);
 
                     // 3. If password check is requested, verify hash
                     if (!ifForgotPassword && !PasswordHelper.VerifyPassword(password, storedPasswordHash))
@@ -398,7 +410,8 @@ namespace Application.Users.Repository.Implementation
                         UserName = userNam,
                         IsAdmin = isAdmin,
                         IsTempPassword = isTempPassword,
-                        IsActive = true
+                        IsActive = true,
+                        Relationship = relationship
                     };
                 }
             }

@@ -16,7 +16,6 @@
     <ProjectReference Include="..\Application.Users\Users.csproj" />
     <ProjectReference Include="..\Email\Email.csproj" />
     <ProjectReference Include="..\InternalContracts\InternalContracts.csproj" />
-    <ProjectReference Include="..\Sedat\Sedat.csproj" />
     <ProjectReference Include="..\Users.Utils,Implementation\Users.Utils.Implementation.csproj" />
   </ItemGroup>
 

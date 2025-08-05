@@ -19,8 +19,6 @@
     <ProjectReference Include="..\InternalContracts.Implementation\InternalContracts.Implementation.csproj" />
     <ProjectReference Include="..\InternalContracts.Registry\InternalContracts.Registry.csproj" />
     <ProjectReference Include="..\InternalContracts\InternalContracts.csproj" />
-    <ProjectReference Include="..\Sedat.Registry\Sedat.Registry.csproj" />
-    <ProjectReference Include="..\Sedat\Sedat.csproj" />
     <ProjectReference Include="..\WebMsgSender\WebMsgSender.csproj" />
   </ItemGroup>
 

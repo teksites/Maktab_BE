@@ -66,6 +66,7 @@ namespace Users.Implementation.Services
             {
                 SessionId = Guid.NewGuid(),
                 UserId = userInfo.UserId,
+                FamilyId = userInfo.FamilyId,
                 IpAddress = ipAddress,
                 IsActive = true,
                 Token = tokenString,
@@ -88,6 +89,7 @@ namespace Users.Implementation.Services
                     AccessToken = tokenString,
                     SessionId = sessionInfo.SessionId,
                     UserId = userInfo.UserId,
+                    FamilyId = userInfo.FamilyId,
                     RefreshToken = "",
                     LoginTime = loginTime,
                     ExpiresIn = tokenExpiry

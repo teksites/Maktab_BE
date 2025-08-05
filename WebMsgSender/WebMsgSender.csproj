@@ -13,7 +13,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Elavon\Elavon.csproj" />
     <ProjectReference Include="..\InternalContracts\InternalContracts.csproj" />
-    <ProjectReference Include="..\Sedat\Sedat.csproj" />
   </ItemGroup>
 
 </Project>

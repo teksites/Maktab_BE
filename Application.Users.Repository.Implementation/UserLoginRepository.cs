@@ -39,7 +39,7 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName from user_info" +
+                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, FamilyId from user_info" +
                         " where UserName = @userName and Password = @password and IsActive = true";
 
                     cmd.AddParameter("@userName", userName);
@@ -57,7 +57,8 @@ namespace Application.Users.Repository.Implementation
                     var email = reader.GetString(3);
                     var phone = reader.GetString(4);
                     var userNam = reader.GetString(5);
- 
+                    var familyId = reader.GetGuidFromByteArray(6);
+
                     return new UserInformation
                     {
                         UserId = id,
@@ -66,6 +67,7 @@ namespace Application.Users.Repository.Implementation
                         Email = email,
                         Phone = phone,
                         UserName = userName,
+                        FamilyId = familyId
                     };
                 }
             }
@@ -77,11 +79,12 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"insert into session_info (SessionId, UserId, Token, TokenExpiry, IpAddress, IsActive, LogInTime)"
-                    + "Values(@sessionId, @userId, @token, @tokenExpiry, @ipAddress, @isActive, @logInTime)";
+                    cmd.CommandText = @"insert into session_info (SessionId, UserId, FamilyId, Token, TokenExpiry, IpAddress, IsActive, LogInTime)"
+                    + "Values(@sessionId, @userId, @familyId, @token, @tokenExpiry, @ipAddress, @isActive, @logInTime)";
 
                     cmd.AddParameter("@sessionId", addSession.SessionId.ToByteArray());
                     cmd.AddParameter("@userId", addSession.UserId.ToByteArray());
+                    cmd.AddParameter("@familyId", addSession.FamilyId.ToByteArray());
                     cmd.AddParameter("@token", addSession.Token);
                     cmd.AddParameter("@tokenExpiry", addSession.TokenExpiry);
                     cmd.AddParameter("@ipAddress", addSession.IpAddress);
@@ -95,7 +98,6 @@ namespace Application.Users.Repository.Implementation
                     return false;
                 }
             }
-
         }
 
         public async Task<bool> LogOutSession(Guid sessionId)

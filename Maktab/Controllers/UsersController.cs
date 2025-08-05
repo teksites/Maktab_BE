@@ -36,12 +36,20 @@ namespace Maktab.Controllers
 
         [Authorize]
         [ApiAuthorize()]
-
         [HttpGet("")]
         [EnableCors("corspolicy")]
         public async Task<IEnumerable<UserInformationResponse>> GetAllUsers(bool ifOnlyActive = true)
         {
             return await _userService.GetAllUsersInformation(ifOnlyActive).ConfigureAwait(false);
+        }
+
+        [Authorize]
+        [ApiAuthorize()]
+        [HttpGet("family/{familyId:guid}")]
+        [EnableCors("corspolicy")]
+        public async Task<IEnumerable<UserInformationResponse>> GetAllFamilyUsers(Guid familyId, bool ifOnlyActive = true)
+        {
+            return await _userService.GetAllFamilyUsersInformation(familyId, ifOnlyActive).ConfigureAwait(false);
         }
 
         [Authorize]
@@ -88,6 +96,14 @@ namespace Maktab.Controllers
                 EmailVerificationCode = userInformation.EmailVerificationCode,
                 PhoneVerificationCode = userInformation.PhoneVerificationCode
             }).ConfigureAwait(false);
+        }
+
+        [Authorize]
+        [HttpPut("{userId:guid}/link/{familyId:guid}")]
+        [EnableCors("corspolicy")]
+        public async Task<UserInformationResponse> LinkFamily(Guid userId, Guid familyId)
+        {
+            return await _userService.LinkUserToAFamily(userId, familyId).ConfigureAwait(false);
         }
 
         [HttpPost("{userId:guid}/resetpassword")]
