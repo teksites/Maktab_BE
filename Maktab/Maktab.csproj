@@ -27,7 +27,6 @@
     <ProjectReference Include="..\Application.Users.Registry\Users.Registry.csproj" />
     <ProjectReference Include="..\WebMsgSender.Registry\WebMsgSender.Registry.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <Reference Include="MaktabDataContracts">
       <HintPath>..\ExternalContracts\MaktabDataContracts.dll</HintPath>
