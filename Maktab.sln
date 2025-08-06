@@ -53,14 +53,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebMsgSender", "WebMsgSende
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebMsgSender.Implementation", "WebMsgSender.Implementation\WebMsgSender.Implementation.csproj", "{14CC0FD4-09E2-456F-ABF6-5B6671C4DE6D}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sedat", "Sedat", "{10CF5313-5406-4772-B268-7F4DCB54FA81}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sedat", "Sedat\Sedat.csproj", "{722EFC0F-6D5E-4D95-95B0-7B2AE8385838}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sedat.Implementation", "Sedat.Implementation\Sedat.Implementation.csproj", "{38BB8BCB-8D36-45B3-A0E3-5E3E3FF03C95}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sedat.Registry", "Sedat.Registry\Sedat.Registry.csproj", "{D243BFD2-94AC-4CA2-BB1E-7064E672E2E1}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "InternalContracts", "InternalContracts", "{E76FBB76-A7DB-4C4F-A4E4-1B964096AA43}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "InternalContracts", "InternalContracts\InternalContracts.csproj", "{1FAE1752-5849-4567-9C3B-6269E94312E4}"
