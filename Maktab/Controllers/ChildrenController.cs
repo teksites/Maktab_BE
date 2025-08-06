@@ -41,7 +41,7 @@ namespace Maktab.Controllers
         }
         
         [Authorize]
-        [HttpGet("family/{familyId:guid}/children")]
+        [HttpGet("families/{familyId:guid}/children")]
         [EnableCors("corspolicy")]
         public async Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid familyId)
         {
@@ -49,7 +49,7 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [HttpPost("family/{familyId:guid}/children/add")]
+        [HttpPost("families/{familyId:guid}/children/add")]
         [EnableCors("corspolicy")]
         public async Task<MaktabApiResult<ChildResponse>> AddUserChild(Guid familyId,AddChildRequest child)
         {
@@ -65,7 +65,7 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [HttpPost("family/{familyId:guid}/children/delete")]
+        [HttpPost("families/{familyId:guid}/children/delete")]
         [EnableCors("corspolicy")]
         public async Task<bool> DeleteChildByUserId(Guid familyId, bool ifHardDelete = false)
         {

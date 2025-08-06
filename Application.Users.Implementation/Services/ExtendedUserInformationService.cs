@@ -1,6 +1,5 @@
 ﻿using Application.Users.Contracts;
 using Microsoft.Extensions.Configuration;
-using MaktabDataContracts.Requests.Users;
 using MaktabDataContracts.Responses.Users;
 using Users.Contracts;
 using Users.Repository;

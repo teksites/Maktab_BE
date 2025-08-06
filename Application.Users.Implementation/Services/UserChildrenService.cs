@@ -1,7 +1,6 @@
 ﻿using Application.Users.Contracts;
 using Microsoft.Extensions.Configuration;
 using MaktabDataContracts.Models;
-using Users.Contracts;
 using Users.Repository;
 using Users.Services;
 using MaktabDataContracts.Responses.Children;
@@ -10,13 +9,13 @@ using MaktabDataContracts.Requests.Children;
 namespace Application.Users.Implementation
 {
  
-    public class UserChildsService : IUserChildrenService
+    public class UserChildrenService : IUserChildrenService
     {
         //private readonly ISedatService _sedatService;
         private readonly IConfiguration _configuration;
         private readonly IUserChildsRepository _repository;
 
-        public UserChildsService(IConfiguration configuration, IUserChildsRepository repository) 
+        public UserChildrenService(IConfiguration configuration, IUserChildsRepository repository) 
         {
             _configuration = configuration;
             _repository = repository;

@@ -19,9 +19,9 @@ namespace Application.Users.Registry
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<ITempUserRepository, TempUserRepository>();
-            services.AddScoped<IUserCardsService, UserCardsService>();
-            services.AddScoped<IUserCardsRepository, UserCardsRepository>();
-            services.AddScoped<IUserChildrenService, UserChildsService>();
+            services.AddScoped<IOtherContactsService, OtherContactsService>();
+            services.AddScoped<IOtherContactsRepository, OtherContactsRepository>();
+            services.AddScoped<IUserChildrenService, UserChildrenService>();
             services.AddScoped<IUserChildsRepository, UserChildsRepository>();
             services.AddScoped<IAddressService, AddressService>();
             services.AddScoped<IAddressRepository, AddressRepository>();
