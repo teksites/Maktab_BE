@@ -32,6 +32,11 @@
       <HintPath>..\ExternalContracts\MaktabDataContracts.dll</HintPath>
     </Reference>
   </ItemGroup>
+<ItemGroup>
+  <Content Include="Maktab/Content/DigiCertGlobalRootCA.crt.pem">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </Content>
+</ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\PublishProfiles\" />
     <Folder Include="Services\" />
