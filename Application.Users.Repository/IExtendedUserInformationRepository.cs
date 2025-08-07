@@ -1,6 +1,4 @@
 ﻿using Application.Users.Contracts;
-using MaktabDataContracts.Requests.Users;
-using MaktabDataContracts.Responses.Users;
 
 namespace Users.Repository
 {
@@ -9,7 +7,11 @@ namespace Users.Repository
         Task<ExtendedUserInformationDetail> AddExtendedUserInformation(ExtendedUserInformationDetail userInformation);
         Task<ExtendedUserInformationDetail> UpdateExtendedUserInformation(ExtendedUserInformationDetail userInformation);
         Task<bool> DeleteExtendedUserInformation(Guid userId, bool ifHardDelete = false);
+        Task<bool> DeleteFamilyExtendedUserInformation(Guid familyId, bool ifHardDelete = false);
         Task<ExtendedUserInformationDetail> GetExtendedUserInformation(Guid userId);
+        Task<ExtendedUserInformationDetail> GetFamilyExtendedUserInformation(Guid familyId);
         Task<bool> CheckIfExtendedUserInformationExisit(Guid userId);
+        Task<bool> CheckIfExtendedFamilyInformationExisit(Guid familyId);
+
     }
 }

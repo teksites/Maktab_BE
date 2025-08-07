@@ -1,11 +1,6 @@
 ﻿using Application.Users.Contracts;
 using Cumulus.Data;
 using Data;
-using MaktabDataContracts.Enums;
-using MaktabDataContracts.Models;
-using MaktabDataContracts.Requests.Cards;
-using MaktabDataContracts.Requests.Users;
-using MaktabDataContracts.Responses.Users;
 using Users.Repository;
 
 namespace Application.Users.Repository.Implementation
@@ -23,15 +18,14 @@ namespace Application.Users.Repository.Implementation
 
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"insert into extended_user_info (`UserId`, `IdNumber`, `Occupation`,  `BusinesName`, `DateOfBirth`, "
+                    cmd.CommandText = @"insert into extended_user_info (`UserId`, `FamilyId`, `SIN`,  `AddressId`, "
                         + "`IsActive`, `CreatedAt`, `UpdatedOn`)"
-                        + " Values(@userId, @idNumber, @occupation, @businesName,@dateOfBirth,  @isActive, @createdAt, @updatedOn )";
+                        + " Values(@userId, @familyId, @sin, @addressId,  @isActive, @createdAt, @updatedOn )";
 
                     cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
-                    cmd.AddParameter("@idNumber", userInformation.IdNumber);
-                    cmd.AddParameter("@occupation", userInformation.Occupation);
-                    cmd.AddParameter("@dateOfBirth", userInformation.DateOfBirth);
-                    cmd.AddParameter("@businesName", userInformation.BusinesName);
+                    cmd.AddParameter("@familyId", userInformation.FamilyId);
+                    cmd.AddParameter("@sin", userInformation.SIN);
+                    cmd.AddParameter("@addressId", userInformation.AddressId);
                     cmd.AddParameter("@isActive", userInformation.IsActive);
                     cmd.AddParameter("@createdAt", userInformation.CreatedAt);
                     cmd.AddParameter("@updatedOn", userInformation.UpdatedOn);
@@ -44,6 +38,20 @@ namespace Application.Users.Repository.Implementation
                     {
                         return null;
                     }
+                }
+            }
+        }
+
+        public async Task<bool> CheckIfExtendedFamilyInformationExisit(Guid familyId)
+        {
+            using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"Select userId from extended_user_info where FamilyId = @familyId and IsActive = true";
+                    cmd.AddParameter("@familyId", familyId.ToByteArray());
+                    var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    return reader.HasRows;
                 }
             }
         }
@@ -83,14 +91,35 @@ namespace Application.Users.Repository.Implementation
             }
         }
 
+        public async Task<bool> DeleteFamilyExtendedUserInformation(Guid familyId, bool ifHardDelete = false)
+        {
+            using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    if (ifHardDelete)
+                    {
+                        cmd.CommandText = @"Delete from extended_user_info where FamilyId = @familyId";
+                    }
+                    else
+                    {
+                        cmd.CommandText = @"Update extended_user_info SET IsActive = false where FamilyId = @familyId";
+                    }
+
+                    cmd.AddParameter("@familyId", familyId.ToByteArray());
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
         public async Task<ExtendedUserInformationDetail> GetExtendedUserInformation(Guid userId)
         {
             using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Select `UserId`, `IdNumber`, `DateOfBirth`, `Occupation`, `BusinesName`,  " +
-                        " `IsActive`, `CreatedAt`, `UpdatedOn`  from extended_user_info " +
+                    cmd.CommandText = @"Select `UserId`, `FamilyId`, `SIN`,  `AddressId`, "
+                        + "`IsActive`, `CreatedAt`, `UpdatedOn`  from extended_user_info " +
                         " where UserId = @userId and IsActive = True";
 
                     cmd.AddParameter("@userId", userId.ToByteArray());
@@ -102,21 +131,59 @@ namespace Application.Users.Repository.Implementation
                     }
 
                     var id = reader.GetGuidFromByteArray(0);
-                    var idNumber = reader.GetString(1);
-                    var dateOfBirth = reader.GetDateTime(2);
-                    var occupation = reader.GetString(3);
-                    var businesName = reader.GetString(4);
-                    var isActive = reader.GetBoolean(5);
-                    var createdAt = reader.GetDateTime(6);
-                    var updatedOn = reader.GetDateTime(7);
+                    var familyId = reader.GetGuidFromByteArray(1);
+                    var sin = reader.GetString(2);
+                    var addressId = reader.GetGuidFromByteArray(3);
+                    var isActive = reader.GetBoolean(4);
+                    var createdAt = reader.GetDateTime(5);
+                    var updatedOn = reader.GetDateTime(6);
                     
                     return new ExtendedUserInformationDetail
                     {
                         UserId = id,
-                        IdNumber = idNumber,
-                        Occupation = occupation,
-                        BusinesName = businesName,
-                        DateOfBirth = dateOfBirth,
+                        FamilyId = familyId,
+                        SIN = sin,
+                        AddressId = addressId,
+                        IsActive = isActive,
+                        CreatedAt = createdAt,
+                        UpdatedOn = updatedOn,
+                    };
+                }
+            }
+        }
+
+        public async Task<ExtendedUserInformationDetail> GetFamilyExtendedUserInformation(Guid familyId)
+        {
+            using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"Select `UserId`, `FamilyId`, `SIN`,  `AddressId`, "
+                        + "`IsActive`, `CreatedAt`, `UpdatedOn`  from extended_user_info " +
+                        " where FamilyId = @familyId and IsActive = True";
+
+                    cmd.AddParameter("@familyId", familyId.ToByteArray());
+                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+
+                    if (!await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        return null;
+                    }
+
+                    var id = reader.GetGuidFromByteArray(0);
+                    var family = reader.GetGuidFromByteArray(1);
+                    var sin = reader.GetString(2);
+                    var addressId = reader.GetGuidFromByteArray(3);
+                    var isActive = reader.GetBoolean(4);
+                    var createdAt = reader.GetDateTime(5);
+                    var updatedOn = reader.GetDateTime(6);
+
+                    return new ExtendedUserInformationDetail
+                    {
+                        UserId = id,
+                        FamilyId = family,
+                        SIN = sin,
+                        AddressId = addressId,
                         IsActive = isActive,
                         CreatedAt = createdAt,
                         UpdatedOn = updatedOn,
@@ -131,13 +198,11 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Update extended_user_info SET IdNumber = @idNumber, DateOfBirth = @dateOfBirth, Occupation = @occupation, BusinesName = @businesName, UpdatedOn = @updatedOn  where UserId = @userId";
+                    cmd.CommandText = @"Update extended_user_info SET AddressId = @addressId  where UserId = @userId";
 
                     cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
-                    cmd.AddParameter("@idNumber", userInformation.IdNumber);
-                    cmd.AddParameter("@businesName", userInformation.BusinesName);
-                    cmd.AddParameter("@dateOfBirth", userInformation.DateOfBirth);
-                    cmd.AddParameter("@occupation", userInformation.Occupation);
+                    //cmd.AddParameter("@sin", userInformation.SIN);
+                    cmd.AddParameter("@addressId", userInformation.AddressId);
                     cmd.AddParameter("@updatedOn", DateTime.Now);
                     
                     if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)

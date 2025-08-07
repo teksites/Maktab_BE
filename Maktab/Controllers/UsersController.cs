@@ -1,5 +1,4 @@
-﻿using Application.Users.Contracts;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -12,6 +11,7 @@ using System.Threading.Tasks;
 using System.Web;
 using Users.Contracts;
 using Users.Services;
+using Application.Users.Contracts;
 
 namespace Maktab.Controllers
 {
@@ -147,15 +147,14 @@ namespace Maktab.Controllers
         [Authorize]
         [HttpPost("{userId:guid}/identity")]
         [EnableCors("corspolicy")]
-        public async Task<ExtendedUserInformationResponse> AddIdentity(Guid userId,AddExtendedUserInformationRequest userInformation)
+        public async Task<ExtendedUserInformationResponse> AddIdentity(Guid userId, AddExtendedUserInformationRequest userInformation)
         {
-            return await _extendedUserInformationService.AddExtendedUserInformation(new AddExtendedUserInformation 
+            return await _extendedUserInformationService.AddExtendedUserInformation(new AddExtendedUserInformationInternal 
             {
                 UserId = userId,
-                BusinesName= userInformation.BusinesName,
-                DateOfBirth = userInformation.DateOfBirth,
-              //  IdNumber = userInformation.IdNumber,
-                Occupation = userInformation.Occupation,
+                FamilyId = userInformation.FamilyId,
+                SIN = userInformation.SIN,
+                AddressId = userInformation.AddressId,
               
             }).ConfigureAwait(false);
         }
@@ -163,41 +162,63 @@ namespace Maktab.Controllers
         [Authorize]
         [HttpPut("{userId:guid}/identity")]
         [EnableCors("corspolicy")]
-        public async Task<ExtendedUserInformationResponse> UpdateIdentity(Guid userId, UpdateExtendedUserInformationRequest userInformation)
+        public async Task<ExtendedUserInformationResponse> UpdateExtendedUserInformation(Guid userId, UpdateExtendedUserInformationRequest userInformation)
         {
-            return await _extendedUserInformationService.UpdateExtendedUserInformation(new AddExtendedUserInformation
+            return await _extendedUserInformationService.UpdateExtendedUserInformation(new AddExtendedUserInformationInternal
             {
                 UserId = userId,
-                BusinesName = userInformation.BusinesName,
-                DateOfBirth = userInformation.DateOfBirth,
-                IdNumber = userInformation.IdNumber,
-                Occupation = userInformation.Occupation,
-
+                //SIN = userInformation.SIN,
+                AddressId = userInformation.AddressId,
             }).ConfigureAwait(false);
         }
 
         [Authorize]
         [HttpDelete("{userId:guid}/identity")]
         [EnableCors("corspolicy")]
-        public async Task<bool> DeleteIdentity(Guid userId, bool ifHardDelete)
+        public async Task<bool> DeleteExtendedUserInformation(Guid userId, bool ifHardDelete)
         {
             return await _extendedUserInformationService.DeletExtendedUserInformation(userId, ifHardDelete).ConfigureAwait(false);
         }
 
         [Authorize]
-        [HttpGet("{userId:guid}/identity")]
+        [HttpDelete("/families/{familyId:guid}/extendedinfo")]
         [EnableCors("corspolicy")]
-        public async Task<ExtendedUserInformationResponse> GetIdentity(Guid userId)
+        public async Task<bool> DeleteFamilyExtendedUserInformation(Guid familyId, bool ifHardDelete)
+        {
+            return await _extendedUserInformationService.DeletExtendedUserInformation(familyId, ifHardDelete).ConfigureAwait(false);
+        }
+
+
+        [Authorize]
+        [HttpGet("{userId:guid}/extendedinfo")]
+        [EnableCors("corspolicy")]
+        public async Task<ExtendedUserInformationResponse> GetExtendedUserInformation(Guid userId)
         {
             return await _extendedUserInformationService.GetExtendedUserInformation(userId).ConfigureAwait(false);
         }
 
         [Authorize]
-        [HttpGet("{userId:guid}/identity/check")]
+        [HttpGet("families/{familyId:guid}/extendedinfo")]
         [EnableCors("corspolicy")]
-        public async Task<bool> CheckIdentity(Guid userId)
+        public async Task<ExtendedUserInformationResponse> GetFamilyExtendedUserInformation(Guid familyId)
+        {
+            return await _extendedUserInformationService.GetFamilyExtendedUserInformation(familyId).ConfigureAwait(false);
+        }
+
+        [Authorize]
+        [HttpGet("{userId:guid}/extendedinfo/check")]
+        [EnableCors("corspolicy")]
+        public async Task<bool> CheckExtendedUserInformation(Guid userId)
         {
             return await _extendedUserInformationService.CheckIfExtendedUserInformationExisit(userId).ConfigureAwait(false);
+        }
+
+        [Authorize]
+        [HttpGet("families/{familyId:guid}/familyextendedinfo/check")]
+        [EnableCors("corspolicy")]
+        public async Task<bool> CheckFamilyExtendedUserInformation(Guid familyId)
+        {
+            return await _extendedUserInformationService.CheckIfExtendedFamilyInformationExisit(familyId).ConfigureAwait(false);
         }
     }
 }

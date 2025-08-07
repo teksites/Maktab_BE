@@ -17,18 +17,18 @@ namespace Application.Users.Implementation
         private readonly IUserRepository _repository;
         private readonly ITempUserRepository _tempUserRepository;
         private readonly IAddressService _addressService;
-        private readonly IOtherContactsService _userCardsService;
+        private readonly IOtherContactsService _otherContactsService;
         private readonly IUserChildrenService _userChildsService;
         private readonly ISendEmailService _sendEmailService;
 
         public UserService(IConfiguration configuration, IUserRepository repository, ITempUserRepository tempUserRepository, IAddressService addressService, 
-            IOtherContactsService userCardsService, IUserChildrenService userChildsService, ISendEmailService sendEmailService) 
+            IOtherContactsService otherContactsService, IUserChildrenService userChildsService, ISendEmailService sendEmailService) 
         {
             _configuration = configuration;
             _repository = repository;
             _tempUserRepository = tempUserRepository;
             _addressService = addressService;
-            _userCardsService = userCardsService;
+            _otherContactsService = otherContactsService;
             _userChildsService = userChildsService;
            _sendEmailService = sendEmailService;
         }
@@ -98,7 +98,7 @@ namespace Application.Users.Implementation
             if (ifDeleted)
             {
                 await _addressService.DeleteAddressByConnectedId(userId, ifHardDelete).ConfigureAwait(false);
-                await _userCardsService.DeleteFamilyOtherContact(userId, ifHardDelete).ConfigureAwait(false);
+                await _otherContactsService.DeleteFamilyOtherContact(userId, ifHardDelete).ConfigureAwait(false);
                 await _userChildsService.DeleteUserChilds(userId, ifHardDelete).ConfigureAwait(false);
             }
             return ifDeleted;

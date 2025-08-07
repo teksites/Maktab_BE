@@ -1,6 +1,6 @@
 ﻿using Application.Users.Contracts;
-using Microsoft.Extensions.Configuration;
 using MaktabDataContracts.Responses.Users;
+using Microsoft.Extensions.Configuration;
 using Users.Contracts;
 using Users.Repository;
 using Users.Services;
@@ -30,15 +30,14 @@ namespace Application.Users.Implementation
             return null;
         }
         
-        private ExtendedUserInformationDetail MapToUserInformation(AddExtendedUserInformation addUserInformation)
+        private ExtendedUserInformationDetail MapToUserInformation(AddExtendedUserInformationInternal addUserInformation)
         {
             return new ExtendedUserInformationDetail
             {
                 UserId = addUserInformation.UserId,
-                BusinesName = addUserInformation.BusinesName,
-                Occupation = addUserInformation.Occupation,
-                DateOfBirth = addUserInformation.DateOfBirth,
-                IdNumber = addUserInformation.IdNumber,
+                FamilyId = addUserInformation.FamilyId,
+                SIN = addUserInformation.SIN,
+                AddressId = addUserInformation.AddressId,
                 IsActive = true,
                 CreatedAt = DateTime.Now,
                 UpdatedOn = DateTime.Now,
@@ -54,22 +53,20 @@ namespace Application.Users.Implementation
             return new ExtendedUserInformationResponse
             {
                 UserId = userInformation.UserId,
-             //   BusinesName = userInformation.BusinesName,
-              //  Occupation = userInformation.Occupation,
-                DateOfBirth = userInformation.DateOfBirth,
-                IdNumber = userInformation.IdNumber,
+                FamilyId = userInformation.FamilyId,
+                SIN = userInformation.SIN,
                 IsActive = userInformation.IsActive,
                 CreatedAt = userInformation.CreatedAt,
                 UpdatedOn = userInformation.UpdatedOn,
             };
         }
 
-        public async Task<ExtendedUserInformationResponse> AddExtendedUserInformation(AddExtendedUserInformation userInformation)
+        public async Task<ExtendedUserInformationResponse> AddExtendedUserInformation(AddExtendedUserInformationInternal userInformation)
         {
             return MapToUserInformationResponse(await  _repository.AddExtendedUserInformation(MapToUserInformation(userInformation)).ConfigureAwait(false));
         }
 
-        public async Task<ExtendedUserInformationResponse> UpdateExtendedUserInformation(AddExtendedUserInformation userInformation)
+        public async Task<ExtendedUserInformationResponse> UpdateExtendedUserInformation(AddExtendedUserInformationInternal userInformation)
         {
             return MapToUserInformationResponse(await _repository.UpdateExtendedUserInformation(MapToUserInformation(userInformation)).ConfigureAwait(false));
         }
@@ -79,10 +76,31 @@ namespace Application.Users.Implementation
             return await _repository.DeleteExtendedUserInformation(userId, ifHardDelete).ConfigureAwait(false);
         }
 
-
         public async Task<bool> CheckIfExtendedUserInformationExisit(Guid userId)
         {
             return await _repository.CheckIfExtendedUserInformationExisit(userId).ConfigureAwait(false);
+        }
+
+        public async Task<bool> CheckIfExtendedFamilyInformationExisit(Guid familyId)
+        {
+            return await _repository.CheckIfExtendedFamilyInformationExisit(familyId).ConfigureAwait(false);
+        }
+
+        public async Task<bool> DeleteFamilyExtendedUserInformation(Guid familyId, bool ifHardDelete = false)
+        {
+            return await _repository.DeleteFamilyExtendedUserInformation(familyId, ifHardDelete).ConfigureAwait(false);
+        }
+
+        public async Task<ExtendedUserInformationResponse> GetFamilyExtendedUserInformation(Guid familyId)
+        {
+            var userInfo = await _repository.GetFamilyExtendedUserInformation(familyId).ConfigureAwait(false);
+
+            if (userInfo != null)
+            {
+                var mappedUser = MapToUserInformationResponse(userInfo);
+                return mappedUser;
+            }
+            return null;
         }
     }
 }
