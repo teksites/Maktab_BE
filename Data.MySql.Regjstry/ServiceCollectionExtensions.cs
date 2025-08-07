@@ -38,12 +38,13 @@ namespace Data.MySql.Regjstry
                {
                    var configuration = services.GetRequiredService<IConfiguration>();
                    var connectionString = configuration["Database:ConnectionString"].ToString();
+                   var sslCertPath = configuration["Database:SslCertPath"].ToString();
 
                    if (connectionString == null) 
                    {
                        throw new Exception("Database connection not found");
                    }
-                   return new DatabaseConfiguration(connectionString.ToString());
+                   return new DatabaseConfiguration(connectionString.ToString(), sslCertPath.ToString());
                });
         }
     }

@@ -6,6 +6,7 @@ namespace Data
     {
         private readonly DatabaseConfiguration _configuration;
         public string ConnectionString => _configuration.ConnectionString;
+        public string SslCertPath => _configuration.SSLCertPath;
 
         protected Database(DatabaseConfiguration configuration)
         {
