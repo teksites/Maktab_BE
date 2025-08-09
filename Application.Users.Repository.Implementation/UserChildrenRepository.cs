@@ -7,9 +7,9 @@ using Users.Repository;
 
 namespace Application.Users.Repository.Implementation
 {
-    public class UserChildsRepository : DbRepository, IUserChildsRepository
+    public class UserChildrenRepository : DbRepository, IUserChildrenRepository
     {
-        public UserChildsRepository(IDatabase database) : base(database)
+        public UserChildrenRepository(IDatabase database) : base(database)
         {
         }
 

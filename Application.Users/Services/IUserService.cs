@@ -13,6 +13,7 @@ namespace Users.Services
         Task<bool> DeleteUser(Guid userId, bool ifHardDelete);
         Task<UserInformationResponse> GetUserInformation(Guid userId);
         Task<bool> CheckIfUserNameExisit(string userName);
+        Task<Guid> GetUserFamilyInformation(UserFamilyInformationRequest userInformation);
         Task<bool> CheckIfUserAlreadyRegistered(string email, string phone);
         Task<bool> CheckIfUserIsAdmin(Guid userId);
         Task<IEnumerable<UserInformationResponse>> GetAllUsersInformation(bool ifOnlyActive = true);

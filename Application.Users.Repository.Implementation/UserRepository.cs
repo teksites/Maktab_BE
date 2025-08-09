@@ -2,6 +2,7 @@
 using Cumulus.Data;
 using Data;
 using MaktabDataContracts.Enums;
+using MaktabDataContracts.Requests.Users;
 using Users.Contracts;
 using Users.Repository;
 using Users.Utils.Implementation;
@@ -81,6 +82,30 @@ namespace Application.Users.Repository.Implementation
             }
         }
 
+        public async Task<Guid> GetUserFamilyInformation(UserFamilyInformationRequest userInformation)
+        {
+            using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    var query = @"Select FamilyId from user_info where IsActive = True And UPPER(Email) like UPPER(@email) ";
+                    cmd.AddParameter("@email", userInformation.Email);
+                    if (userInformation.Phone != null)
+                    {
+                        cmd.AddParameter("@phone", userInformation.Phone);
+                        query += " or Phone = @phone";
+                    }
+                    cmd.CommandText = query;
+
+                    var result = await cmd.ExecuteScalarAsync();
+                    if (result == null || result == DBNull.Value)
+                        return Guid.Empty;
+
+                    var bytes = (byte[])result;
+                    return new Guid(bytes);
+                }
+            }
+        }
         public async Task<bool> CheckIfUserIsAdmin(Guid userId)
         {
             using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))

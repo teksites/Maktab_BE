@@ -1,4 +1,5 @@
 ﻿using Application.Users.Contracts;
+using MaktabDataContracts.Requests.Users;
 using Users.Contracts;
 
 namespace Users.Repository
@@ -17,5 +18,6 @@ namespace Users.Repository
         Task<UserInformation> GetUserInformation(string userName, string? password, bool ifForgotPassword);
         Task<IEnumerable<UserInformation>> GetAllFamilyUsersInformation(Guid id, bool ifOnlyActive = true);
         Task<UserInformation> LinkUserToAFamily(Guid userId, Guid familyId);
+        Task<Guid> GetUserFamilyInformation(UserFamilyInformationRequest userInformation);
     }
 }

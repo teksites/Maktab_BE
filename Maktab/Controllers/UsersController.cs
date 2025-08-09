@@ -77,6 +77,14 @@ namespace Maktab.Controllers
             return await _userService.CheckIfUserNameExisit(userName).ConfigureAwait(false);
         }
 
+        //[ApiAuthorize(true, true)]
+        [HttpPost("familyinfo")]
+        [EnableCors("corspolicy")]
+        public async Task<Guid> GetFamilyIhfo(UserFamilyInformationRequest userInformation)
+        {
+            return await _userService.GetUserFamilyInformation(userInformation).ConfigureAwait(false);
+        }
+
         //[Authorize]
         [HttpPost("add")]
         [EnableCors("corspolicy")]
@@ -126,7 +134,6 @@ namespace Maktab.Controllers
             return await _userService.ForgotPassword(userName, null).ConfigureAwait(false);
         }
 
-
         [Authorize]
         [ApiAuthorize()]
         [HttpPost("{userId:guid}/delete")]
@@ -145,9 +152,9 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [HttpPost("{userId:guid}/identity")]
+        [HttpPost("{userId:guid}/extendedinfo")]
         [EnableCors("corspolicy")]
-        public async Task<ExtendedUserInformationResponse> AddIdentity(Guid userId, AddExtendedUserInformationRequest userInformation)
+        public async Task<ExtendedUserInformationResponse> AddExtendedUserInformation(Guid userId, AddExtendedUserInformationRequest userInformation)
         {
             return await _extendedUserInformationService.AddExtendedUserInformation(new AddExtendedUserInformationInternal 
             {
@@ -160,7 +167,7 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [HttpPut("{userId:guid}/identity")]
+        [HttpPut("{userId:guid}/extendedinfo")]
         [EnableCors("corspolicy")]
         public async Task<ExtendedUserInformationResponse> UpdateExtendedUserInformation(Guid userId, UpdateExtendedUserInformationRequest userInformation)
         {
@@ -173,7 +180,7 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [HttpDelete("{userId:guid}/identity")]
+        [HttpDelete("{userId:guid}/extendedinfo")]
         [EnableCors("corspolicy")]
         public async Task<bool> DeleteExtendedUserInformation(Guid userId, bool ifHardDelete)
         {
@@ -187,7 +194,6 @@ namespace Maktab.Controllers
         {
             return await _extendedUserInformationService.DeletExtendedUserInformation(familyId, ifHardDelete).ConfigureAwait(false);
         }
-
 
         [Authorize]
         [HttpGet("{userId:guid}/extendedinfo")]

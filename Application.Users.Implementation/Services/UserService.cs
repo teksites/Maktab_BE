@@ -49,7 +49,7 @@ namespace Application.Users.Implementation
                        "<div>&nbsp;</div>" +
                        "<div>Cheers</div>" +
                        "<div>&nbsp;</div>" +
-                       "<div><strong>Maktab Money Transfer</strong></div>"
+                       "<div><strong>ICC Brossard School Registration</strong></div>"
             });
 
             return MapToUserInformationResponse(tempuser, true); 
@@ -182,7 +182,7 @@ namespace Application.Users.Implementation
                         "<div>&nbsp;</div>" +
                         "<div>Cheers</div>" +
                         "<div>&nbsp;</div>" +
-                        "<div><strong>Maktab Money Transfer</strong></div>"
+                        "<div><strong>ICC Brossard School Registration</strong></div>"
                 }).ConfigureAwait(false);
                 
             }
@@ -217,7 +217,7 @@ namespace Application.Users.Implementation
                        "<div>&nbsp;</div>" +
                        "<div>Cheers</div>" +
                        "<div>&nbsp;</div>" +
-                       "<div><strong>Maktab Money Transfer</strong></div>"
+                       "<div><strong>ICC Brossard School Registration</strong></div>"
 
             }).ConfigureAwait(false);
             
@@ -364,6 +364,11 @@ namespace Application.Users.Implementation
         public async Task<UserInformationResponse> LinkUserToAFamily(Guid userId, Guid familyId)
         {
             return MapToUserInformationResponse(await _repository.LinkUserToAFamily(userId, familyId).ConfigureAwait(false), false);
+        }
+
+        public async Task<Guid> GetUserFamilyInformation(UserFamilyInformationRequest userInformation)
+        {
+            return await _repository.GetUserFamilyInformation(userInformation).ConfigureAwait(false);
         }
 
         /*public async Task<MaktabApiResult<UserTransactionsDetails>> CreateUserTransaction(AddUserTransaction addUserTransactions)

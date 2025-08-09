@@ -4,7 +4,7 @@ using MaktabDataContracts.Requests.Children;
 
 namespace Users.Repository
 {
-    public interface IUserChildsRepository
+    public interface IUserChildrenRepository
     {
         Task<Child> AddChild(Child child);
         Task<Child> UpdateChild(UpdateChildRequest child);

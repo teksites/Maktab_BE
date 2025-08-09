@@ -13,9 +13,9 @@ namespace Application.Users.Implementation
     {
         //private readonly ISedatService _sedatService;
         private readonly IConfiguration _configuration;
-        private readonly IUserChildsRepository _repository;
+        private readonly IUserChildrenRepository _repository;
 
-        public UserChildrenService(IConfiguration configuration, IUserChildsRepository repository) 
+        public UserChildrenService(IConfiguration configuration, IUserChildrenRepository repository) 
         {
             _configuration = configuration;
             _repository = repository;

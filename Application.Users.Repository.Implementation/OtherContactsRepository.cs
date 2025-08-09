@@ -21,7 +21,7 @@ namespace Application.Users.Repository.Implementation
                 {
                     cmd.CommandText = @"insert into other_contacts_information (`ContactId`, `FamilyId`, `FirstName`, `LastName`,  `Phone`, `ContactType`, `Relationship`, "
                         + "`IsActive`, `CreatedAt`, `UpdatedOn`)"
-                        + " Values(@contactId, @familyId, @cardHolderName, @firstName, @lastName, @phone, @contactType, @relationship, @isActive, @createdAt, @updatedOn)";
+                        + " Values(@contactId, @familyId, @firstName, @lastName, @phone, @contactType, @relationship, @isActive, @createdAt, @updatedOn)";
 
                     cmd.AddParameter("@contactId", otherContactInformation.ContactId.ToByteArray());
                     cmd.AddParameter("@familyId", otherContactInformation.FamilyId.ToByteArray());
@@ -260,7 +260,7 @@ namespace Application.Users.Repository.Implementation
 
         public Task<OtherContactInformation> UpdateOtherContact(OtherContactInformation otherContactInformation)
         {
-            throw new NotImplementedException("You cannot update a card. Please delete and add again.");
+            throw new NotImplementedException("You cannot update the contact. Please delete and add again.");
         }
     }
 }
