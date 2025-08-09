@@ -40,16 +40,16 @@ namespace Application.Users.Implementation
             var success = _sendEmailService.SendEmail(new EmailData
             {
                 To = userInformation.Email,
-                 Subject = "Maktab Money transfer registration activation code",
+                 Subject = "ICC Brossard School Registration registration account activation code",
                  Body = $"<p><strong>Greetings {userInformation.FirstName} {userInformation.LastName}</strong>,</p>"+
-                       "<p>Activation code for the regisration of your Maktab account </p>"+
+                       "<p>Activation code for the regisration of your ICC Brossard School account portal.</p>"+
                        $"<div>Your activation code is : <strong>{ userInforationToStore.EmailVerificationCode} </strong>.</div>" +
                        "<div></div>" +
-                       "<div>Please activate your account by entering the code inside the Maktab App.</div>" +
+                       "<div>Please activate your account by entering the code inside your ICC Brossard School account portal.</div>" +
                        "<div>&nbsp;</div>" +
                        "<div>Cheers</div>" +
                        "<div>&nbsp;</div>" +
-                       "<div><strong>ICC Brossard School Registration</strong></div>"
+                       "<div><strong>ICC Brossard School Registration Portal</strong></div>"
             });
 
             return MapToUserInformationResponse(tempuser, true); 
@@ -173,16 +173,17 @@ namespace Application.Users.Implementation
                 return await _sendEmailService.SendEmail(new EmailData
                 {
                     To = user.Email,
-                    Subject = "Maktab Money transfer registration activation code",
+
+                    Subject = "ICC Brossard School Registration registration account activation code",
                     Body = $"<p><strong>Greetings {user.FirstName} {user.LastName}</strong>,</p>" +
-                        "<p>Activation code for the regisration of your Maktab account </p>" +
-                        $"<div>Your activation code is : <strong> {updateData.EmailVerificationCode} </strong>.</div>" +
-                        "<div></div>" +
-                        "<div>Please activate your account by entering the code inside the Maktab App.</div>" +
-                        "<div>&nbsp;</div>" +
-                        "<div>Cheers</div>" +
-                        "<div>&nbsp;</div>" +
-                        "<div><strong>ICC Brossard School Registration</strong></div>"
+                       "<p>Activation code for the regisration of your ICC Brossard School account portal.</p>" +
+                       $"<div>Your activation code is : <strong>{updateData.EmailVerificationCode} </strong>.</div>" +
+                       "<div></div>" +
+                       "<div>Please activate your account by entering the code inside your ICC Brossard School account portal.</div>" +
+                       "<div>&nbsp;</div>" +
+                       "<div>Cheers</div>" +
+                       "<div>&nbsp;</div>" +
+                       "<div><strong>ICC Brossard School Registration Portal</strong></div>"
                 }).ConfigureAwait(false);
                 
             }

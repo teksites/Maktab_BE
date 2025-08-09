@@ -162,7 +162,7 @@ namespace Maktab.Controllers
                 FamilyId = userInformation.FamilyId,
                 SIN = userInformation.SIN,
                 AddressId = userInformation.AddressId,
-              
+              IsActiveTaxCreditRecipient = userInformation.IsActiveTaxCreditRecipient,
             }).ConfigureAwait(false);
         }
 
@@ -171,6 +171,7 @@ namespace Maktab.Controllers
         [EnableCors("corspolicy")]
         public async Task<ExtendedUserInformationResponse> UpdateExtendedUserInformation(Guid userId, UpdateExtendedUserInformationRequest userInformation)
         {
+
             return await _extendedUserInformationService.UpdateExtendedUserInformation(new AddExtendedUserInformationInternal
             {
                 UserId = userId,

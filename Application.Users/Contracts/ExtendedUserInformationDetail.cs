@@ -9,5 +9,6 @@
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedOn { get; set; }
+        public bool IsActiveTaxCreditRecipient { get; set; } = false;
     }
 }

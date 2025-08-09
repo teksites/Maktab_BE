@@ -1,6 +1,7 @@
 ﻿using Application.Users.Contracts;
 using Cumulus.Data;
 using Data;
+using Users.Contracts;
 using Users.Repository;
 
 namespace Application.Users.Repository.Implementation
@@ -18,9 +19,9 @@ namespace Application.Users.Repository.Implementation
 
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"insert into extended_user_info (`UserId`, `FamilyId`, `SIN`,  `AddressId`, "
+                    cmd.CommandText = @"insert into extended_user_info (`UserId`, `FamilyId`, `SIN`,  `IsActiveTaxCreditRecipient`,  `AddressId`, "
                         + "`IsActive`, `CreatedAt`, `UpdatedOn`)"
-                        + " Values(@userId, @familyId, @sin, @addressId,  @isActive, @createdAt, @updatedOn )";
+                        + " Values(@userId, @familyId, @sin, @isActiveTaxCreditRecipient,  @addressId,  @isActive, @createdAt, @updatedOn )";
 
                     cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
                     cmd.AddParameter("@familyId", userInformation.FamilyId);
@@ -29,6 +30,7 @@ namespace Application.Users.Repository.Implementation
                     cmd.AddParameter("@isActive", userInformation.IsActive);
                     cmd.AddParameter("@createdAt", userInformation.CreatedAt);
                     cmd.AddParameter("@updatedOn", userInformation.UpdatedOn);
+                    cmd.AddParameter("@isActiveTaxCreditRecipient", userInformation.IsActiveTaxCreditRecipient);
 
                     if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
                     {
@@ -119,7 +121,7 @@ namespace Application.Users.Repository.Implementation
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = @"Select `UserId`, `FamilyId`, `SIN`,  `AddressId`, "
-                        + "`IsActive`, `CreatedAt`, `UpdatedOn`  from extended_user_info " +
+                        + "`IsActive`, `CreatedAt`, `UpdatedOn`, `IsActiveTaxCreditRecipient`  from extended_user_info " +
                         " where UserId = @userId and IsActive = True";
 
                     cmd.AddParameter("@userId", userId.ToByteArray());
@@ -137,7 +139,8 @@ namespace Application.Users.Repository.Implementation
                     var isActive = reader.GetBoolean(4);
                     var createdAt = reader.GetDateTime(5);
                     var updatedOn = reader.GetDateTime(6);
-                    
+                    var isActiveTaxCreditRecipient = reader.GetBoolean(7);
+
                     return new ExtendedUserInformationDetail
                     {
                         UserId = id,
@@ -147,6 +150,7 @@ namespace Application.Users.Repository.Implementation
                         IsActive = isActive,
                         CreatedAt = createdAt,
                         UpdatedOn = updatedOn,
+                        IsActiveTaxCreditRecipient = isActiveTaxCreditRecipient
                     };
                 }
             }
@@ -159,7 +163,7 @@ namespace Application.Users.Repository.Implementation
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = @"Select `UserId`, `FamilyId`, `SIN`,  `AddressId`, "
-                        + "`IsActive`, `CreatedAt`, `UpdatedOn`  from extended_user_info " +
+                        + "`IsActive`, `CreatedAt`, `UpdatedOn`,  `IsActiveTaxCreditRecipient`  from extended_user_info " +
                         " where FamilyId = @familyId and IsActive = True";
 
                     cmd.AddParameter("@familyId", familyId.ToByteArray());
@@ -177,6 +181,7 @@ namespace Application.Users.Repository.Implementation
                     var isActive = reader.GetBoolean(4);
                     var createdAt = reader.GetDateTime(5);
                     var updatedOn = reader.GetDateTime(6);
+                    var isActiveTaxCreditRecipient = reader.GetBoolean(7);
 
                     return new ExtendedUserInformationDetail
                     {
@@ -187,24 +192,33 @@ namespace Application.Users.Repository.Implementation
                         IsActive = isActive,
                         CreatedAt = createdAt,
                         UpdatedOn = updatedOn,
+                        IsActiveTaxCreditRecipient = isActiveTaxCreditRecipient
                     };
                 }
             }
         }
 
-        public async Task<ExtendedUserInformationDetail> UpdateExtendedUserInformation(ExtendedUserInformationDetail userInformation)
+        public async Task<ExtendedUserInformationDetail> UpdateExtendedUserInformation(AddExtendedUserInformationInternal userInformation)
         {
             using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Update extended_user_info SET AddressId = @addressId  where UserId = @userId";
+                    var query = @"Update extended_user_info SET  IsActiveTaxCreditRecipient = @isActiveTaxCreditRecipient, ";
 
                     cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
                     //cmd.AddParameter("@sin", userInformation.SIN);
-                    cmd.AddParameter("@addressId", userInformation.AddressId);
+                    if (userInformation.AddressId != null) 
+                    {
+                        cmd.AddParameter("@addressId", userInformation.AddressId);
+                        query += " AddressId = @addressId, ";
+                    }
+
                     cmd.AddParameter("@updatedOn", DateTime.Now);
-                    
+                    cmd.AddParameter("@isActiveTaxCreditRecipient", userInformation.IsActiveTaxCreditRecipient);
+
+                    cmd.CommandText = query+ "  UpdatedOn = @updatedOn where UserId = @userId";
+
                     if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
                     {
                         return await GetExtendedUserInformation(userInformation.UserId).ConfigureAwait(false);
