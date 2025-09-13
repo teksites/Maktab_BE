@@ -24,9 +24,9 @@ namespace Application.Users.Repository.Implementation
                         + " Values(@userId, @familyId, @sin, @isActiveTaxCreditRecipient,  @addressId,  @isActive, @createdAt, @updatedOn )";
 
                     cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
-                    cmd.AddParameter("@familyId", userInformation.FamilyId);
+                    cmd.AddParameter("@familyId", userInformation.FamilyId.ToByteArray());
                     cmd.AddParameter("@sin", userInformation.SIN);
-                    cmd.AddParameter("@addressId", userInformation.AddressId);
+                    cmd.AddParameter("@addressId", userInformation.AddressId.ToByteArray());
                     cmd.AddParameter("@isActive", userInformation.IsActive);
                     cmd.AddParameter("@createdAt", userInformation.CreatedAt);
                     cmd.AddParameter("@updatedOn", userInformation.UpdatedOn);
@@ -210,7 +210,7 @@ namespace Application.Users.Repository.Implementation
                     //cmd.AddParameter("@sin", userInformation.SIN);
                     if (userInformation.AddressId != null) 
                     {
-                        cmd.AddParameter("@addressId", userInformation.AddressId);
+                        cmd.AddParameter("@addressId", userInformation.AddressId.Value.ToByteArray());
                         query += " AddressId = @addressId, ";
                     }
 
