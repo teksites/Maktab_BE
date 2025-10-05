@@ -20,7 +20,7 @@ namespace Application.Users.Repository.Implementation
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = @"insert into temp_user_info (UserId, FamilyId, FirstName, LastName, Email, Phone, UserName, Password, EmailVerificationCode, PhoneVerificationCode, IsActive, CreatedAt, UpdatedOn, Relationship)"
-                    + "Values(@userId, @familyId, @firstName, @lastName, @email, @phone, @userName, @password, @emailVerificationCode, @phoneVerficationCode, @isActive, @createdAt, @updatedOn, @relationship)";
+                    + "Values(@userId, @familyId, @firstName, @lastName, @email, @phone, @userName, @password, @emailVerificationCode, @phoneVerficationCode, @isActive, @createdAt, @updatedOn, @relationship, @userRole)";
 
                     var password = PasswordHelper.HashPassword(userInformation.Password);
                     cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
@@ -37,7 +37,8 @@ namespace Application.Users.Repository.Implementation
                     cmd.AddParameter("@createdAt", userInformation.CreatedAt);
                     cmd.AddParameter("@updatedOn", userInformation.CreatedAt);
                     cmd.AddParameter("@relationship", (int)userInformation.Relationship);
-
+                    cmd.AddParameter("@userRole", (int)userInformation.UserRole);
+                    
                     if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
                     {
                         return new UserInformation
@@ -159,6 +160,7 @@ namespace Application.Users.Repository.Implementation
                     var isTempPassword = reader.GetBoolean(10);
                     var relationship = (Relationship)reader.GetInt32(11);
                     var familyId = reader.GetGuidFromByteArray(12);
+                    var userRole = (UserRoleType)reader.GetInt32(13);
 
                     return new UserInformation
                     {
@@ -175,7 +177,8 @@ namespace Application.Users.Repository.Implementation
                         UpdatedOn = UpdatedOn,
                         IsTempPassword = isTempPassword,
                         IsAdmin = false,
-                        Relationship = relationship
+                        Relationship = relationship,
+                        UserRole = userRole
                     };
                 }
             }

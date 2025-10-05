@@ -62,7 +62,7 @@ namespace Application.Users.Implementation
 
         public async Task<bool> CheckIfChildExisit(UserChildToVerify child)
         {
-           return await _repository.CheckIfChildExisit(child).ConfigureAwait(false);
+           return await _repository.CheckIfChildExist(child).ConfigureAwait(false);
         }
 
         public async Task<bool> DeleteChild(Guid childId, bool ifHardDelete)
@@ -97,7 +97,6 @@ namespace Application.Users.Implementation
             {
                 ChildId = Guid.NewGuid(),
                 FamilyId = child.FamilyId,
-                WillUseDayCareServices = child.WillUseDayCareServices,
                 Gender = child.Gender,
                 RAMQExpiry = child.RAMQExpiry,
                 DateOfBirth = child.DateOfBirth,
@@ -109,7 +108,9 @@ namespace Application.Users.Implementation
                 OtherHealthConditions = child.OtherHealthConditions,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedOn = DateTime.UtcNow,
-                IsActive = true
+                IsActive = true,
+                AcedemicGroup = child.AcedemicGroup,
+               
             };
         }
 
@@ -133,10 +134,10 @@ namespace Application.Users.Implementation
                 LastName = child.LastName,
                 Gender = child.Gender,
                 OtherHealthConditions = child.OtherHealthConditions,
-                WillUseDayCareServices = child.WillUseDayCareServices,
                 CreatedAt = child.CreatedAt,
                 UpdatedOn = child.UpdatedOn,
-                IsActive = child.IsActive
+                IsActive = child.IsActive,
+                AcedemicGroup = child.AcedemicGroup,
             };
 
             return new MaktabApiResult<ChildResponse>

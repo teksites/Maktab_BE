@@ -3,6 +3,7 @@ using Email;
 using Microsoft.Extensions.Configuration;
 using MaktabDataContracts.Requests.Users;
 using MaktabDataContracts.Responses.Users;
+using MaktabDataContracts.Helpers;
 using System.Text;
 using Users.Contracts;
 using Users.Repository;
@@ -277,7 +278,8 @@ namespace Application.Users.Implementation
                 CreatedAt = DateTime.Now,
                 EmailVerificationCode = GenerateRandomVerificationCode(),
                 PhoneVerificationCode = GenerateRandomVerificationCode(),
-                FamilyId = addUserInformation.FamilyId
+                FamilyId = addUserInformation.FamilyId,
+                UserRole = UserRoleHelper.FromStrings(addUserInformation.UserRoles)
             };
         }
 

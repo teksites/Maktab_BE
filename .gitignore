@@ -70,3 +70,15 @@
 /.vs/ProjectEvaluation
 /.vs/Maktab/FileContentIndex
 /.vs/Maktab/config
+/Courses/bin/Debug/net8.0
+/Courses/obj
+/Courses.Implementation/bin/Debug/net8.0
+/Courses.Implementation/obj
+/Courses.Registry/bin/Debug/net8.0
+/Courses.Registry/obj
+/Courses.Repository/bin/Debug/net8.0
+/Courses.Repository/obj
+/Courses.Repository.Implementation/bin/Debug/net8.0
+/Courses.Repository.Implementation/obj
+/Users.Repository/obj
+/Users.Repository.Implementation/obj

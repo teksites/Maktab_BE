@@ -17,6 +17,7 @@ using WebMsgSender.Registry;
 using Elavon.Registry;
 using Maktab.Jobs;
 using Maktab.Attributes;
+using Courses.Registry;
 
 namespace Maktab
 {
@@ -103,6 +104,7 @@ namespace Maktab
             services.AddUserServices();
             services.AddWebMsgSender();
             services.AddElavonServices();
+            services.AddCoursesServices();
 
             services.AddQuartz(q =>
             {

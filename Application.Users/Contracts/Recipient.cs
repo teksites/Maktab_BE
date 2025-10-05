@@ -15,9 +15,9 @@ namespace Application.Users.Contracts
         public int RAMQSequenceNumber { get; set; } = 1;
         public string Allergies { get; set; } = string.Empty;
         public string OtherHealthConditions { get; set; } = string.Empty;
-        public bool WillUseDayCareServices { get; set; } = false;
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedOn { get; set; }
+        public AcedemicGroupType AcedemicGroup { get; set; } = AcedemicGroupType.None;
     }
 }

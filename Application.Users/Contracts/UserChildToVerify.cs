@@ -2,7 +2,7 @@
 {
     public class UserChildToVerify
     {
-        public Guid familyId { get; set; }
+        public Guid FamilyId { get; set; }
         public string RAMQNumber { get; set; } = string.Empty;
     }
 }

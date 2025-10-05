@@ -18,5 +18,6 @@ namespace Application.Users.Contracts
         public DateTime UpdatedOn { get; set; }
         public bool IsAdmin { get; set; } = false;
         public bool IsTempPassword { get; set; } = false;
+        public UserRoleType UserRole { get; set; } = UserRoleType.Unknown;
     }
 }
