@@ -68,7 +68,7 @@ namespace Maktab.Controllers
             return await _addressService.AddAddress(address, AddressType.Billing).ConfigureAwait(false);
         }
 
-        [Authorize]
+        [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
         [HttpPost("institute/address/add")]
         [EnableCors("corspolicy")]
         public async Task<AddressResponse> AddClienInstituteAddress(AddAddress address)

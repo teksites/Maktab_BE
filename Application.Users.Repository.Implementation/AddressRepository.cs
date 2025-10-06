@@ -27,7 +27,7 @@ namespace Application.Users.Repository.Implementation
 
                     cmd.AddParameter("@addressId", address.AddressId.ToByteArray());
                     cmd.AddParameter("@connectedId", address.ConnectedId.ToByteArray());
-                    cmd.AddParameter("@addressType", Convert.ToInt16(address.AddressType));
+                    cmd.AddParameter("@addressType", Convert.ToInt32(address.AddressType));
                     cmd.AddParameter("@unitNumber", address.UnitNo);
                     cmd.AddParameter("@apartmentNumber", address.ApartmentNo);
                     cmd.AddParameter("@addressLine1", address.AddressLine1);
