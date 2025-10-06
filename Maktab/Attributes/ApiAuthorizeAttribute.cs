@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using MaktabDataContracts.Enums;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,12 +17,13 @@ namespace Maktab.Attributes
         private readonly bool _allowTempUser;
         private readonly bool _ignoreHeaderCheck;
         private readonly bool _checkAdmin;
-
-        public ApiAuthorizeAttribute(bool allowTempUser = false, bool ignoreHeaderCheck = false, bool checkAdmin = false)
+        private readonly UserRoleType _applicableRoles;
+        public ApiAuthorizeAttribute(bool allowTempUser = false, bool ignoreHeaderCheck = false/*, bool checkAdmin = false*/, UserRoleType userRole = UserRoleType.Normal)
         {
             _allowTempUser = allowTempUser;
             _ignoreHeaderCheck = ignoreHeaderCheck;
-            _checkAdmin = checkAdmin;
+            //_checkAdmin = checkAdmin;
+            _applicableRoles = userRole;
         }
 
         public void OnAuthorization(AuthorizationFilterContext context)
@@ -129,15 +131,18 @@ namespace Maktab.Attributes
                 context.Result = new EmptyResult();
             }
 
-            if (_checkAdmin)
+            //if (_checkAdmin)
             {
                 var userId = Task.Run(async () => await loginService.GetUserBySessionId(sessionId).ConfigureAwait(false)).Result;
 
                 if (userId != Guid.Empty)
                 {
-                    var ifExist = Task.Run(async () => await userService.CheckIfUserIsAdmin(userId).ConfigureAwait(false)).Result;
+                    var userRole = Task.Run(async () => await userService.GetUserRoles(userId).ConfigureAwait(false)).Result;
 
-                    if (!ifExist)
+                    var canUseEndpoint = _applicableRoles <= userRole;
+                    //var ifExist = Task.Run(async () => await userService.CheckIfUserIsAdmin(userId).ConfigureAwait(false)).Result;
+
+                    if (!canUseEndpoint)
                     {
                         // Set the response status code to 403 (Forbidden)
                         context.HttpContext.Response.StatusCode = 403;

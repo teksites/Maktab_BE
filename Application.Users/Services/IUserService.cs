@@ -1,4 +1,5 @@
 ﻿using Application.Users.Contracts;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Users;
 using MaktabDataContracts.Responses.Users;
 using Users.Contracts;
@@ -16,6 +17,7 @@ namespace Users.Services
         Task<Guid> GetUserFamilyInformation(UserFamilyInformationRequest userInformation);
         Task<bool> CheckIfUserAlreadyRegistered(string email, string phone);
         Task<bool> CheckIfUserIsAdmin(Guid userId);
+        Task<UserRoleType> GetUserRoles(Guid userId);
         Task<IEnumerable<UserInformationResponse>> GetAllUsersInformation(bool ifOnlyActive = true);
         Task<bool> SendActivationCode(Guid userId);
         Task<UserInformationResponse> GetUserInformation(string userName, string? password, bool ifForgotPassword);

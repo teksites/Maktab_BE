@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System;
+using MaktabDataContracts.Enums;
 
 [Route("api/courses")]
 [ApiController]
@@ -36,17 +37,17 @@ public class CoursesController : ControllerBase
     public async Task<CourseResponseDetailed> GetCourse(Guid courseId)
         => await _courseService.GetCourse(courseId);
 
-    [ApiAuthorize]
+    [ApiAuthorize(false, false, UserRoleType.Admin| UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
     [HttpPost]
     public async Task<CourseResponseDetailed> AddCourse(AddCourse course)
         => await _courseService.AddCourse(course);
 
-    [ApiAuthorize]
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
     [HttpPut("{courseId:guid}")]
     public async Task<CourseResponseDetailed> UpdateCourse(Guid courseId, AddCourse course)
         => await _courseService.UpdateCourse(courseId, course);
 
-    [ApiAuthorize]
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
     [HttpDelete("{courseId:guid}")]
     public async Task<bool> DeleteCourse(Guid courseId, bool hardDelete = false)
         => await _courseService.DeleteCourse(courseId, hardDelete);
@@ -60,17 +61,17 @@ public class CoursesController : ControllerBase
     public async Task<CourseEnrollmentGroupResponse> GetGroup(Guid groupId)
         => await _groupService.GetCourseGroup(groupId);
 
-    [ApiAuthorize]
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
     [HttpPost("groups")]
     public async Task<CourseEnrollmentGroupResponse> AddGroup(AddCourseEnrollmentGroup group)
         => await _groupService.AddCourseEnrollmentGroup(group);
 
-    [ApiAuthorize]
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
     [HttpPut("groups/{groupId:guid}")]
     public async Task<bool> UpdateGroup(Guid groupId, AddCourseEnrollmentGroup group)
         => await _groupService.UpdateCourseEnrollmentGroup(groupId, group);
 
-    [ApiAuthorize]
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
     [HttpDelete("groups/{groupId:guid}")]
     public async Task<bool> DeleteGroup(Guid groupId, bool hardDelete = false)
         => await _groupService.UpdateCourseEnrollmentGroup(groupId);

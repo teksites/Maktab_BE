@@ -1,4 +1,5 @@
 ﻿using Application.Users.Contracts;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Users;
 using Users.Contracts;
 
@@ -19,5 +20,6 @@ namespace Users.Repository
         Task<IEnumerable<UserInformation>> GetAllFamilyUsersInformation(Guid id, bool ifOnlyActive = true);
         Task<UserInformation> LinkUserToAFamily(Guid userId, Guid familyId);
         Task<Guid> GetUserFamilyInformation(UserFamilyInformationRequest userInformation);
+        Task<UserRoleType> GetUserRoles(Guid userId);
     }
 }

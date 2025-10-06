@@ -9,6 +9,7 @@ using Users.Contracts;
 using Users.Repository;
 using Users.Services;
 using Users.Utils.Implementation;
+using MaktabDataContracts.Enums;
 
 namespace Application.Users.Implementation
 {
@@ -150,6 +151,11 @@ namespace Application.Users.Implementation
             }
 
             return null;
+        }
+
+        public async Task<UserRoleType> GetUserRoles(Guid userId)
+        {
+            return await _repository.GetUserRoles(userId).ConfigureAwait(false);
         }
 
         public async Task<bool> CheckIfUserIsAdmin(Guid userId)

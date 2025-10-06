@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Maktab.Attributes;
 using Users.Utils;
+using MaktabDataContracts.Enums;
 
 namespace Maktab.Controllers
 {
@@ -17,7 +18,7 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [ApiAuthorize(false, false, true)]
+        [ApiAuthorize(false, false, UserRoleType.Admin|UserRoleType.SuperUser|UserRoleType.SchoolAdmin|UserRoleType.SchoolSupervoiser)]
         [HttpPost("appstate/set")]
         public IActionResult Set(string key, string value)
         {
@@ -26,7 +27,7 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [ApiAuthorize(false, false, true)]
+        [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
         [HttpGet("appstate/get")]
         public IActionResult Get(string key)
         {
@@ -35,7 +36,7 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [ApiAuthorize(false, false, true)]
+        [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
         [HttpGet("appstate/all")]
         public IActionResult GetAll()
         {

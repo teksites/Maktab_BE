@@ -2,6 +2,7 @@
 using Cumulus.Data;
 using Data;
 using MaktabDataContracts.Enums;
+using MaktabDataContracts.Helpers;
 using MaktabDataContracts.Requests.Users;
 using Users.Contracts;
 using Users.Repository;
@@ -225,7 +226,7 @@ namespace Application.Users.Repository.Implementation
                     }
                 }
             }
-            return results; 
+            return results;
         }
 
         public async Task<IEnumerable<UserInformation>> GetAllFamilyUsersInformation(Guid id, bool ifOnlyActive = true)
@@ -300,7 +301,7 @@ namespace Application.Users.Repository.Implementation
 
                     cmd.AddParameter("@userId", userId.ToByteArray());
                     using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                 
+
                     if (!await reader.ReadAsync().ConfigureAwait(false))
                     {
                         return null;
@@ -445,6 +446,29 @@ namespace Application.Users.Repository.Implementation
                         Relationship = relationship,
                         UserRole = userRole
                     };
+                }
+            }
+        }
+
+        public async Task<UserRoleType> GetUserRoles(Guid userId)
+        {
+            using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"Select UserRole from user_info" +
+                        " where UserId = @userId";
+
+                    cmd.AddParameter("@userId", userId.ToByteArray());
+                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+
+                    if (!await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        return UserRoleType.Unknown;
+                    }
+
+                    var userRole = (UserRoleType) reader.GetInt32(0);
+                    return userRole;
                 }
             }
         }
