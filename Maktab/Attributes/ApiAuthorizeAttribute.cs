@@ -11,165 +11,153 @@ using Users.Services;
 
 namespace Maktab.Attributes
 {
-
-    public class ApiAuthorizeAttribute : Attribute, IAuthorizationFilter
+    public class ApiAuthorizeAttribute : Attribute, IAsyncAuthorizationFilter
     {
-        //private readonly string[] _roles;
         private readonly bool _allowTempUser;
         private readonly bool _ignoreHeaderCheck;
-        private readonly bool _checkAdmin;
-        private readonly UserRoleType _applicableRoles;
-        public ApiAuthorizeAttribute(bool allowTempUser = false, bool ignoreHeaderCheck = false/*, bool checkAdmin = false*/, UserRoleType userRole = UserRoleType.Normal)
+        private readonly UserRoleType _requiredRole;
+
+        public ApiAuthorizeAttribute(bool allowTempUser = false, bool ignoreHeaderCheck = false, UserRoleType requiredRole = UserRoleType.Normal)
         {
             _allowTempUser = allowTempUser;
             _ignoreHeaderCheck = ignoreHeaderCheck;
-            //_checkAdmin = checkAdmin;
-            _applicableRoles = userRole;
+            _requiredRole = requiredRole;
         }
 
-        public void OnAuthorization(AuthorizationFilterContext context)
+        public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
         {
             var request = context.HttpContext.Request;
+            string sessionValue = null;
+            Guid sessionId = Guid.Empty;
 
-            //var id = context.HttpContext.Request.Query["id"]
-
-            if (!request.Headers.TryGetValue("Session_Info", out var sessionValue) && !_ignoreHeaderCheck)
+            if (!_ignoreHeaderCheck)
             {
-                // Set the response status code to 403 (Forbidden)
-                context.HttpContext.Response.StatusCode = 401;
-                context.HttpContext.Response.ContentType = "text/plain";
+                if (!request.Headers.TryGetValue("Session_Info", out var headerValue))
+                {
+                    context.Result = CreateUnauthorizedResult("Session header not found");
+                    return;
+                }
 
-                // Write the custom forbidden message to the response body
-                context.HttpContext.Response.WriteAsync("Session header not found").Wait();
+                sessionValue = headerValue;
+                if (!Guid.TryParse(sessionValue, out sessionId) || sessionId == Guid.Empty)
+                {
+                    context.Result = CreateUnauthorizedResult("Invalid session id");
+                    return;
+                }
 
-                // Return a blank result (to prevent further processing)
-                context.Result = new EmptyResult();
-                return;
-            }
+                var loginService = context.HttpContext.RequestServices.GetService<IUserLoginService>();
+                if (loginService == null)
+                {
+                    context.Result = new StatusCodeResult(500);
+                    return;
+                }
 
-            if (!Guid.TryParse(sessionValue, out var sessionId) && !_ignoreHeaderCheck && sessionId == Guid.Empty)
-            {
-                // Set the response status code to 403 (Forbidden)
-                context.HttpContext.Response.StatusCode = 401;
-                context.HttpContext.Response.ContentType = "text/plain";
-
-                // Write the custom forbidden message to the response body
-                context.HttpContext.Response.WriteAsync("Invalid session id").Wait();
-
-                // Return a blank result (to prevent further processing)
-                context.Result = new EmptyResult();
-                return;
-            }
-
-            var loginService = context.HttpContext.RequestServices.GetService<IUserLoginService>();
-
-            var ifSessionExist = sessionId != Guid.Empty && Task.Run(async () => await loginService.CheckIfSessionExistOrActive(sessionId).ConfigureAwait(false)).Result;
-
-            if (!ifSessionExist && !_ignoreHeaderCheck)
-            {
-                // Set the response status code to 403 (Forbidden)
-                context.HttpContext.Response.StatusCode = 401;
-                context.HttpContext.Response.ContentType = "text/plain";
-
-                // Write the custom forbidden message to the response body
-                context.HttpContext.Response.WriteAsync("No active session found").Wait();
-
-                // Return a blank result (to prevent further processing)
-                context.Result = new EmptyResult();
-                return;
+                bool sessionActive = await loginService.CheckIfSessionExistOrActive(sessionId);
+                if (!sessionActive)
+                {
+                    context.Result = CreateUnauthorizedResult("No active session found");
+                    return;
+                }
             }
 
             if (_allowTempUser)
-            {
-                return;
-            }
+                return; // temp users allowed, no further checks
 
             var user = context.HttpContext.User;
-
-            var userService = context.HttpContext.RequestServices.GetService<IUserService>();
-
-            if (userService == null)
-            {
-                context.Result = new StatusCodeResult(500); // Internal Server Error if the service is not found
-                return;
-            }
-
             if (!user.Identity.IsAuthenticated)
             {
                 context.Result = new UnauthorizedResult();
                 return;
             }
 
-            var requiredclaim = user.Claims.ToList().FirstOrDefault(x => x.Type.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"));
+            var requiredClaim = user.Claims.FirstOrDefault(x =>
+                x.Type.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"));
 
-            if (requiredclaim != null)
+            if (requiredClaim == null)
             {
-                var ifExist = Task.Run(async () => await userService.CheckIfTempUser(requiredclaim.Value).ConfigureAwait(false)).Result;
-
-                if (!ifExist)
-                {
-                    // Set the response status code to 403 (Forbidden)
-                    context.HttpContext.Response.StatusCode = 403;
-                    context.HttpContext.Response.ContentType = "text/plain";
-
-                    // Write the custom forbidden message to the response body
-                    context.HttpContext.Response.WriteAsync("Access Denied: Your account is not permitted to access this resource. Please activate your user").Wait();
-
-                    // Return a blank result (to prevent further processing)
-                    context.Result = new EmptyResult();
-                }
-            }
-            else
-            {
-                // Set the response status code to 403 (Forbidden)
-                context.HttpContext.Response.StatusCode = 403;
-                context.HttpContext.Response.ContentType = "text/plain";
-
-                // Write the custom forbidden message to the response body
-                context.HttpContext.Response.WriteAsync("Access Denied: Your account is not permitted to access this resource. Please activate your user").Wait();
-
-                // Return a blank result (to prevent further processing)
-                context.Result = new EmptyResult();
+                context.Result = CreateForbiddenResult("Access Denied: user claim not found");
+                return;
             }
 
-            //if (_checkAdmin)
+            var userService = context.HttpContext.RequestServices.GetService<IUserService>();
+            var loginSvc = context.HttpContext.RequestServices.GetService<IUserLoginService>();
+            if (userService == null || loginSvc == null)
             {
-                var userId = Task.Run(async () => await loginService.GetUserBySessionId(sessionId).ConfigureAwait(false)).Result;
-
-                if (userId != Guid.Empty)
-                {
-                    var userRole = Task.Run(async () => await userService.GetUserRoles(userId).ConfigureAwait(false)).Result;
-                    
-                     //var ifExist = Task.Run(async () => await userService.CheckIfUserIsAdmin(userId).ConfigureAwait(false)).Result;
-
-                    if (!UserRoleHelper.HasRole(_applicableRoles, userRole))
-                    {
-                        // Set the response status code to 403 (Forbidden)
-                        context.HttpContext.Response.StatusCode = 403;
-                        context.HttpContext.Response.ContentType = "text/plain";
-
-                        // Write the custom forbidden message to the response body
-                        context.HttpContext.Response.WriteAsync("Access Denied: Your account is not permitted to access this resource. You need admin previlages").Wait();
-
-                        // Return a blank result (to prevent further processing)
-                        context.Result = new EmptyResult();
-                    }
-                }
-                else
-                {
-                    // Set the response status code to 403 (Forbidden)
-                    context.HttpContext.Response.StatusCode = 403;
-                    context.HttpContext.Response.ContentType = "text/plain";
-
-                    // Write the custom forbidden message to the response body
-                    context.HttpContext.Response.WriteAsync("Access Denied: Your account is not permitted to access this resource. You need admin previlages").Wait();
-
-                    // Return a blank result (to prevent further processing)
-                    context.Result = new EmptyResult();
-                }
-
+                context.Result = new StatusCodeResult(500);
+                return;
             }
-            return;            // If user is authenticated, check for roles
+
+            bool isTempUser = await userService.CheckIfTempUser(requiredClaim.Value);
+            if (!isTempUser)
+            {
+                context.Result = CreateForbiddenResult("Access Denied: please activate your account");
+                return;
+            }
+
+            // Get userId and roles
+            var userId = await loginSvc.GetUserBySessionId(sessionId);
+            if (userId == Guid.Empty)
+            {
+                context.Result = CreateForbiddenResult("Access Denied: invalid session");
+                return;
+            }
+
+            var userRoles = await userService.GetUserRoles(userId);
+
+            // Check role hierarchy
+            if (!HasRequiredRole(userRoles, _requiredRole))
+            {
+                context.Result = CreateForbiddenResult("Access Denied: insufficient privileges");
+                return;
+            }
+
+            // If all checks pass, allow access
+        }
+
+        private bool HasRequiredRole(UserRoleType userRoles, UserRoleType requiredRole)
+        {
+            // Hierarchy: Normal < SchoolSupervoiser < SchoolAdmin < SuperUser < Admin
+            // Only allow access if user role >= required role in hierarchy
+            int roleHierarchy(UserRoleType role) => role switch
+            {
+                UserRoleType.Normal => 1,
+                UserRoleType.SchoolSupervoiser => 2,
+                UserRoleType.SchoolAdmin => 3,
+                UserRoleType.SuperUser => 4,
+                UserRoleType.Admin => 5,
+                _ => 0
+            };
+
+            int maxUserRoleLevel = Enum.GetValues(typeof(UserRoleType))
+                .Cast<UserRoleType>()
+                .Where(r => r != UserRoleType.Unknown && userRoles.HasFlag(r))
+                .Select(r => roleHierarchy(r))
+                .DefaultIfEmpty(0)
+                .Max();
+
+            int requiredRoleLevel = roleHierarchy(requiredRole);
+
+            return maxUserRoleLevel >= requiredRoleLevel;
+        }
+
+        private IActionResult CreateUnauthorizedResult(string message)
+        {
+            return new ContentResult
+            {
+                StatusCode = StatusCodes.Status401Unauthorized,
+                ContentType = "text/plain",
+                Content = message
+            };
+        }
+
+        private IActionResult CreateForbiddenResult(string message)
+        {
+            return new ContentResult
+            {
+                StatusCode = StatusCodes.Status403Forbidden,
+                ContentType = "text/plain",
+                Content = message
+            };
         }
     }
 }

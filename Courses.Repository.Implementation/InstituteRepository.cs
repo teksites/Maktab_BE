@@ -15,9 +15,9 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"INSERT INTO institutes 
-                (InstituteId, Name, NameFr, Description, DescriptionFr, Email, Phone, AddressId, IsActive, CreatedAt, UpdatedOn)
+                (InstituteId, Name, NameFr, Description, DescriptionFr, Email, Phone, IsActive, CreatedAt, UpdatedOn)
                 VALUES 
-                (@InstituteId, @Name, @NameFr, @Description, @DescriptionFr, @Email, @Phone, @AddressId, @IsActive, @CreatedAt, @UpdatedOn)";
+                (@InstituteId, @Name, @NameFr, @Description, @DescriptionFr, @Email, @Phone, @IsActive, @CreatedAt, @UpdatedOn)";
 
             var instituteId = Guid.NewGuid();
             cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
@@ -27,10 +27,10 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@DescriptionFr", institute.DescriptionFr ?? string.Empty);
             cmd.AddParameter("@Email", institute.Email ?? string.Empty);
             cmd.AddParameter("@Phone", institute.Phone ?? string.Empty);
-            cmd.AddParameter("@AddressId", institute.AddressId.ToByteArray());
             cmd.AddParameter("@IsActive", true);
             cmd.AddParameter("@CreatedAt", DateTime.UtcNow);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
+
             await cmd.ExecuteNonQueryAsync();
             return await GetInstitute(instituteId);
         }
@@ -41,6 +41,7 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"SELECT * FROM institutes WHERE InstituteId = @InstituteId";
             cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
+
             using var reader = await cmd.ExecuteReaderAsync();
             if (!await reader.ReadAsync()) return null;
             return MapToInstituteResponse(reader);
@@ -53,6 +54,7 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"SELECT * FROM institutes";
             if (onlyActive) cmd.CommandText += " WHERE IsActive = TRUE";
+
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
@@ -72,7 +74,6 @@ namespace Courses.Repository.Implementation
                 DescriptionFr = @DescriptionFr, 
                 Email = @Email, 
                 Phone = @Phone, 
-                AddressId = @AddressId, 
                 UpdatedOn = @UpdatedOn 
                 WHERE InstituteId = @InstituteId";
 
@@ -83,8 +84,8 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@DescriptionFr", institute.DescriptionFr ?? string.Empty);
             cmd.AddParameter("@Email", institute.Email ?? string.Empty);
             cmd.AddParameter("@Phone", institute.Phone ?? string.Empty);
-            cmd.AddParameter("@AddressId", institute.AddressId.ToByteArray());
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
+
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
@@ -96,6 +97,7 @@ namespace Courses.Repository.Implementation
                 cmd.CommandText = @"DELETE FROM institutes WHERE InstituteId = @InstituteId";
             else
                 cmd.CommandText = @"UPDATE institutes SET IsActive = FALSE WHERE InstituteId = @InstituteId";
+
             cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
@@ -111,7 +113,6 @@ namespace Courses.Repository.Implementation
                 DescriptionFr = reader.GetString("DescriptionFr"),
                 Email = reader.GetString("Email"),
                 Phone = reader.GetString("Phone"),
-                AddressId = reader.GetGuidFromByteArray("AddressId"),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn")

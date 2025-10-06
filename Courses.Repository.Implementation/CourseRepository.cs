@@ -11,7 +11,8 @@ namespace Courses.Repository.Implementation
     {
         public CourseRepository(IDatabase database) : base(database) { }
 
-        // Add new course
+        #region Add / Update / Delete
+
         public async Task<CourseResponseDetailed> AddCourse(AddCourse course)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
@@ -46,7 +47,6 @@ namespace Courses.Repository.Implementation
             return await GetCourse(courseId);
         }
 
-        // Update course
         public async Task<bool> UpdateCourse(Guid courseId, AddCourse course)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
@@ -91,11 +91,47 @@ namespace Courses.Repository.Implementation
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
-        // Get single course
+        public async Task<bool> DeleteCourse(Guid courseId, bool hardDelete = false)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            if (hardDelete)
+                cmd.CommandText = "DELETE FROM courses WHERE CourseId = @CourseId";
+            else
+                cmd.CommandText = "UPDATE courses SET IsActive = FALSE WHERE CourseId = @CourseId";
+
+            cmd.AddParameter("@CourseId", courseId.ToByteArray());
+            return await cmd.ExecuteNonQueryAsync() > 0;
+        }
+
+        public async Task<CourseResponseDetailed> SetCourseRegistrationStatus(Guid courseId, bool ifRegistrationOpen)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                UPDATE courses
+                SET IsRegistrationOpened = @IfRegistrationOpen, UpdatedOn = @UpdatedOn
+                WHERE CourseId = @CourseId";
+
+            cmd.AddParameter("@CourseId", courseId.ToByteArray());
+            cmd.AddParameter("@IfRegistrationOpen", ifRegistrationOpen);
+            cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
+
+            await cmd.ExecuteNonQueryAsync();
+            return await GetCourse(courseId);
+        }
+
+        #endregion
+
+        #region Get Courses
+
         public async Task<CourseResponseDetailed> GetCourse(Guid courseId)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
+
             cmd.CommandText = @"SELECT * FROM courses WHERE CourseId = @CourseId";
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
@@ -105,7 +141,6 @@ namespace Courses.Repository.Implementation
             return MapToCourseResponse(reader);
         }
 
-        // Get all courses
         public async Task<IEnumerable<CourseResponseDetailed>> GetAllCourses(bool onlyActive = true)
         {
             var results = new List<CourseResponseDetailed>();
@@ -122,14 +157,15 @@ namespace Courses.Repository.Implementation
             return results;
         }
 
-        // Get courses with options
         public async Task<IEnumerable<CourseResponseDetailed>> GetAllCourses(GetCourseOptions options)
         {
             var results = new List<CourseResponseDetailed>();
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
+
             var sql = new StringBuilder("SELECT * FROM courses WHERE 1=1");
 
+            // Filter by IsActive
             if (options.IsActive.HasValue)
             {
                 sql.Append(" AND IsActive = @IsActive");
@@ -150,7 +186,23 @@ namespace Courses.Repository.Implementation
                 sql.Append(")");
             }
 
+            // Filter by offered dates
+            if (options.OfferedFromDate.HasValue)
+            {
+                sql.Append(" AND StartDate >= @OfferedFromDate");
+                cmd.AddParameter("@OfferedFromDate", options.OfferedFromDate.Value);
+            }
+
+            if (options.OfferedToDate.HasValue)
+            {
+                sql.Append(" AND EndDate <= @OfferedToDate");
+                cmd.AddParameter("@OfferedToDate", options.OfferedToDate.Value);
+            }
+
+            // TODO: Filter by AcedemicGroups if needed (requires join with enrollment groups table)
+
             cmd.CommandText = sql.ToString();
+
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
                 results.Add(MapToCourseResponse(reader));
@@ -158,41 +210,10 @@ namespace Courses.Repository.Implementation
             return results;
         }
 
-        // Delete course
-        public async Task<bool> DeleteCourse(Guid courseId, bool hardDelete = false)
-        {
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
+        #endregion
 
-            if (hardDelete)
-                cmd.CommandText = "DELETE FROM courses WHERE CourseId = @CourseId";
-            else
-                cmd.CommandText = "UPDATE courses SET IsActive = FALSE WHERE CourseId = @CourseId";
+        #region Mapping
 
-            cmd.AddParameter("@CourseId", courseId.ToByteArray());
-            return await cmd.ExecuteNonQueryAsync() > 0;
-        }
-
-        // Set registration status
-        public async Task<CourseResponseDetailed> SetCourseRegistrationStatus(Guid courseId, bool ifRegistrationOpen)
-        {
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
-
-            cmd.CommandText = @"
-                UPDATE courses
-                SET IsRegistrationOpened = @IfRegistrationOpen, UpdatedOn = @UpdatedOn
-                WHERE CourseId = @CourseId";
-
-            cmd.AddParameter("@CourseId", courseId.ToByteArray());
-            cmd.AddParameter("@IfRegistrationOpen", ifRegistrationOpen);
-            cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
-
-            await cmd.ExecuteNonQueryAsync();
-            return await GetCourse(courseId);
-        }
-
-        // Map DB row to DTO
         private CourseResponseDetailed MapToCourseResponse(DbDataReader reader)
         {
             return new CourseResponseDetailed
@@ -207,14 +228,19 @@ namespace Courses.Repository.Implementation
                 DetailsFr = reader.GetString("DetailsFr"),
                 StartDate = reader.GetDateTime("StartDate"),
                 EndDate = reader.GetDateTime("EndDate"),
-                IsActive = reader.IsDBNull(reader.GetOrdinal("IsActive")) ? true : reader.GetBoolean("IsActive"),
+                IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn"),
                 CanSelectMultipleEnrollmentGroups = reader.GetBoolean("CanSelectMultipleEnrollmentGroups"),
                 PolicyHyperLink = reader.GetString("PolicyHyperLink"),
                 IsCourseCompleted = reader.GetBoolean("IsCourseCompleted"),
-                IsRegistrationOpened = reader.GetBoolean("IsRegistrationOpened")
+                IsRegistrationOpened = reader.GetBoolean("IsRegistrationOpened"),
+                // Empty lists for now
+                AcedemicGroups = new List<string>(),
+                CourseEnrollmentGroups = new List<CourseEnrollmentGroupResponse>()
             };
         }
+
+        #endregion
     }
 }
