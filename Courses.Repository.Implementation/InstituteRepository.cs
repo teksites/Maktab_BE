@@ -14,11 +14,19 @@ namespace Courses.Repository.Implementation
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"INSERT INTO institutes (InstituteId, Name, AddressId, IsActive, CreatedAt, UpdatedOn)
-                            VALUES (@InstituteId, @Name, @AddressId, @IsActive, @CreatedAt, @UpdatedOn)";
+            cmd.CommandText = @"INSERT INTO institutes 
+                (InstituteId, Name, NameFr, Description, DescriptionFr, Email, Phone, AddressId, IsActive, CreatedAt, UpdatedOn)
+                VALUES 
+                (@InstituteId, @Name, @NameFr, @Description, @DescriptionFr, @Email, @Phone, @AddressId, @IsActive, @CreatedAt, @UpdatedOn)";
+
             var instituteId = Guid.NewGuid();
             cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
             cmd.AddParameter("@Name", institute.Name);
+            cmd.AddParameter("@NameFr", institute.NameFr ?? string.Empty);
+            cmd.AddParameter("@Description", institute.Description ?? string.Empty);
+            cmd.AddParameter("@DescriptionFr", institute.DescriptionFr ?? string.Empty);
+            cmd.AddParameter("@Email", institute.Email ?? string.Empty);
+            cmd.AddParameter("@Phone", institute.Phone ?? string.Empty);
             cmd.AddParameter("@AddressId", institute.AddressId.ToByteArray());
             cmd.AddParameter("@IsActive", true);
             cmd.AddParameter("@CreatedAt", DateTime.UtcNow);
@@ -57,9 +65,24 @@ namespace Courses.Repository.Implementation
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"UPDATE institutes SET Name = @Name, AddressId = @AddressId, UpdatedOn = @UpdatedOn WHERE InstituteId = @InstituteId";
+            cmd.CommandText = @"UPDATE institutes SET 
+                Name = @Name, 
+                NameFr = @NameFr, 
+                Description = @Description, 
+                DescriptionFr = @DescriptionFr, 
+                Email = @Email, 
+                Phone = @Phone, 
+                AddressId = @AddressId, 
+                UpdatedOn = @UpdatedOn 
+                WHERE InstituteId = @InstituteId";
+
             cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
             cmd.AddParameter("@Name", institute.Name);
+            cmd.AddParameter("@NameFr", institute.NameFr ?? string.Empty);
+            cmd.AddParameter("@Description", institute.Description ?? string.Empty);
+            cmd.AddParameter("@DescriptionFr", institute.DescriptionFr ?? string.Empty);
+            cmd.AddParameter("@Email", institute.Email ?? string.Empty);
+            cmd.AddParameter("@Phone", institute.Phone ?? string.Empty);
             cmd.AddParameter("@AddressId", institute.AddressId.ToByteArray());
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
             return await cmd.ExecuteNonQueryAsync() > 0;
@@ -83,6 +106,11 @@ namespace Courses.Repository.Implementation
             {
                 InstituteId = reader.GetGuidFromByteArray("InstituteId"),
                 Name = reader.GetString("Name"),
+                NameFr = reader.GetString("NameFr"),
+                Description = reader.GetString("Description"),
+                DescriptionFr = reader.GetString("DescriptionFr"),
+                Email = reader.GetString("Email"),
+                Phone = reader.GetString("Phone"),
                 AddressId = reader.GetGuidFromByteArray("AddressId"),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
