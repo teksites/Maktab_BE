@@ -1,4 +1,5 @@
 ﻿using MaktabDataContracts.Enums;
+using MaktabDataContracts.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -138,11 +139,10 @@ namespace Maktab.Attributes
                 if (userId != Guid.Empty)
                 {
                     var userRole = Task.Run(async () => await userService.GetUserRoles(userId).ConfigureAwait(false)).Result;
+                    
+                     //var ifExist = Task.Run(async () => await userService.CheckIfUserIsAdmin(userId).ConfigureAwait(false)).Result;
 
-                    var canUseEndpoint = _applicableRoles <= userRole;
-                    //var ifExist = Task.Run(async () => await userService.CheckIfUserIsAdmin(userId).ConfigureAwait(false)).Result;
-
-                    if (!canUseEndpoint)
+                    if (!UserRoleHelper.HasRole(_applicableRoles, userRole))
                     {
                         // Set the response status code to 403 (Forbidden)
                         context.HttpContext.Response.StatusCode = 403;
