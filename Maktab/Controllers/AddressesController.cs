@@ -31,17 +31,17 @@ namespace Maktab.Controllers
         [Authorize]
         [HttpGet("address/{addressId:guid}")]
         [EnableCors("corspolicy")]
-        public async Task<AddressResponse> GetAddress(Guid addressId)
+        public async Task<AddressResponse> GetAddress(Guid addressId, bool includeInactive = false)
         {
-            return await _addressService.GetAddress(addressId).ConfigureAwait(false);
+            return await _addressService.GetAddress(addressId, includeInactive).ConfigureAwait(false);
         }
         
         [Authorize]
         [HttpGet("connectedid/{id:guid}/address")]
         [EnableCors("corspolicy")]
-        public async Task<AddressResponse> GetUserAddress(Guid id)
+        public async Task<AddressResponse> GetUserAddress(Guid id, bool includeInactive = false)
         {
-            return await _addressService.GetAddressWithConnectedId(id).ConfigureAwait(false);
+            return await _addressService.GetAddressWithConnectedId(id, includeInactive).ConfigureAwait(false);
         }
 
         [Authorize]

@@ -9,8 +9,8 @@ namespace Users.Services
         Task<AddressResponse> AddAddress(AddAddress address, AddressType addressType);
         Task<AddressResponse> UpdateAddress(UpdateAddress address);
         Task<bool> DeleteAddress(Guid addressId, bool ifHardDelete);
-        Task<AddressResponse> GetAddress(Guid addressId);
-        Task<AddressResponse> GetAddressWithConnectedId(Guid connectedId);
+        Task<AddressResponse> GetAddress(Guid addressId, bool includeInactive);
+        Task<AddressResponse> GetAddressWithConnectedId(Guid connectedId, bool includeInactive);
         Task<bool> DeleteAddressByConnectedId(Guid userId, bool ifHardDelete);
     }
 }

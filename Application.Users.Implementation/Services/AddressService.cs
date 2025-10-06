@@ -36,12 +36,12 @@ namespace Application.Users.Implementation
             return await _repository.DeleteAddressByConnectedId(userId, ifHardDelete).ConfigureAwait(false);
         }
 
-        public async Task<AddressResponse> GetAddress(Guid addressId)
+        public async Task<AddressResponse> GetAddress(Guid addressId, bool includeInactive)
         {
             return MapToAddressResponse(await _repository.GetAddress(addressId).ConfigureAwait(false));
         }
 
-        public async Task<AddressResponse> GetAddressWithConnectedId(Guid connectedId)
+        public async Task<AddressResponse> GetAddressWithConnectedId(Guid connectedId, bool includeInactive)
         {
             return MapToAddressResponse(await _repository.GetAddressWithConnectedId(connectedId).ConfigureAwait(false));
         }
