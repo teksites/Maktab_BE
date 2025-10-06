@@ -3,6 +3,7 @@ using Data;
 using MaktabDataContracts.Requests.Institute;
 using MaktabDataContracts.Responses.Institute;
 using MaktabDataContracts.Enums;
+using System.Data.Common;
 
 namespace Courses.Repository.Implementation
 {
@@ -107,7 +108,7 @@ namespace Courses.Repository.Implementation
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
-        private InstitutePolicyResponse MapToPolicyResponse(dynamic reader)
+        private InstitutePolicyResponse MapToPolicyResponse(DbDataReader reader)
         {
             return new InstitutePolicyResponse
             {
@@ -115,7 +116,7 @@ namespace Courses.Repository.Implementation
                 InstituteId = reader.GetGuidFromByteArray("InstituteId"),
                 PolicyId = reader.GetGuidFromByteArray("InstitutePolicyId"), // Assuming PolicyId maps to InstitutePolicyId
                 Details = reader.GetString("Details"),
-                InstutePolicy = (InstutePolicyType)reader.GetByte("InstutePolicyType"),
+                InstutePolicy = (InstutePolicyType)(reader.GetNullableInt("InstutePolicyType") ?? 0),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn")

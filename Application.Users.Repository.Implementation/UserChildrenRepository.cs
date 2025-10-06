@@ -3,6 +3,7 @@ using Cumulus.Data;
 using Data;
 using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Children;
+using System.Data.Common;
 using Users.Repository;
 
 namespace Application.Users.Repository.Implementation
@@ -153,7 +154,7 @@ namespace Application.Users.Repository.Implementation
             return reader.HasRows;
         }
 
-        private Child MapToChild(dynamic reader)
+        private Child MapToChild(DbDataReader reader)
         {
             return new Child
             {
@@ -163,7 +164,8 @@ namespace Application.Users.Repository.Implementation
                 LastName = reader.GetString("LastName"),
                 OtherHealthConditions = reader.GetString("OtherHealthConditions"),
                 Allergies = reader.GetString("Allergies"),
-                AcedemicGroup = (AcedemicGroupType)reader.GetByte("AcedemicGroupType"),
+                //AcedemicGroup = (AcedemicGroupType)reader.GetInt32("AcedemicGroupType"),
+                AcedemicGroup = (AcedemicGroupType)(reader.GetNullableInt("AcedemicGroupType") ?? 0),
                 DateOfBirth = reader.GetDateTime("DateOfBirth"),
                 Gender = (Gender)reader.GetInt32("Gender"),
                 RAMQExpiry = reader.GetDateTime("RAMQExpiry"),

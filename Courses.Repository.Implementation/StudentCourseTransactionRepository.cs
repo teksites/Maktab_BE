@@ -3,6 +3,7 @@ using Data;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
 using Newtonsoft.Json;
+using System.Data.Common;
 
 namespace Courses.Repository.Implementation
 {
@@ -136,17 +137,17 @@ namespace Courses.Repository.Implementation
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
-        private StudentCourseTransactionResponse MapToTransactionResponse(dynamic reader)
+        private StudentCourseTransactionResponse MapToTransactionResponse(DbDataReader reader)
         {
             return new StudentCourseTransactionResponse
             {
                 StudentCourseTransactionId = reader.GetGuidFromByteArray("StudentCourseTransactionId"),
                 StudentCourseEnrollmentId = JsonConvert.DeserializeObject<List<Guid>>(reader.GetString("StudentCourseEnrollmentId")) ?? new List<Guid>(),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
-                PayableFee = reader.GetInt32("PayableFee"),
-                DayCareFee = reader.GetInt32("DayCareFee"),
+                PayableFee = (reader.GetNullableInt("PayableFee") ?? 0),
+                DayCareFee = (reader.GetNullableInt("DayCareFee") ?? 0),
                 AmountDiscounted = reader.GetInt32("AmountDiscounted"),
-                TotalPayable = reader.GetInt32("TotalPayable"),
+                TotalPayable = (reader.GetNullableInt("TotalPayable") ?? 0),
                 Comments = reader.IsDBNull("Comments") ? string.Empty : reader.GetString("Comments"),
                 TransactionStatus = (MaktabDataContracts.Enums.TransactionStatus)reader.GetInt32("TransactionStatus"),
                 PaymentCode = reader.GetString("PaymentCode"),

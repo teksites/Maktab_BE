@@ -2,6 +2,7 @@
 using Data;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
+using System.Data.Common;
 
 namespace Courses.Repository.Implementation
 {
@@ -80,7 +81,7 @@ namespace Courses.Repository.Implementation
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
-        private StudentCourseEnrollmentResponse MapToEnrollmentResponse(dynamic reader)
+        private StudentCourseEnrollmentResponse MapToEnrollmentResponse(DbDataReader reader)
         {
             return new StudentCourseEnrollmentResponse
             {

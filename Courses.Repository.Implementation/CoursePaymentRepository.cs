@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Threading.Tasks;
 using Cumulus.Data;
 using Data;
@@ -107,7 +108,7 @@ namespace Courses.Repository.Implementation
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
-        private CoursePaymentResponse MapToPaymentResponse(dynamic reader)
+        private CoursePaymentResponse MapToPaymentResponse(DbDataReader reader)
         {
             return new CoursePaymentResponse
             {

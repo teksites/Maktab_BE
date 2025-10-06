@@ -3,6 +3,7 @@ using Data;
 using MaktabDataContracts.Helpers;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
+using System.Data.Common;
 
 namespace Courses.Repository.Implementation
 {
@@ -195,7 +196,7 @@ namespace Courses.Repository.Implementation
         }
 
 
-        private CourseEnrollmentGroupResponse MapToGroupResponse(dynamic reader)
+        private CourseEnrollmentGroupResponse MapToGroupResponse(DbDataReader reader)
         {
             return new CourseEnrollmentGroupResponse
             {
@@ -204,12 +205,12 @@ namespace Courses.Repository.Implementation
                 InstituteId = reader.GetGuidFromByteArray("InstituteId"),
                 GroupTitle = reader.GetString("GroupTitle"),
                 GroupTitleFr = reader.GetString("GroupTitleFr"),
-                Details = reader.IsDBNull("Details") ? null : reader.GetString("Details"),
-                DetailsFr = reader.IsDBNull("DetailsFr") ? null : reader.GetString("DetailsFr"),
+                Details = reader.IsDBNull("Details") ? string.Empty : reader.GetString("Details"),
+                DetailsFr = reader.IsDBNull("DetailsFr") ? string.Empty : reader.GetString("DetailsFr"),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn"),
-                MaxStudents = reader.IsDBNull("MaxStudents") ? null : reader.GetInt32("MaxStudents"),
+                MaxStudents = reader.IsDBNull("MaxStudents") ? 0 : reader.GetInt32("MaxStudents"),
                 AcedemicGroups = AcedemicGroupHelper.FromInt( reader.GetInt32("AcedemicGroup")),
                 Fee = reader.GetInt32("Fee"),
                 IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen")

@@ -2,6 +2,7 @@
 using Data;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
+using System.Data.Common;
 using System.Text;
 
 namespace Courses.Repository.Implementation
@@ -194,7 +195,7 @@ namespace Courses.Repository.Implementation
             return MapToCourseResponse(reader);
         }
 
-        private CourseResponseDetailed MapToCourseResponse(dynamic reader)
+        private CourseResponseDetailed MapToCourseResponse(DbDataReader reader)
         {
             return new CourseResponseDetailed
             {
