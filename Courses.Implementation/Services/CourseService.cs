@@ -44,10 +44,9 @@ namespace Courses.Implementation.Services
 
         public async Task<CourseResponseDetailed> UpdateCourse(Guid courseId, AddCourse course)
         {
-            if(await _repository.UpdateCourse(courseId, course).ConfigureAwait(false))
-            {
+            var success = await _repository.UpdateCourse(courseId, course).ConfigureAwait(false);
+            if (success)
                 return await _repository.GetCourse(courseId).ConfigureAwait(false);
-            }
             return null;
         }
 
@@ -56,9 +55,9 @@ namespace Courses.Implementation.Services
 
         public async Task<CourseEnrollmentGroupResponse> UpdateCourseEnrollmentGroup(UpdateCourseEnrollmentGroup courseEnrollmentGroup)
         {
-            if (await _courseEnrollmentGroupService.UpdateCourseEnrollmentGroup(courseEnrollmentGroup.CourseEnrollmentGroupId, MapToAdd(courseEnrollmentGroup)))
+            if (await _courseEnrollmentGroupService.UpdateCourseEnrollmentGroup(courseEnrollmentGroup.CourseEnrollmentGroupId, MapToAdd(courseEnrollmentGroup)).ConfigureAwait(false))
             {
-                return await _courseEnrollmentGroupService.GetGroup(courseEnrollmentGroup.CourseEnrollmentGroupId);
+                return await _courseEnrollmentGroupService.GetGroup(courseEnrollmentGroup.CourseEnrollmentGroupId).ConfigureAwait(false);
             }
 
             return null;
@@ -75,7 +74,7 @@ namespace Courses.Implementation.Services
 
         public async Task<IEnumerable<CourseEnrollmentGroupResponse>> GetAllCourseGroups(Guid courseId, GetCourseOptions options)
         {
-            var groups = await _courseEnrollmentGroupService.GetAllGroups(courseId);
+            var groups = await _courseEnrollmentGroupService.GetAllGroups(courseId).ConfigureAwait(false);
             if (options.IsActive.HasValue)
             {
                 groups = groups.Where(g => g.IsActive == options.IsActive.Value).ToList();
@@ -86,14 +85,14 @@ namespace Courses.Implementation.Services
         public async Task<bool> SetCourseRegistrationOpenStatus(Guid courseId, bool ifRegistrationOpen)
         {
             // Update all groups registration status
-            var groups = await _courseEnrollmentGroupService.GetAllGroups(courseId);
+            var groups = await _courseEnrollmentGroupService.GetAllGroups(courseId).ConfigureAwait(false);
             foreach (var group in groups)
             {
-                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(group.CourseEnrollmentGroupId, ifRegistrationOpen);
+                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(group.CourseEnrollmentGroupId, ifRegistrationOpen).ConfigureAwait(false);
             }
 
-            // Optional: also update some course-level flag if you track registration at course level
-            var course = await _repository.GetCourse(courseId);
+            // Update course-level registration flag
+            var course = await _repository.GetCourse(courseId).ConfigureAwait(false);
             if (course != null)
             {
                 course.IsRegistrationOpened = ifRegistrationOpen;
@@ -109,13 +108,13 @@ namespace Courses.Implementation.Services
                     EndDate = course.EndDate,
                     CanSelectMultipleEnrollmentGroups = course.CanSelectMultipleEnrollmentGroups,
                     PolicyHyperLink = course.PolicyHyperLink,
-                    IsCourseCompleted = course.IsCourseCompleted
-                });
+                    IsCourseCompleted = course.IsCourseCompleted,
+                    IsRegistrationOpened = ifRegistrationOpen
+                }).ConfigureAwait(false);
             }
 
             return true;
         }
-
 
         private AddCourseEnrollmentGroup MapToAdd(UpdateCourseEnrollmentGroup update)
         {
@@ -131,6 +130,7 @@ namespace Courses.Implementation.Services
                 MaxStudents = update.MaxStudents,
                 Fee = update.Fee,
                 IfRegistrationOpen = update.IfRegistrationOpen,
+                // Map enum list to string list
                 AcedemicGroups = update.AcedemicGroups?.Select(g => g.ToString()).ToList() ?? new List<string>()
             };
         }

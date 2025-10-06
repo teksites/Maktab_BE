@@ -14,17 +14,27 @@ namespace Courses.Repository.Implementation
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"INSERT INTO student_course_enrollment (StudentCourseEnrollmentId, CourseEnrollmentGroupId, CourseId, ChildId, FamilyId, IsActive, CreatedAt, UpdatedOn)
-                            VALUES (@StudentCourseEnrollmentId, @CourseEnrollmentGroupId, @CourseId, @ChildId, @FamilyId, @IsActive, @CreatedAt, @UpdatedOn)";
+
+            cmd.CommandText = @"
+            INSERT INTO student_course_enrollment 
+            (StudentCourseEnrollmentId, CourseEnrollmentGroupId, CourseId, ChildId, FamilyId, 
+             WillUseDayCare, DayCareDays, IsActive, CreatedAt, UpdatedOn)
+            VALUES 
+            (@StudentCourseEnrollmentId, @CourseEnrollmentGroupId, @CourseId, @ChildId, @FamilyId, 
+             @WillUseDayCare, @DayCareDays, @IsActive, @CreatedAt, @UpdatedOn)";
+
             var enrollmentId = Guid.NewGuid();
             cmd.AddParameter("@StudentCourseEnrollmentId", enrollmentId.ToByteArray());
             cmd.AddParameter("@CourseEnrollmentGroupId", enrollment.CourseEnrollmentGroupId.ToByteArray());
             cmd.AddParameter("@CourseId", enrollment.CourseId.ToByteArray());
             cmd.AddParameter("@ChildId", enrollment.ChildId.ToByteArray());
             cmd.AddParameter("@FamilyId", enrollment.FamilyId.ToByteArray());
-            cmd.AddParameter("@IsActive", true);
+            cmd.AddParameter("@WillUseDayCare", enrollment.WillUseDayCare);
+            cmd.AddParameter("@DayCareDays", enrollment.DayCareDays);
+            cmd.AddParameter("@IsActive", enrollment.IsActive);
             cmd.AddParameter("@CreatedAt", DateTime.UtcNow);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
+
             await cmd.ExecuteNonQueryAsync();
             return await GetEnrollment(enrollmentId);
         }
@@ -35,6 +45,7 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
             cmd.AddParameter("@StudentCourseEnrollmentId", enrollmentId.ToByteArray());
+
             using var reader = await cmd.ExecuteReaderAsync();
             if (!await reader.ReadAsync()) return null;
             return MapToEnrollmentResponse(reader);
@@ -47,6 +58,7 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE CourseId = @CourseId AND IsActive = TRUE";
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
+
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
@@ -59,13 +71,27 @@ namespace Courses.Repository.Implementation
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"UPDATE student_course_enrollment SET CourseEnrollmentGroupId = @CourseEnrollmentGroupId, CourseId = @CourseId, ChildId = @ChildId, FamilyId = @FamilyId, UpdatedOn = @UpdatedOn WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
+
+            cmd.CommandText = @"
+            UPDATE student_course_enrollment 
+            SET CourseEnrollmentGroupId = @CourseEnrollmentGroupId,
+                CourseId = @CourseId,
+                ChildId = @ChildId,
+                FamilyId = @FamilyId,
+                WillUseDayCare = @WillUseDayCare,
+                DayCareDays = @DayCareDays,
+                UpdatedOn = @UpdatedOn
+            WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
+
             cmd.AddParameter("@StudentCourseEnrollmentId", enrollmentId.ToByteArray());
             cmd.AddParameter("@CourseEnrollmentGroupId", enrollment.CourseEnrollmentGroupId.ToByteArray());
             cmd.AddParameter("@CourseId", enrollment.CourseId.ToByteArray());
             cmd.AddParameter("@ChildId", enrollment.ChildId.ToByteArray());
             cmd.AddParameter("@FamilyId", enrollment.FamilyId.ToByteArray());
+            cmd.AddParameter("@WillUseDayCare", enrollment.WillUseDayCare);
+            cmd.AddParameter("@DayCareDays", enrollment.DayCareDays);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
+
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
@@ -73,11 +99,16 @@ namespace Courses.Repository.Implementation
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
+
             if (hardDelete)
                 cmd.CommandText = @"DELETE FROM student_course_enrollment WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
             else
-                cmd.CommandText = @"UPDATE student_course_enrollment SET IsActive = FALSE WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
+                cmd.CommandText = @"UPDATE student_course_enrollment SET IsActive = FALSE, UpdatedOn = @UpdatedOn WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
+
             cmd.AddParameter("@StudentCourseEnrollmentId", enrollmentId.ToByteArray());
+            if (!hardDelete)
+                cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
+
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
@@ -90,10 +121,13 @@ namespace Courses.Repository.Implementation
                 CourseId = reader.GetGuidFromByteArray("CourseId"),
                 ChildId = reader.GetGuidFromByteArray("ChildId"),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
+                WillUseDayCare = reader.GetBoolean("WillUseDayCare"),
+                DayCareDays = reader.GetInt32("DayCareDays"),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn")
             };
         }
     }
+
 }
