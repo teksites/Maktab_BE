@@ -26,7 +26,7 @@ namespace Courses.Implementation.Services
             => _repository.GetEnrollment(enrollmentId);
 
         public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollments(Guid courseId)
-            => _repository.GetAllEnrollments(courseId);
+            => _repository.GetAllEnrollmentsByCourse(courseId);
 
         public Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
             => _repository.UpdateEnrollment(enrollmentId, enrollment);

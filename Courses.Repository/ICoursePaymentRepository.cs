@@ -5,29 +5,13 @@ namespace Courses.Repository
 {
     public interface ICoursePaymentRepository
     {
-        /// <summary>
-        /// Adds a new payment for a student course transaction.
-        /// </summary>
         Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment);
-
-        /// <summary>
-        /// Updates an existing payment.
-        /// </summary>
         Task<bool> UpdatePayment(Guid paymentId, AddCoursePayment payment);
-
-        /// <summary>
-        /// Deletes a payment. Can perform soft or hard delete.
-        /// </summary>
         Task<bool> DeletePayment(Guid paymentId, bool hardDelete = false);
+        Task<CoursePaymentResponse?> GetPayment(Guid paymentId);
+        Task<IEnumerable<CoursePaymentResponse>> GetAllPaymentsByTransaction(Guid transactionId);
+        Task<decimal> GetTotalPaidForTransaction(Guid transactionId);
+        Task<IEnumerable<CoursePaymentResponse>> GetAllPayments(Guid transactionId);
 
-        /// <summary>
-        /// Retrieves a payment by its ID.
-        /// </summary>
-        Task<CoursePaymentResponse> GetPayment(Guid paymentId);
-
-        /// <summary>
-        /// Retrieves all payments for a given student course transaction.
-        /// </summary>
-        Task<IEnumerable<CoursePaymentResponse>> GetAllPayments(Guid studentCourseTransactionId);
     }
 }

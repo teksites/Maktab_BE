@@ -10,20 +10,21 @@ namespace Courses.Repository.Implementation
     {
         public StudentCourseEnrollmentRepository(IDatabase database) : base(database) { }
 
+        // Add a new enrollment
         public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"
-            INSERT INTO student_course_enrollment 
-            (StudentCourseEnrollmentId, CourseEnrollmentGroupId, CourseId, ChildId, FamilyId, 
-             WillUseDayCare, DayCareDays, IsActive, CreatedAt, UpdatedOn)
-            VALUES 
-            (@StudentCourseEnrollmentId, @CourseEnrollmentGroupId, @CourseId, @ChildId, @FamilyId, 
-             @WillUseDayCare, @DayCareDays, @IsActive, @CreatedAt, @UpdatedOn)";
-
             var enrollmentId = Guid.NewGuid();
+            cmd.CommandText = @"
+                INSERT INTO student_course_enrollment 
+                (StudentCourseEnrollmentId, CourseEnrollmentGroupId, CourseId, ChildId, FamilyId, 
+                 WillUseDayCare, DayCareDays, IsActive, CreatedAt, UpdatedOn)
+                VALUES 
+                (@StudentCourseEnrollmentId, @CourseEnrollmentGroupId, @CourseId, @ChildId, @FamilyId, 
+                 @WillUseDayCare, @DayCareDays, @IsActive, @CreatedAt, @UpdatedOn)";
+
             cmd.AddParameter("@StudentCourseEnrollmentId", enrollmentId.ToByteArray());
             cmd.AddParameter("@CourseEnrollmentGroupId", enrollment.CourseEnrollmentGroupId.ToByteArray());
             cmd.AddParameter("@CourseId", enrollment.CourseId.ToByteArray());
@@ -36,27 +37,31 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
 
             await cmd.ExecuteNonQueryAsync();
-            return await GetEnrollment(enrollmentId);
+            return await GetEnrollment(enrollmentId) ?? throw new Exception("Failed to retrieve created enrollment");
         }
 
-        public async Task<StudentCourseEnrollmentResponse> GetEnrollment(Guid enrollmentId)
+        // Get a single enrollment by ID
+        public async Task<StudentCourseEnrollmentResponse?> GetEnrollment(Guid enrollmentId)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
-            cmd.AddParameter("@StudentCourseEnrollmentId", enrollmentId.ToByteArray());
+
+            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE StudentCourseEnrollmentId=@EnrollmentId";
+            cmd.AddParameter("@EnrollmentId", enrollmentId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
             if (!await reader.ReadAsync()) return null;
             return MapToEnrollmentResponse(reader);
         }
 
-        public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollments(Guid courseId)
+        // Get all enrollments for a specific course
+        public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByCourse(Guid courseId)
         {
             var results = new List<StudentCourseEnrollmentResponse>();
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE CourseId = @CourseId AND IsActive = TRUE";
+
+            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE CourseId=@CourseId AND IsActive=TRUE";
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -64,26 +69,47 @@ namespace Courses.Repository.Implementation
             {
                 results.Add(MapToEnrollmentResponse(reader));
             }
+
             return results;
         }
 
+        // Get all enrollments for a specific family
+        public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByFamily(Guid familyId)
+        {
+            var results = new List<StudentCourseEnrollmentResponse>();
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE FamilyId=@FamilyId AND IsActive=TRUE";
+            cmd.AddParameter("@FamilyId", familyId.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                results.Add(MapToEnrollmentResponse(reader));
+            }
+
+            return results;
+        }
+
+        // Update an existing enrollment
         public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-            UPDATE student_course_enrollment 
-            SET CourseEnrollmentGroupId = @CourseEnrollmentGroupId,
-                CourseId = @CourseId,
-                ChildId = @ChildId,
-                FamilyId = @FamilyId,
-                WillUseDayCare = @WillUseDayCare,
-                DayCareDays = @DayCareDays,
-                UpdatedOn = @UpdatedOn
-            WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
+                UPDATE student_course_enrollment 
+                SET CourseEnrollmentGroupId=@CourseEnrollmentGroupId,
+                    CourseId=@CourseId,
+                    ChildId=@ChildId,
+                    FamilyId=@FamilyId,
+                    WillUseDayCare=@WillUseDayCare,
+                    DayCareDays=@DayCareDays,
+                    UpdatedOn=@UpdatedOn
+                WHERE StudentCourseEnrollmentId=@EnrollmentId";
 
-            cmd.AddParameter("@StudentCourseEnrollmentId", enrollmentId.ToByteArray());
+            cmd.AddParameter("@EnrollmentId", enrollmentId.ToByteArray());
             cmd.AddParameter("@CourseEnrollmentGroupId", enrollment.CourseEnrollmentGroupId.ToByteArray());
             cmd.AddParameter("@CourseId", enrollment.CourseId.ToByteArray());
             cmd.AddParameter("@ChildId", enrollment.ChildId.ToByteArray());
@@ -95,23 +121,25 @@ namespace Courses.Repository.Implementation
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
+        // Delete an enrollment (soft or hard delete)
         public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
             if (hardDelete)
-                cmd.CommandText = @"DELETE FROM student_course_enrollment WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
+                cmd.CommandText = @"DELETE FROM student_course_enrollment WHERE StudentCourseEnrollmentId=@EnrollmentId";
             else
-                cmd.CommandText = @"UPDATE student_course_enrollment SET IsActive = FALSE, UpdatedOn = @UpdatedOn WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
+                cmd.CommandText = @"UPDATE student_course_enrollment SET IsActive=FALSE, UpdatedOn=@UpdatedOn WHERE StudentCourseEnrollmentId=@EnrollmentId";
 
-            cmd.AddParameter("@StudentCourseEnrollmentId", enrollmentId.ToByteArray());
+            cmd.AddParameter("@EnrollmentId", enrollmentId.ToByteArray());
             if (!hardDelete)
                 cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
 
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
+        // Helper: Map DbDataReader to StudentCourseEnrollmentResponse
         private StudentCourseEnrollmentResponse MapToEnrollmentResponse(DbDataReader reader)
         {
             return new StudentCourseEnrollmentResponse
@@ -129,5 +157,4 @@ namespace Courses.Repository.Implementation
             };
         }
     }
-
 }

@@ -2,6 +2,7 @@
 using Courses.Services;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
+using MaktabDataContracts.Responses.Transactions;
 
 namespace Courses.Implementation.Services
 {
@@ -21,7 +22,7 @@ namespace Courses.Implementation.Services
             => _repository.GetTransaction(transactionId);
 
         public Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactions(Guid courseId)
-            => _repository.GetAllTransactions(courseId);
+            => _repository.GetAllTransactionsByCourse(courseId);
 
         public Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction)
             => _repository.UpdateTransaction(transactionId, transaction);

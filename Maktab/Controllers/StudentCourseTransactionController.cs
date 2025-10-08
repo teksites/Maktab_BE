@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System;
+using MaktabDataContracts.Responses.Transactions;
 
 [Route("api/student-course-transactions")]
 [ApiController]

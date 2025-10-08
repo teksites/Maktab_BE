@@ -15,10 +15,9 @@ namespace Courses.Repository.Implementation
         // Add a new course
         public async Task<CourseResponseDetailed> AddCourse(AddCourse course)
         {
+            var courseId = Guid.NewGuid();
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-
-            var courseId = Guid.NewGuid();
 
             cmd.CommandText = @"
                 INSERT INTO courses
@@ -51,16 +50,15 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@IsRegistrationOpened", course.IsRegistrationOpened);
 
             await cmd.ExecuteNonQueryAsync();
-            return await GetCourse(courseId);
+            return await GetCourse(courseId) ?? throw new Exception("Failed to retrieve created course");
         }
 
         // Get course by Id
-        public async Task<CourseResponseDetailed> GetCourse(Guid courseId)
+        public async Task<CourseResponseDetailed?> GetCourse(Guid courseId)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-
-            cmd.CommandText = "SELECT * FROM courses WHERE CourseId = @CourseId";
+            cmd.CommandText = "SELECT * FROM courses WHERE CourseId=@CourseId";
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -80,7 +78,7 @@ namespace Courses.Repository.Implementation
 
             if (options.IsActive.HasValue)
             {
-                sql.Append(" AND IsActive = @IsActive");
+                sql.Append(" AND IsActive=@IsActive");
                 cmd.AddParameter("@IsActive", options.IsActive.Value);
             }
 
@@ -99,13 +97,13 @@ namespace Courses.Repository.Implementation
 
             if (options.OfferedFromDate.HasValue)
             {
-                sql.Append(" AND StartDate >= @OfferedFromDate");
+                sql.Append(" AND StartDate>=@OfferedFromDate");
                 cmd.AddParameter("@OfferedFromDate", options.OfferedFromDate.Value);
             }
 
             if (options.OfferedToDate.HasValue)
             {
-                sql.Append(" AND EndDate <= @OfferedToDate");
+                sql.Append(" AND EndDate<=@OfferedToDate");
                 cmd.AddParameter("@OfferedToDate", options.OfferedToDate.Value);
             }
 
@@ -121,7 +119,6 @@ namespace Courses.Repository.Implementation
             }
 
             cmd.CommandText = sql.ToString();
-
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
@@ -134,10 +131,7 @@ namespace Courses.Repository.Implementation
         // Overload to get all courses (onlyActive default)
         public async Task<IEnumerable<CourseResponseDetailed>> GetAllCourses(bool onlyActive = true)
         {
-            var options = new GetCourseOptions
-            {
-                IsActive = onlyActive
-            };
+            var options = new GetCourseOptions { IsActive = onlyActive };
             return await GetAllCourses(options);
         }
 
@@ -195,7 +189,7 @@ namespace Courses.Repository.Implementation
         }
 
         // Set course registration status
-        public async Task<CourseResponseDetailed> SetCourseRegistrationStatus(Guid courseId, bool ifRegistrationOpen)
+        public async Task<CourseResponseDetailed?> SetCourseRegistrationStatus(Guid courseId, bool ifRegistrationOpen)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
