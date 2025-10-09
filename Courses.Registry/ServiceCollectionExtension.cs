@@ -4,6 +4,7 @@ using Courses.Repository;
 using Courses.Services;
 using Courses.Implementation.Services;
 using Courses.Services.Implementation;
+using Courses.Implementation;
 
 namespace Courses.Registry
 {
@@ -31,6 +32,9 @@ namespace Courses.Registry
 
             services.AddScoped<IStudentCourseTransactionService, StudentCourseTransactionService>();
             services.AddScoped<IStudentCourseTransactionRepository, StudentCourseTransactionRepository>();
+
+            services.AddScoped<ICourseReportingService, CourseReportingService>();
+            services.AddScoped<IStudentCourseTransactionReportRepository, StudentCourseTransactionReportRepository>();
 
             return services;
         }    

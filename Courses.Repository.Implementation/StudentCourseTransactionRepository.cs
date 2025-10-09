@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Data;
 using Cumulus.Data;
 using Data;
 using MaktabDataContracts.Requests.Course;
@@ -334,6 +330,65 @@ namespace Courses.Repository.Implementation
         {
             var pending = await GetPendingAmountsReportAsync(courseId: courseId);
             return pending.Sum(p => p.PendingAmount);
+        }
+ 
+        /*
+                public async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsPerCourseAsync(Guid courseId)
+                {
+                    var results = new List<StudentCourseTransactionResponse>();
+                    using var conn = await Database.CreateAndOpenConnectionAsync();
+                    using var cmd = conn.CreateCommand();
+
+                    cmd.CommandText = @"SELECT * FROM student_course_transaction WHERE CourseId=@CourseId AND IsActive=TRUE";
+                    cmd.AddParameter("@CourseId", courseId.ToByteArray());
+
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        results.Add(await MapToTransactionResponse(reader));
+                    }
+
+                    return results;
+                }
+
+                // Pending amount calculations
+                public async Task<decimal> GetPendingAmountByCourse(Guid courseId)
+                {
+                    return await GetPendingAmount(@"SELECT SUM(AmountDue - AmountPaid) FROM student_course_transaction WHERE CourseId=@CourseId AND IsActive=TRUE",
+                                                  ("@CourseId", courseId));
+                }
+
+                public async Task<decimal> GetPendingAmountByFamily(Guid familyId)
+                {
+                    return await GetPendingAmount(@"SELECT SUM(AmountDue - AmountPaid) FROM student_course_transaction WHERE FamilyId=@FamilyId AND IsActive=TRUE",
+                                                  ("@FamilyId", familyId));
+                }
+
+                public async Task<decimal> GetPendingAmountByCourseGroup(Guid courseGroupId)
+                {
+                    return await GetPendingAmount(@"SELECT SUM(AmountDue - AmountPaid) FROM student_course_transaction WHERE CourseEnrollmentGroupId=@CourseGroupId AND IsActive=TRUE",
+                                                  ("@CourseGroupId", courseGroupId));
+                }
+
+                public async Task<decimal> GetPendingAmountByInstitute(Guid instituteId)
+                {
+                    return await GetPendingAmount(@"SELECT SUM(AmountDue - AmountPaid) FROM student_course_transaction t
+                                           INNER JOIN course c ON t.CourseId = c.CourseId
+                                           WHERE c.InstituteId=@InstituteId AND t.IsActive=TRUE",
+                                                  ("@InstituteId", instituteId));
+                }
+        */
+        // Reusable helper
+        private async Task<decimal> GetPendingAmount(string query, (string name, Guid value) param)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = query;
+            cmd.AddParameter(param.name, param.value.ToByteArray());
+
+            var result = await cmd.ExecuteScalarAsync();
+            return result == DBNull.Value ? 0 : Convert.ToDecimal(result);
         }
 
         // ----------------------------

@@ -53,7 +53,7 @@ namespace Courses.Repository.Implementation
             if (!await reader.ReadAsync()) return null;
             return MapToEnrollmentResponse(reader);
         }
-
+/*
         // Get all enrollments for a specific course
         public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByCourse(Guid courseId)
         {
@@ -92,7 +92,7 @@ namespace Courses.Repository.Implementation
             return results;
         }
 
-        // Update an existing enrollment
+*/        // Update an existing enrollment
         public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
@@ -138,6 +138,50 @@ namespace Courses.Repository.Implementation
 
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
+
+        public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByGroup(Guid groupId)
+        {
+            var results = new List<StudentCourseEnrollmentResponse>();
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE CourseEnrollmentGroupId=@GroupId AND IsActive=TRUE";
+            cmd.AddParameter("@GroupId", groupId.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                results.Add(MapToEnrollmentResponse(reader));
+            }
+
+            return results;
+        }
+
+        public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByCourse(Guid courseId)
+        { 
+            return GetEnrollmentsByColumnAsync("CourseId", courseId);
+        }
+        public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByFamily(Guid familyId)
+        { 
+            return GetEnrollmentsByColumnAsync("FamilyId", familyId);
+        }
+
+        private async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentsByColumnAsync(string columnName, Guid value)
+        {
+            var results = new List<StudentCourseEnrollmentResponse>();
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = $"SELECT * FROM student_course_enrollment WHERE {columnName}=@Value AND IsActive=TRUE";
+            cmd.AddParameter("@Value", value.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                results.Add(MapToEnrollmentResponse(reader));
+
+            return results;
+        }
+
 
         // Helper: Map DbDataReader to StudentCourseEnrollmentResponse
         private StudentCourseEnrollmentResponse MapToEnrollmentResponse(DbDataReader reader)
