@@ -44,7 +44,8 @@ namespace Courses.Repository
             Guid? instituteId = null,
             Guid? courseId = null,
             Guid? courseGroupId = null,
-            Guid? familyId = null);
+            Guid? familyId = null,
+            string? paymentCode = null);
 
         Task<decimal> GetPendingAmountByInstitute(Guid instituteId);
 

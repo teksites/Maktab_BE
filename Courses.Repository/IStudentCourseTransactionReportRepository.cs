@@ -12,7 +12,6 @@ namespace Courses.Repository
         Task<IEnumerable<TransactionCollectedInstituteSummary>> GetTotalCollectedByInstitute(Guid? instituteId = null);
         Task<IEnumerable<TransactionPendingFamilySummary>> GetPendingAmountForFamily(Guid familyId);
 
-
         Task<IEnumerable<TransactionReportSummary>> GetTransactionsByFamily(Guid? familyId = null);
         Task<IEnumerable<CourseReportSummary>> GetTransactionsByCourse(Guid? instituteId = null, Guid? courseId = null);
         Task<IEnumerable<EnrollmentGroupReportSummary>> GetTransactionsByCourseGroup(Guid? courseId = null, Guid? groupId = null);

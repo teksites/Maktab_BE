@@ -250,7 +250,7 @@ namespace Courses.Repository.Implementation
         // Pending Amounts
         // ----------------------------
         public async Task<IEnumerable<PendingAmountResponse>> GetPendingAmountsReportAsync(
-            Guid? instituteId = null, Guid? courseId = null, Guid? courseGroupId = null, Guid? familyId = null)
+            Guid? instituteId = null, Guid? courseId = null, Guid? courseGroupId = null, Guid? familyId = null, string? paymentCode = null)
         {
             var results = new List<PendingAmountResponse>();
             using var conn = await Database.CreateAndOpenConnectionAsync();
@@ -261,6 +261,7 @@ namespace Courses.Repository.Implementation
             if (courseId.HasValue) { filters.Add("t.CourseId = @CourseId"); cmd.AddParameter("@CourseId", courseId.Value.ToByteArray()); }
             if (courseGroupId.HasValue) { filters.Add("t.CourseGroupId = @CourseGroupId"); cmd.AddParameter("@CourseGroupId", courseGroupId.Value.ToByteArray()); }
             if (familyId.HasValue) { filters.Add("t.FamilyId = @FamilyId"); cmd.AddParameter("@FamilyId", familyId.Value.ToByteArray()); }
+            if (string.IsNullOrEmpty(paymentCode)) { filters.Add("t.PaymentCode = @PaymentCode"); cmd.AddParameter("@PaymentCode", paymentCode); }
 
             var whereClause = filters.Count > 0 ? "WHERE " + string.Join(" AND ", filters) : string.Empty;
 
@@ -269,13 +270,14 @@ namespace Courses.Repository.Implementation
                        t.CourseId, c.Name AS CourseName,
                        t.CourseGroupId AS CourseEnrollmentGroupId, g.Name AS CourseGroupName,
                        t.FamilyId,
+                       t.PaymentCode,
                        SUM(t.TotalPayable - t.TotalAmountPaid) AS PendingAmount
                 FROM student_course_transaction t
                 LEFT JOIN institute i ON t.InstituteId = i.InstituteId
                 LEFT JOIN course c ON t.CourseId = c.CourseId
                 LEFT JOIN course_enrollment_group g ON t.CourseGroupId = g.CourseEnrollmentGroupId
                 {whereClause}
-                GROUP BY t.InstituteId, i.Name, t.CourseId, c.Name, t.CourseGroupId, g.Name, t.FamilyId
+                GROUP BY t.InstituteId, i.Name, t.CourseId, c.Name, t.CourseGroupId, g.Name, t.FamilyId, t.PaymentCode
             ";
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -331,7 +333,14 @@ namespace Courses.Repository.Implementation
             var pending = await GetPendingAmountsReportAsync(courseId: courseId);
             return pending.Sum(p => p.PendingAmount);
         }
- 
+
+        //public async Task<StudentCoursePaymentResponse> GetStudentCourseTransactionByPaymentCode(string paymentCode)
+        //{
+        //    var pending = await GetPendingAmountsReportAsync(paymentCode: paymentCode);
+        //    return pending.Sum(p => p.PendingAmount);
+        //}
+
+
         /*
                 public async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsPerCourseAsync(Guid courseId)
                 {
@@ -394,10 +403,13 @@ namespace Courses.Repository.Implementation
         // ----------------------------
         // Private Helpers
         // ----------------------------
+
+        
         private async Task<StudentCourseTransactionResponse> MapToTransactionResponse(DbDataReader reader)
         {
             return new StudentCourseTransactionResponse
             {
+                StudentCourseEnrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId"),
                 StudentCourseTransactionId = reader.GetGuidFromByteArray("StudentCourseTransactionId"),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
                 PayableFee = reader.GetDecimal("PayableFee"),

@@ -24,6 +24,8 @@ namespace Courses.Implementation.Services
 
         public Task<StudentCourseEnrollmentResponse> GetEnrollment(Guid enrollmentId)
             => _repository.GetEnrollment(enrollmentId);
+        public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentByFamily(Guid familyId)
+            => _repository.GetAllEnrollmentsByFamily(familyId);
 
         public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollments(Guid courseId)
             => _repository.GetAllEnrollmentsByCourse(courseId);
