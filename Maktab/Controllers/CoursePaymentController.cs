@@ -29,6 +29,13 @@ public class CoursePaymentController : ControllerBase
     public async Task<CoursePaymentResponse> GetPayment(Guid paymentId)
         => await _service.GetPayment(paymentId);
 
+    [HttpGet("studenttransactions/{studentCourseTransactionId:guid}")]
+    public async Task<IEnumerable<CoursePaymentResponse>> GetPaymentByStudentCourse(Guid studentCourseTransactionId)
+    {
+        return new List<CoursePaymentResponse>();
+    }
+        //  => await _service.GetPayment(paymentId);
+
     [HttpPost]
     public async Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment)
         => await _service.AddPayment(payment);

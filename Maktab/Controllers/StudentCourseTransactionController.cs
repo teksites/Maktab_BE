@@ -30,6 +30,13 @@ public class StudentCourseTransactionController : ControllerBase
     public async Task<StudentCourseTransactionResponse> GetTransaction(Guid transactionId)
         => await _service.GetTransaction(transactionId);
 
+    [HttpGet("family/{familyId:guid}/institute/{instituteId:guid}")]
+    public async Task<StudentCourseTransactionResponse> GetTransaction(Guid familyId, Guid instituteId)
+    {
+        return new StudentCourseTransactionResponse();
+    }
+    //=> await _service.GetTransaction(transactionId);
+
     [HttpPost]
     public async Task<StudentCourseTransactionResponse> AddTransaction(AddStudentCourseTransaction transaction)
         => await _service.AddTransaction(transaction);

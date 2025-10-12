@@ -2,26 +2,56 @@
 using Courses.Services;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Courses.Implementation.Services
 {
     public class StudentCourseEnrollmentService : IStudentCourseEnrollmentService
     {
         private readonly IStudentCourseEnrollmentRepository _repository;
+        private readonly IStudentCourseTransactionService _studentCourseEnrollmentService;
 
-        public StudentCourseEnrollmentService(IStudentCourseEnrollmentRepository repository)
+        public StudentCourseEnrollmentService(IStudentCourseEnrollmentRepository repository, IStudentCourseTransactionService studentCourseEnrollmentService)
         {
             _repository = repository;
+            _studentCourseEnrollmentService = studentCourseEnrollmentService;
         }
 
-        public Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment)
-            => _repository.AddEnrollment(enrollment);
+        public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment)
+        {
+            var familyTransactions = await _studentCourseEnrollmentService
+                .GetTransactionByFamily(enrollment.FamilyId)
+                .ConfigureAwait(false);
 
+            var latestTransaction = familyTransactions
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefault();
+
+            
+            // Now add the transcation
+            //if (latestTransaction is not null)// add logic to check the course session here
+            //{
+                // caclulate the discount if any
+                //Calculate the payble fee
+                // Get instution polucy for discount
+
+           //     _studentCourseEnrollmentService.UpdateTransaction(new AddStudentCourseTransaction
+           //     {
+           //         AmountDiscounted = latestTransaction.AmountDiscounted,
+           //         StudentCourseTransactionId = latestTransaction.StudentCourseTransactionId,
+
+           //         FamilyId = latestTransaction.FamilyId,
+           //         PaymentCode = latestTransaction.PaymentCode,
+           //         //       StudentCourseEnrollmentId = latestTransaction.StudentCourseEnrollmentId
+           //     });
+           ////     latestTransaction.StudentCourseEnrollmentId
+           // }
+
+            // add serive to generate payment code and invoice id
+            // in case no exisiting transaction found, create a new one
+           // enrollment.TransactionId = latestTransaction.Id;
+
+            return await _repository.AddEnrollment(enrollment).ConfigureAwait(false);
+        }
         public Task<StudentCourseEnrollmentResponse> GetEnrollment(Guid enrollmentId)
             => _repository.GetEnrollment(enrollmentId);
         public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentByFamily(Guid familyId)

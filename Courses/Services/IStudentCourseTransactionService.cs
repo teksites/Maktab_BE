@@ -10,6 +10,7 @@ namespace Courses.Services
         Task<bool> DeleteTransaction(Guid transactionId, bool hardDelete = false);
         Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactions(Guid courseId);
         Task<StudentCourseTransactionResponse> GetTransaction(Guid transactionId);
+        Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionByFamily(Guid familyId);
         Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction);
     }
 }

@@ -1,7 +1,6 @@
 ﻿using Courses.Repository;
 using Courses.Services;
 using MaktabDataContracts.Requests.Course;
-using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
 
 namespace Courses.Implementation.Services
@@ -29,5 +28,10 @@ namespace Courses.Implementation.Services
 
         public Task<bool> DeleteTransaction(Guid transactionId, bool hardDelete = false)
             => _repository.DeleteTransaction(transactionId, hardDelete);
+
+        public Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionByFamily(Guid familyId)
+        {
+            return _repository.GetAllTransactionsByFamily(familyId);
+        }
     }
 }
