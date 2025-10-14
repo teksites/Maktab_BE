@@ -100,10 +100,16 @@ namespace Courses.Repository.Implementation
             return await ExecuteReaderListAsync(sql, MapReaderToCoursePayment, new { TransactionId = transactionId });
         }
 
-        public async Task<decimal> GetTotalPaidForTransaction(Guid transactionId)
+        public async Task<decimal> GetTotalPaidForStudentTransaction(Guid transactionId)
         {
             var sql = "SELECT COALESCE(SUM(AmountPaid),0) FROM course_payment WHERE StudentCourseTransactionId=@TransactionId AND IsActive=1";
             return await ExecuteScalarDecimalAsync(sql, new { TransactionId = transactionId });
+        }
+
+        public async Task<IEnumerable<CoursePaymentResponse>> GetAllPaymentsByStudentTransactionId(Guid studentTransactionId)
+        {
+            var sql = "SELECT * FROM course_payment WHERE StudentCourseTransactionId=@TransactionId AND IsActive=1";
+            return await ExecuteReaderListAsync(sql, MapReaderToCoursePayment, new { StudentCourseTransactionId = studentTransactionId });
         }
 
         #region Helper Methods

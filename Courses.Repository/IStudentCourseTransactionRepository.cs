@@ -59,5 +59,6 @@ namespace Courses.Repository
         // Additional Queries
         // ----------------------------
         Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsPerCourseAsync(Guid courseId);
+        Task<StudentCourseTransactionResponse> GetTransactionByFamilyForCurrentSession(Guid familyId, Guid instituteId);
     }
 }

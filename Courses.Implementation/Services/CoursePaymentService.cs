@@ -1,6 +1,7 @@
 ﻿using Courses.Repository;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
+using System.Transactions;
 
 namespace Courses.Services.Implementation
 {
@@ -27,5 +28,10 @@ namespace Courses.Services.Implementation
 
         public async Task<bool> DeletePayment(Guid paymentId, bool hardDelete = false)
             => await _repository.DeletePayment(paymentId, hardDelete);
+
+        public async Task<IEnumerable<CoursePaymentResponse>> GetAllPaymentsByStudentTransactionId(Guid studentTransactionId)
+        {
+            return await _repository.GetAllPaymentsByStudentTransactionId(studentTransactionId).ConfigureAwait(false);
+        }
     }
 }

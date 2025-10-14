@@ -23,6 +23,9 @@ namespace Courses.Implementation.Services
         public Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactions(Guid courseId)
             => _repository.GetAllTransactionsByCourse(courseId);
 
+        public Task<StudentCourseTransactionResponse> GetTransactionByFamilyForCurrentSession(Guid familyId, Guid instituteId)
+            => _repository.GetTransactionByFamilyForCurrentSession(familyId, instituteId);
+
         public Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction)
             => _repository.UpdateTransaction(transactionId, transaction);
 

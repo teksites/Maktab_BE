@@ -31,10 +31,7 @@ public class CoursePaymentController : ControllerBase
 
     [HttpGet("studenttransactions/{studentCourseTransactionId:guid}")]
     public async Task<IEnumerable<CoursePaymentResponse>> GetPaymentByStudentCourse(Guid studentCourseTransactionId)
-    {
-        return new List<CoursePaymentResponse>();
-    }
-        //  => await _service.GetPayment(paymentId);
+        => await _service.GetAllPaymentsByStudentTransactionId(studentCourseTransactionId);
 
     [HttpPost]
     public async Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment)

@@ -1,5 +1,6 @@
 ﻿using Cumulus.Data;
 using Data;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Helpers;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
@@ -10,7 +11,13 @@ namespace Courses.Repository.Implementation
 {
     public class CourseRepository : DbRepository, ICourseRepository
     {
-        public CourseRepository(IDatabase database) : base(database) { }
+        private readonly ICourseEnrollmentGroupRepository _groupRepo;
+
+        public CourseRepository(IDatabase database, ICourseEnrollmentGroupRepository groupRepo)
+            : base(database)
+        {
+            _groupRepo = groupRepo;
+        }
 
         // Add a new course
         public async Task<CourseResponseDetailed> AddCourse(AddCourse course)
@@ -24,12 +31,14 @@ namespace Courses.Repository.Implementation
                 (CourseId, InstituteId, Name, NameFr, Description, DescriptionFr,
                  Details, DetailsFr, StartDate, EndDate, IsActive,
                  CreatedAt, UpdatedOn, CanSelectMultipleEnrollmentGroups,
-                 PolicyHyperLink, IsCourseCompleted, IsRegistrationOpened)
+                 PolicyHyperLink, IsCourseCompleted, IsRegistrationOpened,
+                 RegistrationStartDate, RegistrationEndDate, CourseSession)
                 VALUES
                 (@CourseId, @InstituteId, @Name, @NameFr, @Description, @DescriptionFr,
                  @Details, @DetailsFr, @StartDate, @EndDate, @IsActive,
                  @CreatedAt, @UpdatedOn, @CanSelectMultipleEnrollmentGroups,
-                 @PolicyHyperLink, @IsCourseCompleted, @IsRegistrationOpened)";
+                 @PolicyHyperLink, @IsCourseCompleted, @IsRegistrationOpened,
+                 @RegistrationStartDate, @RegistrationEndDate, @CourseSession)";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
             cmd.AddParameter("@InstituteId", course.InstituteId.ToByteArray());
@@ -48,6 +57,9 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@PolicyHyperLink", (object?)course.PolicyHyperLink ?? DBNull.Value);
             cmd.AddParameter("@IsCourseCompleted", course.IsCourseCompleted);
             cmd.AddParameter("@IsRegistrationOpened", course.IsRegistrationOpened);
+            cmd.AddParameter("@RegistrationStartDate", course.RegistrationStartDate);
+            cmd.AddParameter("@RegistrationEndDate", course.RegistrationEndDate);
+            cmd.AddParameter("@CourseSession", (int)course.CourseSession);
 
             await cmd.ExecuteNonQueryAsync();
             return await GetCourse(courseId) ?? throw new Exception("Failed to retrieve created course");
@@ -146,7 +158,8 @@ namespace Courses.Repository.Implementation
                 SET Name=@Name, NameFr=@NameFr, Description=@Description, DescriptionFr=@DescriptionFr,
                     Details=@Details, DetailsFr=@DetailsFr, StartDate=@StartDate, EndDate=@EndDate,
                     IsActive=@IsActive, UpdatedOn=@UpdatedOn, CanSelectMultipleEnrollmentGroups=@CanSelectMultipleEnrollmentGroups,
-                    PolicyHyperLink=@PolicyHyperLink, IsCourseCompleted=@IsCourseCompleted, IsRegistrationOpened=@IsRegistrationOpened
+                    PolicyHyperLink=@PolicyHyperLink, IsCourseCompleted=@IsCourseCompleted, IsRegistrationOpened=@IsRegistrationOpened,
+                    RegistrationStartDate=@RegistrationStartDate, RegistrationEndDate=@RegistrationEndDate, CourseSession=@CourseSession
                 WHERE CourseId=@CourseId";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
@@ -164,6 +177,9 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@PolicyHyperLink", (object?)course.PolicyHyperLink ?? DBNull.Value);
             cmd.AddParameter("@IsCourseCompleted", course.IsCourseCompleted);
             cmd.AddParameter("@IsRegistrationOpened", course.IsRegistrationOpened);
+            cmd.AddParameter("@RegistrationStartDate", course.RegistrationStartDate);
+            cmd.AddParameter("@RegistrationEndDate", course.RegistrationEndDate);
+            cmd.AddParameter("@CourseSession", (int)course.CourseSession);
 
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
@@ -211,6 +227,9 @@ namespace Courses.Repository.Implementation
         private async Task<CourseResponseDetailed> MapToCourseResponse(DbDataReader reader)
         {
             var courseId = reader.GetGuidFromByteArray("CourseId");
+            var registrationStart = reader.GetNullableDateTimeUtc("RegistrationStartDate") ?? reader.GetDateTimeUtc("StartDate");
+            var registrationEnd = reader.GetNullableDateTimeUtc("RegistrationEndDate") ?? reader.GetDateTimeUtc("EndDate");
+
             var course = new CourseResponseDetailed
             {
                 CourseId = courseId,
@@ -221,20 +240,22 @@ namespace Courses.Repository.Implementation
                 DescriptionFr = reader.IsDBNull("DescriptionFr") ? string.Empty : reader.GetString("DescriptionFr"),
                 Details = reader.IsDBNull("Details") ? string.Empty : reader.GetString("Details"),
                 DetailsFr = reader.IsDBNull("DetailsFr") ? string.Empty : reader.GetString("DetailsFr"),
-                StartDate = reader.GetDateTime("StartDate"),
-                EndDate = reader.GetDateTime("EndDate"),
+                StartDate = reader.GetDateTimeUtc("StartDate"),
+                EndDate = reader.GetDateTimeUtc("EndDate"),
                 IsActive = reader.GetBoolean("IsActive"),
                 CanSelectMultipleEnrollmentGroups = reader.GetBoolean("CanSelectMultipleEnrollmentGroups"),
-                CreatedAt = reader.GetDateTime("CreatedAt"),
-                UpdatedOn = reader.GetDateTime("UpdatedOn"),
+                CreatedAt = reader.GetDateTimeUtc("CreatedAt"),
+                UpdatedOn = reader.GetDateTimeUtc("UpdatedOn"),
                 PolicyHyperLink = reader.IsDBNull("PolicyHyperLink") ? string.Empty : reader.GetString("PolicyHyperLink"),
                 IsCourseCompleted = reader.GetBoolean("IsCourseCompleted"),
-                IsRegistrationOpened = reader.GetBoolean("IsRegistrationOpened")
+                IsRegistrationOpened = reader.GetBoolean("IsRegistrationOpened"),
+                RegistrationStartDate = registrationStart,
+                RegistrationEndDate = registrationEnd,
+                CourseSession = (CourseSessionType)reader.GetByte("CourseSession")
             };
 
-            // Load enrollment groups
-            course.CourseEnrollmentGroups = (await new CourseEnrollmentGroupRepository(Database)
-                                              .GetAllGroups(courseId, true)).ToList();
+            // Load enrollment groups using DI
+            course.CourseEnrollmentGroups = (await _groupRepo.GetAllGroups(courseId, true)).ToList();
 
             // Merge unique academic groups
             course.AcedemicGroups = course.CourseEnrollmentGroups

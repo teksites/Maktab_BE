@@ -151,6 +151,21 @@ namespace Courses.Repository.Implementation
             return results;
         }
 
+        
+        public async Task<StudentCourseTransactionResponse> GetTransactionByFamilyForCurrentSession(Guid familyId, Guid instituteId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = "SELECT * FROM student_course_transaction WHERE StudentCourseTransactionId = @TransactionId";
+            cmd.AddParameter("@TransactionId", familyId.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
+
+            return await MapToTransactionResponse(reader);
+        }
+
         public async Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByFamily(Guid familyId)
             => await GetTransactionsByColumn("FamilyId", familyId);
 

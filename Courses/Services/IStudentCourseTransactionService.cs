@@ -12,5 +12,6 @@ namespace Courses.Services
         Task<StudentCourseTransactionResponse> GetTransaction(Guid transactionId);
         Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionByFamily(Guid familyId);
         Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction);
+        Task<StudentCourseTransactionResponse> GetTransactionByFamilyForCurrentSession(Guid familyId, Guid instituteId);
     }
 }

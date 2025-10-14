@@ -31,7 +31,7 @@ public class StudentCourseTransactionController : ControllerBase
         => await _service.GetTransaction(transactionId);
 
     [HttpGet("family/{familyId:guid}/institute/{instituteId:guid}")]
-    public async Task<StudentCourseTransactionResponse> GetTransaction(Guid familyId, Guid instituteId)
+    public async Task<StudentCourseTransactionResponse> GetTransactionByFamily(Guid familyId, Guid instituteId)
     {
         return new StudentCourseTransactionResponse();
     }

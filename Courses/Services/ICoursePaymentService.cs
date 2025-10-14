@@ -8,6 +8,7 @@ namespace Courses.Services
         Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment);
         Task<bool> DeletePayment(Guid paymentId, bool hardDelete = false);
         Task<IEnumerable<CoursePaymentResponse>> GetAllPayments(Guid courseId);
+        Task<IEnumerable<CoursePaymentResponse>> GetAllPaymentsByStudentTransactionId(Guid studentTransactionId);
         Task<CoursePaymentResponse> GetPayment(Guid paymentId);
         Task<bool> UpdatePayment(Guid paymentId, AddCoursePayment payment);
     }
