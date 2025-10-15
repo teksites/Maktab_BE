@@ -424,7 +424,7 @@ namespace Courses.Repository.Implementation
         {
             return new StudentCourseTransactionResponse
             {
-                StudentCourseEnrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId"),
+                //StudentCourseEnrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId"),
                 StudentCourseTransactionId = reader.GetGuidFromByteArray("StudentCourseTransactionId"),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
                 PayableFee = reader.GetDecimal("PayableFee"),

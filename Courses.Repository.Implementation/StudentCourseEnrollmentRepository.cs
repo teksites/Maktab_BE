@@ -3,9 +3,7 @@ using Data;
 using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
-using System.Collections.Generic;
 using System.Data.Common;
-using System.Runtime.Intrinsics.X86;
 using System.Text;
 
 namespace Courses.Repository.Implementation
@@ -161,54 +159,6 @@ namespace Courses.Repository.Implementation
             return results;
         }
 
-        public async Task<IEnumerable<CourseSessionInfoResponse>> GetFamilyCourseSessionInfo(Guid familyId, Guid? instituteId)
-        {
-            var results = new List<CourseSessionInfoResponse>();
-
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
-
-            var sql = new StringBuilder(@"
-        SELECT
-            sce.FamilyId AS FamilyId,
-            c.InstituteId AS InstituteId,
-            c.CourseId AS CourseId,
-            c.CourseSession AS CourseSession,
-            c.IsCourseCompleted AS IsCourseCompleted,
-            c.IsRegistrationOpened AS IsRegistrationOpened,
-            c.RegistrationStartDate AS RegistrationStartDate,
-            c.RegistrationEndDate AS RegistrationEndDate,
-            c.IsActive AS CourseActive,
-            ceg.IsActive AS EnrollmentGroupActive
-        FROM courses c
-        INNER JOIN course_enrollment_groups ceg
-            ON c.CourseId = ceg.CourseId
-        INNER JOIN student_course_enrollment sce
-            ON ceg.CourseEnrollmentGroupId = sce.CourseEnrollmentGroupId
-        WHERE sce.FamilyId = @FamilyId");
-
-            cmd.AddParameter("@FamilyId", familyId.ToByteArray());
-
-            // Only add InstituteId filter if provided
-            if (instituteId.HasValue)
-            {
-                sql.Append(" AND c.InstituteId = @InstituteId");
-                cmd.AddParameter("@InstituteId", instituteId.Value.ToByteArray());
-            }
-
-            sql.Append(" ORDER BY c.CreatedAt DESC");
-
-            cmd.CommandText = sql.ToString();
-
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                results.Add(MapToCourseSessionInfoResponse(reader));
-            }
-
-            return results;
-        }
-
         public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByCourse(Guid courseId)
         { 
             return GetEnrollmentsByColumnAsync("CourseId", courseId);
@@ -252,31 +202,5 @@ namespace Courses.Repository.Implementation
                 UpdatedOn = reader.GetDateTime("UpdatedOn")
             };
         }
-
-        private CourseSessionInfoResponse MapToCourseSessionInfoResponse(DbDataReader reader)
-        {
-            return new CourseSessionInfoResponse
-            {
-                FamilyId = reader.GetGuidFromByteArray("FamilyId"),
-                InstituteId = reader.GetGuidFromByteArray("InstituteId"),
-                CourseId = reader.GetGuidFromByteArray("CourseId"),
-
-                CourseSession = (CourseSessionType)reader.GetByte("CourseSession"),
-                IsCourseCompleted = reader.GetBoolean("IsCourseCompleted"),
-                IsRegistrationOpened = reader.GetBoolean("IsRegistrationOpened"),
-
-                RegistrationStartDate = reader.IsDBNull(reader.GetOrdinal("RegistrationStartDate"))
-                    ? null
-                    : reader.GetDateTime("RegistrationStartDate"),
-
-                RegistrationEndDate = reader.IsDBNull(reader.GetOrdinal("RegistrationEndDate"))
-                    ? null
-                    : reader.GetDateTime("RegistrationEndDate"),
-
-                CourseActive = reader.GetBoolean("CourseActive"),
-                EnrollmentGroupActive = reader.GetBoolean("EnrollmentGroupActive")
-            };
-        }
-
     }
 }

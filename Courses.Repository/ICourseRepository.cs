@@ -39,5 +39,9 @@ namespace Courses.Repository
         /// Updates the registration status of a course. Returns null if course not found.
         /// </summary>
         Task<CourseResponseDetailed?> SetCourseRegistrationStatus(Guid courseId, bool ifRegistrationOpen);
+
+        Task<IEnumerable<CourseSessionInfoResponse>> GetFamilyCourseSessionInfo(Guid familyId, Guid? instituteId);
+
+
     }
 }
