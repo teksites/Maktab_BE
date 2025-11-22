@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System;
+using Microsoft.AspNetCore.Http;
 
 [Route("api/student-course-enrollments")]
 [ApiController]
@@ -36,8 +37,17 @@ public class StudentCourseEnrollmentController : ControllerBase
 
     [HttpPost]
     public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment)
-        => await _service.AddEnrollment(enrollment);
+    { 
+        var response = await _service.AddEnrollment(enrollment).ConfigureAwait(false);
+        
+        if (response == null)
+        {
+            throw new BadHttpRequestException("Child already registered in the course");
+        }
 
+        return response;
+    }
+    
     [HttpPut("{enrollmentId:guid}")]
     public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
         => await _service.UpdateEnrollment(enrollmentId, enrollment);

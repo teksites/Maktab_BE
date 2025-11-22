@@ -1,5 +1,4 @@
 ﻿using MaktabDataContracts.Requests.Course;
-using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
 
 namespace Courses.Services
@@ -11,6 +10,7 @@ namespace Courses.Services
         Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactions(Guid courseId);
         Task<StudentCourseTransactionResponse> GetTransaction(Guid transactionId);
         Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionByFamily(Guid familyId);
+        Task<IEnumerable<StudentCourseTransactionResponse>> GetCourseTransactionByFamily(Guid courseId, Guid familyId);
         Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction);
         Task<StudentCourseTransactionResponse> GetTransactionByFamilyForCurrentSession(Guid familyId, Guid instituteId);
     }

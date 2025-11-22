@@ -9,6 +9,7 @@ namespace Courses.Services
         Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false);
         Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollments(Guid courseId);
         Task<StudentCourseEnrollmentResponse> GetEnrollment(Guid enrollmentId);
+        Task<StudentCourseEnrollmentResponse> GetStudentCourseEnrollment(Guid childId, Guid courseId);
         Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentByFamily(Guid familyId);
         Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment);
     }

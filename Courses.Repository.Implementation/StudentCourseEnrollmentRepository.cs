@@ -55,46 +55,61 @@ namespace Courses.Repository.Implementation
             if (!await reader.ReadAsync()) return null;
             return MapToEnrollmentResponse(reader);
         }
-/*
-        // Get all enrollments for a specific course
-        public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByCourse(Guid courseId)
+
+        public async Task<StudentCourseEnrollmentResponse> GetStudentCourseEnrollment(Guid childId, Guid courseId)
         {
-            var results = new List<StudentCourseEnrollmentResponse>();
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE CourseId=@CourseId AND IsActive=TRUE";
+            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE ChildId = @ChildId and CourseId = @CourseId";
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
+            cmd.AddParameter("@ChildId", childId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                results.Add(MapToEnrollmentResponse(reader));
-            }
-
-            return results;
+            if (!await reader.ReadAsync()) 
+                return null;
+            return MapToEnrollmentResponse(reader);
         }
+        /*
+                // Get all enrollments for a specific course
+                public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByCourse(Guid courseId)
+                {
+                    var results = new List<StudentCourseEnrollmentResponse>();
+                    using var conn = await Database.CreateAndOpenConnectionAsync();
+                    using var cmd = conn.CreateCommand();
 
-        // Get all enrollments for a specific family
-        public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByFamily(Guid familyId)
-        {
-            var results = new List<StudentCourseEnrollmentResponse>();
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE CourseId=@CourseId AND IsActive=TRUE";
+                    cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
-            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE FamilyId=@FamilyId AND IsActive=TRUE";
-            cmd.AddParameter("@FamilyId", familyId.ToByteArray());
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        results.Add(MapToEnrollmentResponse(reader));
+                    }
 
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                results.Add(MapToEnrollmentResponse(reader));
-            }
+                    return results;
+                }
 
-            return results;
-        }
+                // Get all enrollments for a specific family
+                public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByFamily(Guid familyId)
+                {
+                    var results = new List<StudentCourseEnrollmentResponse>();
+                    using var conn = await Database.CreateAndOpenConnectionAsync();
+                    using var cmd = conn.CreateCommand();
 
-*/        // Update an existing enrollment
+                    cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE FamilyId=@FamilyId AND IsActive=TRUE";
+                    cmd.AddParameter("@FamilyId", familyId.ToByteArray());
+
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        results.Add(MapToEnrollmentResponse(reader));
+                    }
+
+                    return results;
+                }
+
+        */        // Update an existing enrollment
         public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();

@@ -158,12 +158,29 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = "SELECT * FROM student_course_transaction WHERE StudentCourseTransactionId = @TransactionId";
-            cmd.AddParameter("@TransactionId", familyId.ToByteArray());
+            cmd.AddParameter("@FamilyId", familyId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
             if (!await reader.ReadAsync()) return null;
 
             return await MapToTransactionResponse(reader);
+        }
+
+        public async Task<IEnumerable<StudentCourseTransactionResponse>> GetCourseTransactionsByFamily(Guid courseId, Guid familyId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = "SELECT * FROM student_course_transaction WHERE StudentCourseTransactionId = @TransactionId";
+            cmd.AddParameter("@TransactionId", familyId.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
+
+            return null;
+
+
+         //   return await MapToTransactionResponse(reader);
         }
 
         public async Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByFamily(Guid familyId)

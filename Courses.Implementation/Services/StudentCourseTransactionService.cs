@@ -36,5 +36,10 @@ namespace Courses.Implementation.Services
         {
             return _repository.GetAllTransactionsByFamily(familyId);
         }
+
+        public Task<IEnumerable<StudentCourseTransactionResponse>> GetCourseTransactionByFamily(Guid courseId, Guid familyId)
+        {
+            return _repository.GetCourseTransactionsByFamily(courseId, familyId);
+        }
     }
 }

@@ -137,7 +137,7 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsTempPassword, Relationship, FamilyId from temp_user_info" +
+                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsTempPassword, Relationship, FamilyId, UserRole from temp_user_info" +
                         " where UserId = @userId";
 
                     cmd.AddParameter("@userId", userId.ToByteArray());
