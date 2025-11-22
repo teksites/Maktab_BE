@@ -287,6 +287,7 @@ namespace Application.Users.Repository.Implementation
                     }
                 }
             }
+
             return results;
         }
 
