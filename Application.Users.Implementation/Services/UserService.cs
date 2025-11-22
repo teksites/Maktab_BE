@@ -270,6 +270,12 @@ namespace Application.Users.Implementation
         }
         private UserRegistrationInformation MapToUserRegistrationInformation(AddUserInformation addUserInformation)
         {
+            var userRole = UserRoleHelper.FromStrings(addUserInformation.UserRoles);
+            if (userRole == UserRoleType.Unknown)
+            {
+                userRole = UserRoleType.Normal;
+            }
+
             return new UserRegistrationInformation
             {
                 UserId = Guid.NewGuid(),
@@ -285,7 +291,7 @@ namespace Application.Users.Implementation
                 EmailVerificationCode = GenerateRandomVerificationCode(),
                 PhoneVerificationCode = GenerateRandomVerificationCode(),
                 FamilyId = addUserInformation.FamilyId,
-                UserRole = UserRoleHelper.FromStrings(addUserInformation.UserRoles)
+                UserRole = userRole
             };
         }
 
@@ -304,7 +310,8 @@ namespace Application.Users.Implementation
                 IsActive = true,
                 CreatedAt = userInformation.CreatedAt,
                 UpdatedOn = userInformation.UpdatedOn,
-                IfTempUser = ifTempUser
+                IfTempUser = ifTempUser,
+                UserRoles = UserRoleHelper.ToStrings(userInformation.UserRole)
             };
         }
 

@@ -338,7 +338,8 @@ namespace Application.Users.Repository.Implementation
                         UpdatedOn = UpdatedOn,
                         IsAdmin = isAdmin,
                         IsTempPassword = isTempPassword,
-                        Relationship = relationship
+                        Relationship = relationship,
+                        UserRole = userRole
                     };
                 }
             }

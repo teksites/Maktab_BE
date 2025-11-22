@@ -19,7 +19,7 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"insert into temp_user_info (UserId, FamilyId, FirstName, LastName, Email, Phone, UserName, Password, EmailVerificationCode, PhoneVerificationCode, IsActive, CreatedAt, UpdatedOn, Relationship)"
+                    cmd.CommandText = @"insert into temp_user_info (UserId, FamilyId, FirstName, LastName, Email, Phone, UserName, Password, EmailVerificationCode, PhoneVerificationCode, IsActive, CreatedAt, UpdatedOn, Relationship,UserRole)"
                     + "Values(@userId, @familyId, @firstName, @lastName, @email, @phone, @userName, @password, @emailVerificationCode, @phoneVerficationCode, @isActive, @createdAt, @updatedOn, @relationship, @userRole)";
 
                     var password = PasswordHelper.HashPassword(userInformation.Password);
@@ -54,7 +54,8 @@ namespace Application.Users.Repository.Implementation
                             IsActive   = userInformation.IsActive,
                             CreatedAt = userInformation.CreatedAt,
                             UpdatedOn = userInformation.CreatedAt,
-                            Relationship = userInformation.Relationship
+                            Relationship = userInformation.Relationship,
+                            UserRole = userInformation.UserRole
                         };
                     }
                     else
@@ -214,7 +215,7 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, isTempPassword, Relationship, FamilyId from temp_user_info";
+                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, isTempPassword, Relationship, UserRole, FamilyId from temp_user_info";
 
                     if (ifOnlyActive)
                     {
@@ -237,7 +238,8 @@ namespace Application.Users.Repository.Implementation
                         var UpdatedOn = reader.GetDateTime(9);
                         var isTempPassword = reader.GetBoolean(10);
                         var relationship = (Relationship)reader.GetInt32(11);
-                        var familyId = reader.GetGuidFromByteArray(12);
+                        var userRole = (UserRoleType)reader.GetInt32(12);
+                        var familyId = reader.GetGuidFromByteArray(13);
 
                         results.Add(new UserInformation
                         {
@@ -255,6 +257,7 @@ namespace Application.Users.Repository.Implementation
                             IsAdmin = false,
                             IsTempPassword = isTempPassword,
                             Relationship = relationship,
+                            UserRole = userRole
                         });
                     }
                 }
@@ -269,7 +272,7 @@ namespace Application.Users.Repository.Implementation
                 {
                     // 1. Remove password from WHERE clause
                     cmd.CommandText = @"
-                SELECT UserId, FirstName, LastName, Email, Phone, UserName, Password, IsTempPassword, Relationship, FamilyId   
+                SELECT UserId, FirstName, LastName, Email, Phone, UserName, Password, IsTempPassword, Relationship, FamilyId, UserRole   
                 FROM temp_user_info 
                 WHERE (UPPER(UserName) = UPPER(@userName) OR UPPER(Email) = UPPER(@userName)) AND IsActive = true";
 
@@ -299,6 +302,7 @@ namespace Application.Users.Repository.Implementation
                     var isTempPassword = reader.GetBoolean(7);
                     var relationship = (Relationship)reader.GetInt32(8);
                     var familyId = reader.GetGuidFromByteArray(9);
+                    var userRole = (UserRoleType)reader.GetInt32(10);
 
                     return new UserInformation
                     {
@@ -310,7 +314,8 @@ namespace Application.Users.Repository.Implementation
                         Phone = phone,
                         UserName = userNam,
                         IsTempPassword = isTempPassword,
-                        Relationship = relationship
+                        Relationship = relationship,
+                        UserRole = userRole
                     };
                 }
             }
