@@ -9,6 +9,8 @@ namespace Courses.Repository
         // ----------------------------
         // Transactions
         // ----------------------------
+        Task<bool> AddEnrollmentsToTransaction(Guid studentCourseTransactionId, Guid studentCourseEnrollmentId);
+
         Task<StudentCourseTransactionResponse> AddTransaction(AddStudentCourseTransaction transaction);
 
         Task<StudentCourseTransactionResponse?> GetTransaction(Guid transactionId);

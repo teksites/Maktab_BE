@@ -6,6 +6,10 @@ using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
 using MaktabDataContracts.Enums;
 using System.Data.Common;
+using System.Transactions;
+using Newtonsoft.Json.Linq;
+using System.Security.Cryptography;
+using TransactionStatus = MaktabDataContracts.Enums.TransactionStatus;
 
 namespace Courses.Repository.Implementation
 {
@@ -23,6 +27,8 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
+            var paymentCode = await GenerateUniquePaymentCodeAsync(conn).ConfigureAwait(false);
+
             cmd.CommandText = @"
                 INSERT INTO student_course_transaction
                 (StudentCourseTransactionId, FamilyId, PayableFee, DayCareFee, AmountDiscounted, TotalPayable, Comments, Status, PaymentCode, IsActive, TotalAmountPaid, IsCompletelyPaid, CreatedAt, UpdatedOn)
@@ -38,7 +44,7 @@ namespace Courses.Repository.Implementation
                .AddParameter("@TotalPayable", transaction.TotalPayable)
                .AddParameter("@Comments", transaction.Comments)
                .AddParameter("@Status", (int)transaction.TransactionStatus)
-               .AddParameter("@PaymentCode", transaction.PaymentCode)
+               .AddParameter("@PaymentCode", paymentCode)
                .AddParameter("@IsActive", transaction.IsActive)
                .AddParameter("@TotalAmountPaid", transaction.TotalAmountPaid)
                .AddParameter("@IsCompletelyPaid", transaction.IsCompletelyPaid)
@@ -47,11 +53,33 @@ namespace Courses.Repository.Implementation
 
             await cmd.ExecuteNonQueryAsync();
 
-            if (transaction.StudentCourseEnrollmentIds?.Count > 0)
-                await AddEnrollmentsToTransaction(transactionId, transaction.StudentCourseEnrollmentIds);
+            //if (transaction.StudentCourseEnrollmentIds?.Count > 0)
+              //  await AddEnrollmentsToTransaction(transactionId, transaction.StudentCourseEnrollmentIds);
 
             return await GetTransaction(transactionId) ?? throw new Exception("Failed to retrieve transaction");
         }
+
+        public async Task<bool> AddEnrollmentsToTransaction(Guid studentCourseTransactionId, Guid studentCourseEnrollmentId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            // Same transaction id param reused for all rows
+            cmd.AddParameter("@Id", Guid.NewGuid().ToByteArray());  // Id (PK)
+            cmd.AddParameter("@StudentCourseTransactionId", studentCourseTransactionId.ToByteArray());
+            cmd.AddParameter("@StudentCourseEnrollmentId", studentCourseEnrollmentId.ToByteArray());
+
+            cmd.CommandText = @"
+                INSERT INTO student_course_transaction_enrollment
+                (Id, StudentCourseTransactionId, StudentCourseEnrollmentId)
+                VALUES
+                (@Id, @StudentCourseTransactionId, @StudentCourseEnrollmentId)
+            ";
+
+            var affected = await cmd.ExecuteNonQueryAsync();
+            return affected > 0;
+        }
+
 
         // ----------------------------
         // Get Transaction by ID
@@ -1078,6 +1106,33 @@ namespace Courses.Repository.Implementation
             };
         }
 
+        private async Task<string> GenerateUniquePaymentCodeAsync(DbConnection conn)
+        {
+            const int maxAttempts = 20;
+
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                var code = Generate6CharCode();
+
+                using var checkCmd = conn.CreateCommand();
+                checkCmd.CommandText = @"
+            SELECT 1
+            FROM student_course_transaction
+            WHERE PaymentCode = @Code
+            LIMIT 1;
+        ";
+                checkCmd.AddParameter("@Code", code);
+
+                var exists = await checkCmd.ExecuteScalarAsync();
+
+                if (exists == null || exists == DBNull.Value)
+                {
+                    return code; // unique
+                }
+            }
+
+            throw new Exception("Failed to generate a unique payment code after several attempts.");
+        }
         private async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsByColumn(string columnName, Guid columnValue)
         {
             var results = new List<StudentCourseTransactionResponse>();
@@ -1096,5 +1151,24 @@ namespace Courses.Repository.Implementation
             return results;
         }
 
+        private static readonly char[] PaymentCodeChars =
+        "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".ToCharArray();
+        // Excludes I, O, 1, 0 for readability
+
+        private static string Generate6CharCode()
+        {
+            Span<char> buffer = stackalloc char[6];
+            Span<byte> bytes = stackalloc byte[6];
+
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(bytes);
+
+            for (int i = 0; i < buffer.Length; i++)
+            {
+                buffer[i] = PaymentCodeChars[bytes[i] % PaymentCodeChars.Length];
+            }
+
+            return new string(buffer);
+        }
     }
 }

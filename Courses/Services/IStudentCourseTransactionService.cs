@@ -24,7 +24,7 @@ namespace Courses.Services
         // ----------------------------
         // Enrollments
         // ----------------------------
-        Task<bool> AddEnrollmentsToTransaction(Guid transactionId, IEnumerable<Guid> enrollmentIds);
+        Task<bool> AddEnrollmentsToTransaction(Guid studentCourseTransactionId, Guid studentCourseEnrollmentId);
 
         Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentsForTransaction(Guid transactionId);
 

@@ -39,8 +39,8 @@ namespace Courses.Implementation.Services
         // ----------------------------
         // Enrollments
         // ----------------------------
-        public Task<bool> AddEnrollmentsToTransaction(Guid transactionId, IEnumerable<Guid> enrollmentIds)
-            => _repository.AddEnrollmentsToTransaction(transactionId, enrollmentIds);
+        public Task<bool> AddEnrollmentsToTransaction(Guid studentCourseTransactionId, Guid studentCourseEnrollmentId)
+            => _repository.AddEnrollmentsToTransaction(studentCourseTransactionId, studentCourseEnrollmentId);
 
         public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentsForTransaction(Guid transactionId)
             => _repository.GetEnrollmentsForTransaction(transactionId);
