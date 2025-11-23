@@ -19,11 +19,10 @@ namespace Courses.Repository
 
         Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactions();
 
-        Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByFamily(Guid familyId);
+        Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionByFamily(Guid familyId);
 
-        Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByCourse(Guid courseId);
 
-        Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByEnrollment(Guid enrollmentId);
+        //Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByEnrollment(Guid enrollmentId);
 
         // ----------------------------
         // Enrollments
@@ -60,6 +59,11 @@ namespace Courses.Repository
         // ----------------------------
         Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsPerCourseAsync(Guid courseId);
         Task<StudentCourseTransactionResponse> GetTransactionByFamilyForCurrentSession(Guid familyId, Guid instituteId);
+        Task<IEnumerable<StudentCourseTransactionResponse>> GetInstituteTransactionsByFamily(Guid familyId, Guid instituteId);
         Task<IEnumerable<StudentCourseTransactionResponse>> GetCourseTransactionsByFamily(Guid courseId, Guid familyId);
+
+        Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByCourse(Guid courseId);
+
+        Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByInstitute(Guid instituteId);
     }
 }

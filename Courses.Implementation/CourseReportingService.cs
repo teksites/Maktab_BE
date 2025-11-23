@@ -35,7 +35,7 @@ namespace Courses.Implementation
         // ----------------------------
         public async Task<IEnumerable<PendingAmountPerFamily>> GetPendingAmountsPerFamily()
         {
-            var transactions = await _transactionRepo.GetAllTransactionsByFamily(Guid.Empty); // Fetch all
+            var transactions = await _transactionRepo.GetAllTransactions(); // Fetch all
             return transactions
                 .GroupBy(t => t.FamilyId)
                 .Select(g => new PendingAmountPerFamily
@@ -51,7 +51,7 @@ namespace Courses.Implementation
         // ----------------------------
         public async Task<IEnumerable<PendingAmountPerInstitute>> GetPendingAmountsPerInstitute()
         {
-            var transactions = await _transactionRepo.GetAllTransactionsByFamily(Guid.Empty);
+            var transactions = await _transactionRepo.GetAllTransactions();
             var result = new List<PendingAmountPerInstitute>();
 
             foreach (var t in transactions)
@@ -82,7 +82,7 @@ namespace Courses.Implementation
         // ----------------------------
         public async Task<IEnumerable<PendingAmountPerCourse>> GetPendingAmountsPerCourse()
         {
-            var transactions = await _transactionRepo.GetAllTransactionsByFamily(Guid.Empty);
+            var transactions = await _transactionRepo.GetAllTransactions();
             var result = new List<PendingAmountPerCourse>();
 
             foreach (var t in transactions)
@@ -113,7 +113,7 @@ namespace Courses.Implementation
         // ----------------------------
         public async Task<IEnumerable<PendingAmountPerCourseGroup>> GetPendingAmountsPerCourseGroup()
         {
-            var transactions = await _transactionRepo.GetAllTransactionsByFamily(Guid.Empty);
+            var transactions = await _transactionRepo.GetAllTransactions();
             var result = new List<PendingAmountPerCourseGroup>();
 
             foreach (var t in transactions)
