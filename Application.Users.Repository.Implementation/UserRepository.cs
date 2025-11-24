@@ -234,62 +234,166 @@ namespace Application.Users.Repository.Implementation
             var results = new List<UserInformation>();
 
             using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            using (var cmd = conn.CreateCommand())
             {
-                using (var cmd = conn.CreateCommand())
+                cmd.CommandText = @"
+SELECT 
+    UserId,
+    FirstName,
+    LastName,
+    Email,
+    Phone,
+    UserName,
+    Password,
+    IsActive,
+    CreatedAt,
+    UpdatedOn,
+    IsAdmin,
+    IsTempPassword,
+    FamilyId,
+    Relationship,
+    UserRole
+FROM
+(
+    -- Permanent user table
+    SELECT
+        ui.UserId,
+        ui.FirstName,
+        ui.LastName,
+        ui.Email,
+        ui.Phone,
+        ui.UserName,
+        ui.Password,
+        ui.IsActive,
+        ui.CreatedAt,
+        ui.UpdatedOn,
+        ui.IsAdmin,
+        ui.IsTempPassword,
+        ui.FamilyId,
+        ui.Relationship,
+        ui.UserRole
+    FROM user_info ui
+    WHERE ui.FamilyId = @familyId
+
+    UNION ALL
+
+    -- Temp user table
+    SELECT
+        tui.UserId,
+        tui.FirstName,
+        tui.LastName,
+        tui.Email,
+        tui.Phone,
+        tui.UserName,
+        tui.Password,
+        tui.IsActive,
+        tui.CreatedAt,
+        tui.UpdatedOn,
+        0 AS IsAdmin,   -- temp users do not have admin flag
+        tui.IsTempPassword,
+        tui.FamilyId,
+        tui.Relationship,
+        tui.UserRole
+    FROM temp_user_info tui
+    WHERE tui.FamilyId = @familyId
+) u
+";
+
+                cmd.AddParameter("@familyId", id.ToByteArray());
+
+                // Apply IsActive filter only if requested
+                if (ifOnlyActive)
+                    cmd.CommandText += " WHERE u.IsActive = 1";
+
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+
+                while (await reader.ReadAsync().ConfigureAwait(false))
                 {
-                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId, Relationship, UserRole from user_info where FamilyId = @familyId";
-
-                    cmd.AddParameter("@familyId", id.ToByteArray());
-
-                    if (ifOnlyActive)
+                    results.Add(new UserInformation
                     {
-                        cmd.CommandText += " and IsActive = True";
-                    }
-
-                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-
-                    while (await reader.ReadAsync().ConfigureAwait(false))
-                    {
-                        var userId = reader.GetGuidFromByteArray(0);
-                        var fristName = reader.GetString(1);
-                        var lastName = reader.GetString(2);
-                        var email = reader.GetString(3);
-                        var phone = reader.GetString(4);
-                        var userName = reader.GetString(5);
-                        var password = reader.GetString(6);
-                        var isActive = reader.GetBoolean(7);
-                        var CreatedAt = reader.GetDateTime(8);
-                        var UpdatedOn = reader.GetDateTime(9);
-                        var isAdmin = reader.GetBoolean(10);
-                        var isTempPassword = reader.GetBoolean(11);
-                        var familyId = reader.GetGuidFromByteArray(12);
-                        var relationship = (Relationship)reader.GetInt32(13);
-                        var userRole = (UserRoleType)reader.GetInt32(14);
-
-                        results.Add(new UserInformation
-                        {
-                            UserId = userId,
-                            FamilyId = familyId,
-                            FirstName = fristName,
-                            LastName = lastName,
-                            Email = email,
-                            Phone = phone,
-                            Password = string.Empty,
-                            UserName = userName,
-                            IsActive = isActive,
-                            CreatedAt = CreatedAt,
-                            UpdatedOn = UpdatedOn,
-                            IsAdmin = isAdmin,
-                            IsTempPassword = isTempPassword,
-                            Relationship = relationship,
-                            UserRole = userRole
-                        });
-                    }
+                        UserId = reader.GetGuidFromByteArray(0),
+                        FirstName = reader.GetString(1),
+                        LastName = reader.GetString(2),
+                        Email = reader.GetString(3),
+                        Phone = reader.GetString(4),
+                        UserName = reader.GetString(5),
+                        Password = string.Empty, // protect password
+                        IsActive = reader.GetBoolean(7),
+                        CreatedAt = reader.GetDateTime(8),
+                        UpdatedOn = reader.GetDateTime(9),
+                        IsAdmin = reader.GetBoolean(10),
+                        IsTempPassword = reader.GetBoolean(11),
+                        FamilyId = reader.GetGuidFromByteArray(12),
+                        Relationship = (Relationship)reader.GetInt32(13),
+                        UserRole = (UserRoleType)reader.GetInt32(14)
+                    });
                 }
             }
 
             return results;
         }
+
+        //public async Task<IEnumerable<UserInformation>> GetAllFamilyUsersInformation(Guid id, bool ifOnlyActive = true)
+        //{
+        //    var results = new List<UserInformation>();
+
+        //    using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+        //    {
+        //        using (var cmd = conn.CreateCommand())
+        //        {
+        //            cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId, Relationship, UserRole from user_info where FamilyId = @familyId";
+
+        //            cmd.AddParameter("@familyId", id.ToByteArray());
+
+        //            if (ifOnlyActive)
+        //            {
+        //                cmd.CommandText += " and IsActive = True";
+        //            }
+
+        //            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+
+        //            while (await reader.ReadAsync().ConfigureAwait(false))
+        //            {
+        //                var userId = reader.GetGuidFromByteArray(0);
+        //                var fristName = reader.GetString(1);
+        //                var lastName = reader.GetString(2);
+        //                var email = reader.GetString(3);
+        //                var phone = reader.GetString(4);
+        //                var userName = reader.GetString(5);
+        //                var password = reader.GetString(6);
+        //                var isActive = reader.GetBoolean(7);
+        //                var CreatedAt = reader.GetDateTime(8);
+        //                var UpdatedOn = reader.GetDateTime(9);
+        //                var isAdmin = reader.GetBoolean(10);
+        //                var isTempPassword = reader.GetBoolean(11);
+        //                var familyId = reader.GetGuidFromByteArray(12);
+        //                var relationship = (Relationship)reader.GetInt32(13);
+        //                var userRole = (UserRoleType)reader.GetInt32(14);
+
+        //                results.Add(new UserInformation
+        //                {
+        //                    UserId = userId,
+        //                    FamilyId = familyId,
+        //                    FirstName = fristName,
+        //                    LastName = lastName,
+        //                    Email = email,
+        //                    Phone = phone,
+        //                    Password = string.Empty,
+        //                    UserName = userName,
+        //                    IsActive = isActive,
+        //                    CreatedAt = CreatedAt,
+        //                    UpdatedOn = UpdatedOn,
+        //                    IsAdmin = isAdmin,
+        //                    IsTempPassword = isTempPassword,
+        //                    Relationship = relationship,
+        //                    UserRole = userRole
+        //                });
+        //            }
+        //        }
+        //    }
+
+        //    return results;
+        //}
 
         public async Task<UserInformation> GetUserInformation(Guid userId)
         {
