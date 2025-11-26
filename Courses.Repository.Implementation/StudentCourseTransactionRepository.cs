@@ -553,6 +553,7 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
+            sct.DayCareDiscount,
             sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
@@ -563,6 +564,7 @@ namespace Courses.Repository.Implementation
             sct.IsCompletelyPaid,
             sct.CreatedAt,
             sct.UpdatedOn,
+
 
             -- Enrollment fields
             sce.StudentCourseEnrollmentId,
@@ -612,6 +614,7 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
+            sct.DayCareDiscount,
             sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
@@ -669,6 +672,7 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
+            sct.DayCareDiscount,
             sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
@@ -723,6 +727,7 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
+            sct.DayCareDiscount,
             sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
