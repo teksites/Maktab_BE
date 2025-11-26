@@ -1,7 +1,6 @@
 ﻿using Courses.Services;
 using Maktab.Attributes;
 using MaktabDataContracts.Requests.Course;
-using MaktabDataContracts.Responses.Course;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
@@ -52,9 +51,9 @@ public class StudentCourseTransactionController : ControllerBase
         return await _service.GetTransactionByPaymentCode(paymentCode).ConfigureAwait(false);
     }
 
-    [HttpPost]
-    public async Task<StudentCourseTransactionResponse> AddTransaction(AddStudentCourseTransaction transaction)
-        => await _service.AddTransaction(transaction);
+    //[HttpPost]
+    //public async Task<StudentCourseTransactionResponse> AddTransaction(AddStudentCourseTransaction transaction)
+    //    => await _service.AddTransaction(transaction);
 
     [HttpPut("{transactionId:guid}")]
     public async Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction)
