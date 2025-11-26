@@ -67,5 +67,6 @@ namespace Courses.Repository
         Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByCourse(Guid courseId);
 
         Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByInstitute(Guid instituteId);
+        Task<StudentCourseTransactionResponse?> GetTransactionByPaymentCode(string paymentCode);
     }
 }

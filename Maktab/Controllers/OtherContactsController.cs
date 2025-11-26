@@ -41,9 +41,9 @@ namespace Maktab.Controllers
         [Authorize]
         [HttpGet("families/{familyId:guid}/otherContacts")]
         [EnableCors("corspolicy")]
-        public async Task<IEnumerable<OtherContactResponse>> GetUserOtherContactss(Guid familyId, IEnumerable<ContactType> contactTypes)
+        public async Task<IEnumerable<OtherContactResponse>> GetUserOtherContactss(Guid familyId, [FromQuery] List<ContactType> contactTypes)
         {
-            return await _otherContactsService.GetFamilyOtherContacts(familyId, contactTypes).ConfigureAwait(false);
+            return await _otherContactsService.GetFamilyOtherContacts(familyId, contactTypes);
         }
 
         [Authorize]

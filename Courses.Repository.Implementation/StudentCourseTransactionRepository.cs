@@ -6,8 +6,6 @@ using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
 using MaktabDataContracts.Enums;
 using System.Data.Common;
-using System.Transactions;
-using Newtonsoft.Json.Linq;
 using System.Security.Cryptography;
 using TransactionStatus = MaktabDataContracts.Enums.TransactionStatus;
 
@@ -31,16 +29,17 @@ namespace Courses.Repository.Implementation
 
             cmd.CommandText = @"
                 INSERT INTO student_course_transaction
-                (StudentCourseTransactionId, FamilyId, PayableFee, DayCareFee, AmountDiscounted, TotalPayable, Comments, Status, PaymentCode, IsActive, TotalAmountPaid, IsCompletelyPaid, CreatedAt, UpdatedOn)
+                (StudentCourseTransactionId, FamilyId, PayableFee, DayCareFee, FeeAmountDiscount, TotalPayable, Comments, Status, PaymentCode, IsActive, TotalAmountPaid, IsCompletelyPaid, CreatedAt, UpdatedOn, DayCareFee, DayCareDiscount)
                 VALUES
-                (@TransactionId, @FamilyId, @PayableFee, @DayCareFee, @AmountDiscounted, @TotalPayable, @Comments, @Status, @PaymentCode, @IsActive, @TotalAmountPaid, @IsCompletelyPaid, @CreatedAt, @UpdatedOn)
+                (@TransactionId, @FamilyId, @PayableFee, @DayCareFee, @FeeAmountDiscount, @TotalPayable, @Comments, @Status, @PaymentCode, @IsActive, @TotalAmountPaid, @IsCompletelyPaid, @CreatedAt, @UpdatedOn, @DayCareFee, @DayCareDiscount)
             ";
 
             cmd.AddParameter("@TransactionId", transactionId.ToByteArray())
                .AddParameter("@FamilyId", transaction.FamilyId.ToByteArray())
                .AddParameter("@PayableFee", transaction.PayableFee)
                .AddParameter("@DayCareFee", transaction.DayCareFee)
-               .AddParameter("@AmountDiscounted", transaction.AmountDiscounted)
+               .AddParameter("@DayCareDiscount", transaction.DayCareDiscount)
+               .AddParameter("@FeeAmountDiscount", transaction.FeeAmountDiscount)
                .AddParameter("@TotalPayable", transaction.TotalPayable)
                .AddParameter("@Comments", transaction.Comments)
                .AddParameter("@Status", (int)transaction.TransactionStatus)
@@ -111,7 +110,8 @@ namespace Courses.Repository.Implementation
                 SET FamilyId = @FamilyId,
                     PayableFee = @PayableFee,
                     DayCareFee = @DayCareFee,
-                    AmountDiscounted = @AmountDiscounted,
+                    DayCareDiscount = @DayCareDiscount,
+                    FeeAmountDiscount = @FeeAmountDiscount,
                     TotalPayable = @TotalPayable,
                     Comments = @Comments,
                     Status = @Status,
@@ -127,7 +127,8 @@ namespace Courses.Repository.Implementation
                .AddParameter("@FamilyId", transaction.FamilyId.ToByteArray())
                .AddParameter("@PayableFee", transaction.PayableFee)
                .AddParameter("@DayCareFee", transaction.DayCareFee)
-               .AddParameter("@AmountDiscounted", transaction.AmountDiscounted)
+               .AddParameter("@DayCareDiscount", transaction.DayCareDiscount)
+               .AddParameter("@FeeAmountDiscount", transaction.FeeAmountDiscount)
                .AddParameter("@TotalPayable", transaction.TotalPayable)
                .AddParameter("@Comments", transaction.Comments)
                .AddParameter("@Status", (int)transaction.TransactionStatus)
@@ -206,7 +207,7 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
-            sct.AmountDiscounted,
+            sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
             sct.Status          AS TransactionStatus,
@@ -257,7 +258,7 @@ namespace Courses.Repository.Implementation
             var ordTxFamilyId = reader.GetOrdinal("FamilyId");
             var ordPayableFee = reader.GetOrdinal("PayableFee");
             var ordDayCareFee = reader.GetOrdinal("DayCareFee");
-            var ordAmountDiscounted = reader.GetOrdinal("AmountDiscounted");
+            var ordFeeAmountDiscount = reader.GetOrdinal("FeeAmountDiscount");
             var ordTotalPayable = reader.GetOrdinal("TotalPayable");
             var ordComments = reader.GetOrdinal("Comments");
             var ordStatus = reader.GetOrdinal("TransactionStatus");
@@ -294,7 +295,7 @@ namespace Courses.Repository.Implementation
                         FamilyId = reader.GetGuid(ordTxFamilyId),
                         PayableFee = reader.GetDecimal(ordPayableFee),
                         DayCareFee = reader.GetDecimal(ordDayCareFee),
-                        AmountDiscounted = Convert.ToDecimal(reader.GetInt32(ordAmountDiscounted)),
+                        FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32(ordFeeAmountDiscount)),
                         TotalPayable = reader.GetDecimal(ordTotalPayable),
                         Comments = reader.IsDBNull(ordComments)
                                           ? string.Empty
@@ -346,7 +347,8 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
-            sct.AmountDiscounted,
+            sct.DayCareDiscount,
+            sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
             sct.Status          AS TransactionStatus,
@@ -402,7 +404,7 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
-            sct.AmountDiscounted,
+            sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
             sct.Status          AS TransactionStatus,
@@ -458,7 +460,7 @@ namespace Courses.Repository.Implementation
             var ordTxFamilyId = reader.GetOrdinal("FamilyId");
             var ordPayableFee = reader.GetOrdinal("PayableFee");
             var ordDayCareFee = reader.GetOrdinal("DayCareFee");
-            var ordAmountDiscounted = reader.GetOrdinal("AmountDiscounted");
+            var ordFeeAmountDiscount = reader.GetOrdinal("FeeAmountDiscount");
             var ordTotalPayable = reader.GetOrdinal("TotalPayable");
             var ordComments = reader.GetOrdinal("Comments");
             var ordStatus = reader.GetOrdinal("TransactionStatus");
@@ -496,7 +498,7 @@ namespace Courses.Repository.Implementation
                         DayCareFee = reader.GetDecimal(ordDayCareFee),
 
                         // DB is int, DTO is decimal; if needed you can change this mapping:
-                        AmountDiscounted = Convert.ToDecimal(reader.GetInt32(ordAmountDiscounted)),
+                        FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32(ordFeeAmountDiscount)),
 
                         TotalPayable = reader.GetDecimal(ordTotalPayable),
                         Comments = reader.IsDBNull(ordComments)
@@ -551,7 +553,7 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
-            sct.AmountDiscounted,
+            sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
             sct.Status          AS TransactionStatus,
@@ -610,7 +612,7 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
-            sct.AmountDiscounted,
+            sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
             sct.Status          AS TransactionStatus,
@@ -667,7 +669,7 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
-            sct.AmountDiscounted,
+            sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
             sct.Status          AS TransactionStatus,
@@ -721,7 +723,7 @@ namespace Courses.Repository.Implementation
             sct.FamilyId,
             sct.PayableFee,
             sct.DayCareFee,
-            sct.AmountDiscounted,
+            sct.FeeAmountDiscount,
             sct.TotalPayable,
             sct.Comments,
             sct.Status          AS TransactionStatus,
@@ -1004,7 +1006,8 @@ namespace Courses.Repository.Implementation
             var ordTxFamilyId = reader.GetOrdinal("FamilyId");
             var ordPayableFee = reader.GetOrdinal("PayableFee");
             var ordDayCareFee = reader.GetOrdinal("DayCareFee");
-            var ordAmountDiscounted = reader.GetOrdinal("AmountDiscounted");
+            var ordDayCareDiscount = reader.GetOrdinal("DayCareDiscount");
+            var ordFeeAmountDiscount = reader.GetOrdinal("FeeAmountDiscount");
             var ordTotalPayable = reader.GetOrdinal("TotalPayable");
             var ordComments = reader.GetOrdinal("Comments");
             var ordStatus = reader.GetOrdinal("TransactionStatus");
@@ -1040,9 +1043,9 @@ namespace Courses.Repository.Implementation
                         FamilyId = reader.GetGuid(ordTxFamilyId),
                         PayableFee = reader.GetDecimal(ordPayableFee),
                         DayCareFee = reader.GetDecimal(ordDayCareFee),
-
+                        DayCareDiscount = reader.GetDecimal(ordDayCareDiscount),
                         // DB: int, DTO: decimal
-                        AmountDiscounted = Convert.ToDecimal(reader.GetInt32(ordAmountDiscounted)),
+                        FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32(ordFeeAmountDiscount)),
 
                         TotalPayable = reader.GetDecimal(ordTotalPayable),
                         Comments = reader.IsDBNull(ordComments)
@@ -1093,7 +1096,8 @@ namespace Courses.Repository.Implementation
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
                 PayableFee = reader.GetDecimal("PayableFee"),
                 DayCareFee = reader.GetDecimal("DayCareFee"),
-                AmountDiscounted = reader.GetDecimal("AmountDiscounted"),
+                DayCareDiscount = reader.GetDecimal("DayCareDiscount"),
+                FeeAmountDiscount = reader.GetDecimal("FeeAmountDiscount"),
                 TotalPayable = reader.GetDecimal("TotalPayable"),
                 TotalAmountPaid = reader.GetDecimal("TotalAmountPaid"),
                 Comments = reader.GetString("Comments"),
@@ -1169,6 +1173,20 @@ namespace Courses.Repository.Implementation
             }
 
             return new string(buffer);
+        }
+
+        public async Task<StudentCourseTransactionResponse?> GetTransactionByPaymentCode(string paymentCode)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = "SELECT * FROM student_course_transaction WHERE LOWER(PaymentCode) = LOWER(@PaymentCode);";
+            cmd.AddParameter("@PaymentCode", paymentCode);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
+
+            return await MapToTransactionSingleResponse(reader);
         }
     }
 }

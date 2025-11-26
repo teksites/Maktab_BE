@@ -94,5 +94,10 @@ namespace Courses.Implementation.Services
 
         public Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByInstitute(Guid instituteId)
             => _repository.GetAllTransactionsByInstitute(instituteId);
+
+        public Task<StudentCourseTransactionResponse?> GetTransactionByPaymentCode(string paymentCode)
+        {
+            return _repository.GetTransactionByPaymentCode(paymentCode);
+        }
     }
 }

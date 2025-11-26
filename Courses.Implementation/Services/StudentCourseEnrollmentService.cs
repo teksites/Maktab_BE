@@ -1,9 +1,10 @@
 ﻿using Courses.Repository;
 using Courses.Services;
 using MaktabDataContracts.Requests.Course;
+using MaktabDataContracts.Requests.Policies;
 using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
-using System.Transactions;
+using Newtonsoft.Json;
 
 namespace Courses.Implementation.Services
 {
@@ -12,125 +13,163 @@ namespace Courses.Implementation.Services
         private readonly IStudentCourseEnrollmentRepository _repository;
         private readonly IStudentCourseTransactionService _studentCourseTransactionService;
         private readonly ICourseService _courseService;
+        private readonly IInstitutePolicyService _policyService;
 
-        public StudentCourseEnrollmentService(IStudentCourseEnrollmentRepository repository, IStudentCourseTransactionService studentCourseEnrollmentService, ICourseService courseService)
+        public StudentCourseEnrollmentService(IStudentCourseEnrollmentRepository repository, IStudentCourseTransactionService studentCourseEnrollmentService, ICourseService courseService, IInstitutePolicyService policyService)
         {
             _repository = repository;
             _studentCourseTransactionService = studentCourseEnrollmentService;
             _courseService = courseService;
+            _policyService = policyService;
         }
 
         public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment)
         {
 
-            var childEnrollment = await GetStudentCourseEnrollment(enrollment.ChildId, enrollment.CourseId).ConfigureAwait(false);
+            var familyTransactions = await _studentCourseTransactionService.GetCourseTransactionsByFamily(enrollment.CourseId, enrollment.FamilyId).ConfigureAwait(false);
 
-            // If child is not already registered to the same course
-            if (childEnrollment is not null && childEnrollment.CourseEnrollmentGroupId != enrollment.CourseEnrollmentGroupId)
+            var familyCourseTransaction = familyTransactions.Where(x => x.Enrollments.All(y => y.CourseId == enrollment.CourseId));
+            var course = await _courseService.GetCourse(enrollment.CourseId).ConfigureAwait(false);
+            var selectedCourseEnrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
+
+            if (familyCourseTransaction.Any())// We have the transaction for the same course for same child or other child at the moment
             {
+                //var childEnrollments = await GetStudentCourseEnrollment(enrollment.ChildId, enrollment.CourseId).ConfigureAwait(false);
+                var childEnrollment = familyCourseTransaction.First().Enrollments.Where(childEnrollment => childEnrollment.ChildId == enrollment.ChildId);
+                var enrollmentForExistingChild = childEnrollment.Any(x => x.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
 
-                var familyTransactions = await _studentCourseTransactionService.GetCourseTransactionsByFamily(enrollment.CourseId, enrollment.FamilyId).ConfigureAwait(false);
-
-                if (familyTransactions.Any()) // we have to append the transaction and recalculate the discount and fee in transaction
+                if (enrollmentForExistingChild)
                 {
-                    // Add enrollment first
-                    var addedEnrollment = await _repository.AddEnrollment(enrollment).ConfigureAwait(false);
+                    throw new Exception("The child is already registered to the selected course group");
+                }
 
-                    var transaction = await _studentCourseTransactionService.GetTransaction(familyTransactions.First().StudentCourseTransactionId).ConfigureAwait(false);
+                var transaction = familyCourseTransaction.First();
 
-                    // Update the transcation
-                    // First create the transaction based on course data
-                    var transactionToAdd = await CreateTransactionData(enrollment, new AddStudentCourseTransaction
-                    {
-                        StudentCourseTransactionId = transaction.StudentCourseTransactionId,
-                        FamilyId = transaction.FamilyId,
-                        PaymentCode = transaction.PaymentCode,
-                        AmountDiscounted = transaction.AmountDiscounted,
-                        Comments = transaction.Comments,
-                        DayCareFee = transaction.DayCareFee,
-                        IsActive = transaction.IsActive,
-                        IsCompletelyPaid = transaction.IsCompletelyPaid,
-                        PayableFee = transaction.PayableFee,
-                        StudentCourseEnrollmentIds = new List<Guid> { transaction.StudentCourseEnrollmentId },
-                        TotalAmountPaid = transaction.TotalAmountPaid,
-                        TotalPayable = transaction.TotalPayable,
-                         TransactionStatus = transaction.TransactionStatus
-                    }).ConfigureAwait(false);
-                    
-                    if (addedEnrollment != null)
-                    {
-                        var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(transaction.StudentCourseTransactionId,
-                            addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
-                    }
+                var newDayCareFee = (enrollment.WillUseDayCare ? selectedCourseEnrollmentGroup.DayCareFee : 0);
+                decimal newCourseFee = 0;
 
+                //if there is any existing enrollment for the child in the same course for any course group. if it is the same course group then we will not allow registration
+                if (childEnrollment.Any()) // child is already registered for the same course in different course group
+                {
+                    enrollment.EnrollmentIndex = childEnrollment.Max(e => e.EnrollmentIndex);
+                    newCourseFee = selectedCourseEnrollmentGroup.Fee;
                     //Now update the transaction to include the new enrollment
 
                 }
-                else //its a brand new registration for the course
+                else // child is not registered for any course group of the course
                 {
-                    // Add enrollment first
-                    var addedEnrollment = await _repository.AddEnrollment(enrollment).ConfigureAwait(false);
-                    StudentCourseTransactionResponse transaction = null; 
+                    //here we have to add new enrollment and update the existing transaction to include the new enrollment for new child
+                    // We will calculate the discount and apply
+                    var policies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
+                    var discountPolicy = policies.Where(p => p.IsActive && p.InstutePolicy == MaktabDataContracts.Enums.InstutePolicyType.SiblingDiscount).First().Details;
+                    SiblingDiscountPolicy policy = JsonConvert.DeserializeObject<SiblingDiscountPolicy>(discountPolicy);
+
+                    var distinctChildIds = familyTransactions
+                        .SelectMany(t => t.Enrollments)
+                        .Select(e => e.ChildId)
+                        .Distinct()
+                        .ToList();
                     
-                    // Add student transaction
-                    if (addedEnrollment != null)
+                    enrollment.EnrollmentIndex = distinctChildIds.Count + 1;
+
+                    decimal discountPercentage = policy.FirstChildFee / 100;
+
+                    if (distinctChildIds.Count == 1)
                     {
-                        // First create the transaction based on course data
-                        transaction = await _studentCourseTransactionService.AddTransaction(await CreateTransactionData(enrollment, null).ConfigureAwait(false)
-                            ).ConfigureAwait(false);
-                        
-                        if (transaction != null)
-                        {
-                            var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(transaction.StudentCourseEnrollmentId,
-                                addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
-                        }
-                        else//reverting the state
-                        {
-                            await _repository.DeleteEnrollment(addedEnrollment.StudentCourseEnrollmentId, true).ConfigureAwait(false);
-                        }
+                        discountPercentage = policy.SecondChildFee / 100;
+                    }
+                    else if (distinctChildIds.Count >= 2)
+                    {
+                        discountPercentage = policy.ThirdAndOnwardChildFee / 100;
                     }
 
-                    if (addedEnrollment != null && transaction != null)
-                    {
-                        var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(familyTransactions.First().StudentCourseTransactionId,
-                            addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
-                    }
+                    newCourseFee = selectedCourseEnrollmentGroup.Fee * discountPercentage;
                 }
 
-                // Now add the transcation
-                //if (latestTransaction is not null)// add logic to check the course session here
-                //{
-                // caclulate the discount if any
-                //Calculate the payble fee
-                // Get instution polucy for discount
+                // Add enrollment first
+                var addedEnrollment = await _repository.AddEnrollment(enrollment).ConfigureAwait(false);
 
-                //     _studentCourseEnrollmentService.UpdateTransaction(new AddStudentCourseTransaction
-                //     {
-                //         AmountDiscounted = latestTransaction.AmountDiscounted,
-                //         StudentCourseTransactionId = latestTransaction.StudentCourseTransactionId,
+                //var transaction = await _studentCourseTransactionService.GetTransaction(familyCourseTransaction.First().StudentCourseTransactionId).ConfigureAwait(false);
 
-                //         FamilyId = latestTransaction.FamilyId,
-                //         PaymentCode = latestTransaction.PaymentCode,
-                //         //       StudentCourseEnrollmentId = latestTransaction.StudentCourseEnrollmentId
-                //     });
-                ////     latestTransaction.StudentCourseEnrollmentId
-                // }
+                // Update the transcation
+                // First create the transaction based on course data
+                var transactionToUpdate = new AddStudentCourseTransaction
+                {
+                    StudentCourseTransactionId = transaction.StudentCourseTransactionId,
+                    FamilyId = transaction.FamilyId,
+                    PaymentCode = transaction.PaymentCode,
+                    FeeAmountDiscount = transaction.FeeAmountDiscount,
+                    DayCareDiscount = transaction.DayCareDiscount,
+                    Comments = transaction.Comments,
+                    DayCareFee = transaction.DayCareFee + newDayCareFee,
+                    IsActive = transaction.IsActive,
+                    IsCompletelyPaid = transaction.IsCompletelyPaid,
+                    PayableFee = transaction.PayableFee + newCourseFee,
+                    StudentCourseEnrollmentIds = new List<Guid> { transaction.StudentCourseEnrollmentId },
+                    TotalAmountPaid = transaction.TotalAmountPaid,
+                    TotalPayable = transaction.TotalPayable + newDayCareFee + newCourseFee,
+                    TransactionStatus = transaction.TransactionStatus
+                };
+                var ifTransactionUpdated = await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, transactionToUpdate).ConfigureAwait(false);
 
-                // add serive to generate payment code and invoice id
-                // in case no exisiting transaction found, create a new one
-                // enrollment.TransactionId = latestTransaction.Id;
+                if (ifTransactionUpdated)
+                {
+                    var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(transaction.StudentCourseTransactionId,
+                        addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _repository.DeleteEnrollment(addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
+                }
 
-                return await _repository.AddEnrollment(enrollment).ConfigureAwait(false); 
+                return addedEnrollment;
             }
+            else // there is no previous transaction for the course for any child of the family. we will calculate new transaction and apply regisrtration fee
+            {
+                var addedEnrollment = await _repository.AddEnrollment(enrollment).ConfigureAwait(false);
+                StudentCourseTransactionResponse transaction = null;
 
-            return null;
+                // Add student transaction
+                var addStudentCourseTransaction = new AddStudentCourseTransaction();
+                addStudentCourseTransaction.StudentCourseTransactionId = Guid.NewGuid();
+                addStudentCourseTransaction.FamilyId = enrollment.FamilyId;
+                addStudentCourseTransaction.PaymentCode = $"GENERATECODE";
+                addStudentCourseTransaction.TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.AwaitingPayment;
+                addStudentCourseTransaction.IsActive = true;
+                addStudentCourseTransaction.PayableFee = selectedCourseEnrollmentGroup.Fee; // get from course
+                addStudentCourseTransaction.FeeAmountDiscount = 0;
+                addStudentCourseTransaction.DayCareDiscount = 0;
+                addStudentCourseTransaction.DayCareFee = enrollment.WillUseDayCare ? selectedCourseEnrollmentGroup.DayCareFee : 0;//add day care fee in course group
+                addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
+                    (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
+                addStudentCourseTransaction.Comments = "New Enrollment";
+                addStudentCourseTransaction.IsCompletelyPaid = false;
 
+                try
+                {
+                    var addedTransaction = await _studentCourseTransactionService.AddTransaction(addStudentCourseTransaction).ConfigureAwait(false);
+                    var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(addedTransaction.StudentCourseEnrollmentId,
+                              addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
+                }
+                catch(Exception e)
+                {
+                        await _repository.DeleteEnrollment(addedEnrollment.StudentCourseEnrollmentId, true).ConfigureAwait(false);
+                }
+                return addedEnrollment;
+            }
         }
 
         private async Task<AddStudentCourseTransaction> CreateTransactionData(AddStudentCourseEnrollment enrollment, AddStudentCourseTransaction addStudentCourseTransaction)
         {
-            var course = await _courseService.GetCourseGroup(enrollment.CourseEnrollmentGroupId).ConfigureAwait(false);
-
+            //var course = await _courseService.GetCourseGroup(enrollment.CourseEnrollmentGroupId).ConfigureAwait(false);
+            var course = await _courseService.GetCourse(enrollment.CourseId).ConfigureAwait(false);
+            var enrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
+           
+            if (enrollmentGroup == null)
+            {
+                throw new Exception("Course enrollment group not found");
+            }
+             
             if (addStudentCourseTransaction == null) // new
             {
                 addStudentCourseTransaction = new AddStudentCourseTransaction();
@@ -139,10 +178,12 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.PaymentCode = $"GENERATECODE";
                 addStudentCourseTransaction.TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.AwaitingPayment;
                 addStudentCourseTransaction.IsActive = true;
-                addStudentCourseTransaction.PayableFee = course.Fee; // get from course
-                addStudentCourseTransaction.AmountDiscounted = 0;
-                addStudentCourseTransaction.DayCareFee = course.Fee;//add day care fee in course group
-                addStudentCourseTransaction.TotalPayable = addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee - addStudentCourseTransaction.AmountDiscounted;
+                addStudentCourseTransaction.PayableFee = enrollmentGroup.Fee; // get from course
+                addStudentCourseTransaction.FeeAmountDiscount = 0;
+                addStudentCourseTransaction.DayCareDiscount = 0;
+                addStudentCourseTransaction.DayCareFee = enrollmentGroup.DayCareFee;//add day care fee in course group
+                addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) - 
+                    (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount) ;
                 addStudentCourseTransaction.Comments = "New Enrollment";
                 addStudentCourseTransaction.IsCompletelyPaid = false;
             }
@@ -150,11 +191,11 @@ namespace Courses.Implementation.Services
             {
                 // Add logic to recacluate fee
                 addStudentCourseTransaction.IsActive = true;
-                addStudentCourseTransaction.PayableFee += course.Fee; // get from course
-                addStudentCourseTransaction.AmountDiscounted = 0;
-                addStudentCourseTransaction.DayCareFee += course.Fee;
-                //Get discount on fee
-                addStudentCourseTransaction.TotalPayable = addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee - addStudentCourseTransaction.AmountDiscounted;
+                addStudentCourseTransaction.PayableFee += enrollmentGroup.Fee; // get from course
+                addStudentCourseTransaction.FeeAmountDiscount += 0;
+                addStudentCourseTransaction.DayCareFee += enrollmentGroup.DayCareFee;
+                addStudentCourseTransaction.DayCareDiscount += 0;//Get discount on fee
+                addStudentCourseTransaction.TotalPayable += (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee);
                 addStudentCourseTransaction.IsCompletelyPaid = false;
             }
 

@@ -98,7 +98,7 @@ namespace Application.Users.Repository.Implementation
                     }
 
                     cmd.AddParameter("@familyId", familyId.ToByteArray());
-                    return cmd.ExecuteNonQuery() > 0;
+                    return await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0;
                 }
             }
         }
@@ -195,64 +195,43 @@ namespace Application.Users.Repository.Implementation
             }
         }
 
-        public async Task<IEnumerable<OtherContactInformation>> GetFamilyOtherContacts(Guid familyId, IEnumerable<ContactType> contactTypes)
+        public async Task<IEnumerable<OtherContactInformation>> GetFamilyOtherContacts(
+            Guid familyId,
+            ContactType contactType)
         {
             var results = new List<OtherContactInformation>();
+            // var typeList = contactTypes?.ToList() ?? new List<ContactType>();
 
-            using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"  SELECT 
+            ContactId, FamilyId, FirstName, LastName, Phone, ContactType, Relationship, IsActive, CreatedAt, UpdatedOn
+              FROM maktab.other_contacts_information 
+              WHERE FamilyId = @FamilyId AND IsActive = 1 and ContactType = @ContactType";
+            cmd.AddParameter("@FamilyId", familyId.ToByteArray());
+            cmd.AddParameter("@ContactType", (int)contactType);
+
+            using var reader = await cmd.ExecuteReaderAsync();//.ConfigureAwait(false);
+            //       if (!await reader.ReadAsync())
+            //         return null;
+            //   return MapToEnrollmentResponse(reader);
+            //using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())//.ConfigureAwait(false))
             {
-                using (var cmd = conn.CreateCommand())
+                results.Add(new OtherContactInformation
                 {
-
-                    var sb = new StringBuilder();
-                    sb.AppendLine("Select `ContactId`, `FamilyId`, `FirstName`, `LastName`,  `Phone`, `ContactType`, `Relationship`, ");
-                    sb.AppendLine("`IsActive`, `CreatedAt`, `UpdatedOn` from other_contacts_information ");
-                    sb.AppendLine("SubmittedDate, TransferDate, IsActive, CreatedAt, UpdatedOn, ExchangeRateId, RecepientName, CurrencySymbol, TransactionName");
-                    sb.AppendLine(" where FamilyId = @familyId and IsActive = True AND ContactTypeIN (");
-
-                    // Dynamically build parameters for the IN clause
-                    var contactTypesParams = contactTypes.Select((contactType, index) => {
-                        string paramName = $"@state{index}";
-                        cmd.AddParameter(paramName, (int)contactType);
-                        return paramName;
-                    }).ToList();
-                    sb.AppendLine(string.Join(", ", contactTypesParams));
-                    sb.AppendLine(") ");
-
-
-                    cmd.AddParameter("@familyId", familyId.ToByteArray());
-                    cmd.CommandText = sb.ToString();
-
-                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-
-                    while (await reader.ReadAsync().ConfigureAwait(false))
-                    {
-                        var id = reader.GetGuidFromByteArray(0);
-                        var famailyId = reader.GetGuidFromByteArray(1);
-                        var firstName = reader.GetString(2);
-                        var lastName = reader.GetString(3);
-                        var phone = reader.GetString(4);
-                        var contactTyp = (ContactType)reader.GetInt32(5);
-                        var relationship = (Relationship)reader.GetInt32(6);
-                        var isActive = reader.GetBoolean(7);
-                        var createdAt = reader.GetDateTime(8);
-                        var updatedOn = reader.GetDateTime(9);
-
-                        results.Add(new OtherContactInformation
-                        {
-                            ContactId = id,
-                            FamilyId = famailyId,
-                            FirstName = firstName,
-                            LastName = lastName,
-                            Phone = phone,
-                            ContactType = contactTyp,
-                            Relationship = relationship,
-                            IsActive = isActive,
-                            CreatedAt = createdAt,
-                            UpdatedOn = updatedOn,
-                        });
-                    }
-                }
+                    ContactId = reader.GetGuidFromByteArray(0),
+                    FamilyId = reader.GetGuidFromByteArray(1),
+                    FirstName = reader.GetString(2),
+                    LastName = reader.GetString(3),
+                    Phone = reader.GetString(4),
+                    ContactType = (ContactType)reader.GetInt32(5),
+                    Relationship = (Relationship)reader.GetInt32(6),
+                    IsActive = reader.GetBoolean(7),
+                    CreatedAt = reader.GetDateTime(8),
+                    UpdatedOn = reader.GetDateTime(9)
+                });
             }
 
             return results;

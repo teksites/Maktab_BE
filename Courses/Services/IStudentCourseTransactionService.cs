@@ -12,6 +12,7 @@ namespace Courses.Services
         Task<StudentCourseTransactionResponse> AddTransaction(AddStudentCourseTransaction transaction);
 
         Task<StudentCourseTransactionResponse?> GetTransaction(Guid transactionId);
+        Task<StudentCourseTransactionResponse?> GetTransactionByPaymentCode(string paymentCode);
 
         Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction);
 

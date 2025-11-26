@@ -32,13 +32,13 @@ namespace Courses.Repository.Implementation
                  Details, DetailsFr, StartDate, EndDate, IsActive,
                  CreatedAt, UpdatedOn, CanSelectMultipleEnrollmentGroups,
                  PolicyHyperLink, IsCourseCompleted, IsRegistrationOpened,
-                 RegistrationStartDate, RegistrationEndDate, CourseSession)
+                 RegistrationStartDate, RegistrationEndDate, CourseSession, RegistrationFee)
                 VALUES
                 (@CourseId, @InstituteId, @Name, @NameFr, @Description, @DescriptionFr,
                  @Details, @DetailsFr, @StartDate, @EndDate, @IsActive,
                  @CreatedAt, @UpdatedOn, @CanSelectMultipleEnrollmentGroups,
                  @PolicyHyperLink, @IsCourseCompleted, @IsRegistrationOpened,
-                 @RegistrationStartDate, @RegistrationEndDate, @CourseSession)";
+                 @RegistrationStartDate, @RegistrationEndDate, @CourseSession, @RegistrationFee)";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
             cmd.AddParameter("@InstituteId", course.InstituteId.ToByteArray());
@@ -60,6 +60,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@RegistrationStartDate", course.RegistrationStartDate);
             cmd.AddParameter("@RegistrationEndDate", course.RegistrationEndDate);
             cmd.AddParameter("@CourseSession", (int)course.CourseSession);
+            cmd.AddParameter("@RegistrationFee", (int)course.RegistrationFee);
 
             await cmd.ExecuteNonQueryAsync();
             return await GetCourse(courseId) ?? throw new Exception("Failed to retrieve created course");
@@ -70,7 +71,7 @@ namespace Courses.Repository.Implementation
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT * FROM courses WHERE CourseId=@CourseId";
+            cmd.CommandText = "SELECT * FROM courses WHERE CourseId = @CourseId";
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -159,7 +160,8 @@ namespace Courses.Repository.Implementation
                     Details=@Details, DetailsFr=@DetailsFr, StartDate=@StartDate, EndDate=@EndDate,
                     IsActive=@IsActive, UpdatedOn=@UpdatedOn, CanSelectMultipleEnrollmentGroups=@CanSelectMultipleEnrollmentGroups,
                     PolicyHyperLink=@PolicyHyperLink, IsCourseCompleted=@IsCourseCompleted, IsRegistrationOpened=@IsRegistrationOpened,
-                    RegistrationStartDate=@RegistrationStartDate, RegistrationEndDate=@RegistrationEndDate, CourseSession=@CourseSession
+                    RegistrationStartDate=@RegistrationStartDate, RegistrationEndDate=@RegistrationEndDate, CourseSession=@CourseSession, 
+                    RegistrationFee=@RegistrationFee
                 WHERE CourseId=@CourseId";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
@@ -180,6 +182,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@RegistrationStartDate", course.RegistrationStartDate);
             cmd.AddParameter("@RegistrationEndDate", course.RegistrationEndDate);
             cmd.AddParameter("@CourseSession", (int)course.CourseSession);
+            cmd.AddParameter("@RegistrationFee", (int)course.RegistrationFee);
 
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
@@ -251,7 +254,8 @@ namespace Courses.Repository.Implementation
                 IsRegistrationOpened = reader.GetBoolean("IsRegistrationOpened"),
                 RegistrationStartDate = registrationStart,
                 RegistrationEndDate = registrationEnd,
-                CourseSession = (CourseSessionType)reader.GetByte("CourseSession")
+                CourseSession = (CourseSessionType)reader.GetByte("CourseSession"),
+                RegistrationFee = (int)reader.GetInt32("RegistrationFee")
             };
 
             // Load enrollment groups using DI

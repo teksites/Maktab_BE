@@ -86,7 +86,7 @@ namespace Application.Users.Implementation
         
         public async Task<IEnumerable<OtherContactResponse>> GetFamilyOtherContacts(Guid familyId, IEnumerable<ContactType> contactTypes)
         {
-            return (await _repository.GetFamilyOtherContacts(familyId, contactTypes).ConfigureAwait(false)).
+            return (await _repository.GetFamilyOtherContacts(familyId, contactTypes.First())).
                 Select(MaptToOtherContactResonse).ToList();
         }
 

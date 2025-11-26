@@ -46,6 +46,12 @@ public class StudentCourseTransactionController : ControllerBase
         return await _service.GetCourseTransactionsByFamily(familyId, courseId).ConfigureAwait(false);
     }
 
+    [HttpGet("paymentcode/{paymentCode}")]
+    public async Task<StudentCourseTransactionResponse> GetTransactionByPaymentCode(string paymentCode)
+    {
+        return await _service.GetTransactionByPaymentCode(paymentCode).ConfigureAwait(false);
+    }
+
     [HttpPost]
     public async Task<StudentCourseTransactionResponse> AddTransaction(AddStudentCourseTransaction transaction)
         => await _service.AddTransaction(transaction);

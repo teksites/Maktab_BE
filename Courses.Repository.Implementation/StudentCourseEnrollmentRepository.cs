@@ -1,10 +1,8 @@
 ﻿using Cumulus.Data;
 using Data;
-using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
 using System.Data.Common;
-using System.Text;
 
 namespace Courses.Repository.Implementation
 {
@@ -22,10 +20,10 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 INSERT INTO student_course_enrollment 
                 (StudentCourseEnrollmentId, CourseEnrollmentGroupId, CourseId, ChildId, FamilyId, 
-                 WillUseDayCare, DayCareDays, IsActive, CreatedAt, UpdatedOn)
+                 WillUseDayCare, DayCareDays, IsActive, CreatedAt, UpdatedOn, EnrollmentIndex)
                 VALUES 
                 (@StudentCourseEnrollmentId, @CourseEnrollmentGroupId, @CourseId, @ChildId, @FamilyId, 
-                 @WillUseDayCare, @DayCareDays, @IsActive, @CreatedAt, @UpdatedOn)";
+                 @WillUseDayCare, @DayCareDays, @IsActive, @CreatedAt, @UpdatedOn, @EnrollmentIndex)";
 
             cmd.AddParameter("@StudentCourseEnrollmentId", enrollmentId.ToByteArray());
             cmd.AddParameter("@CourseEnrollmentGroupId", enrollment.CourseEnrollmentGroupId.ToByteArray());
@@ -37,7 +35,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@IsActive", enrollment.IsActive);
             cmd.AddParameter("@CreatedAt", DateTime.UtcNow);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
-
+            cmd.AddParameter("@EnrollmentIndex", enrollment.EnrollmentIndex);
             await cmd.ExecuteNonQueryAsync();
             return await GetEnrollment(enrollmentId) ?? throw new Exception("Failed to retrieve created enrollment");
         }
@@ -123,7 +121,8 @@ namespace Courses.Repository.Implementation
                     FamilyId=@FamilyId,
                     WillUseDayCare=@WillUseDayCare,
                     DayCareDays=@DayCareDays,
-                    UpdatedOn=@UpdatedOn
+                    UpdatedOn=@UpdatedOn,
+                    EnrollmentIndex = @EnrollmentIndex
                 WHERE StudentCourseEnrollmentId=@EnrollmentId";
 
             cmd.AddParameter("@EnrollmentId", enrollmentId.ToByteArray());
@@ -134,7 +133,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@WillUseDayCare", enrollment.WillUseDayCare);
             cmd.AddParameter("@DayCareDays", enrollment.DayCareDays);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
-
+            cmd.AddParameter("@EnrollmentIndex", enrollment.EnrollmentIndex);
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
@@ -214,7 +213,8 @@ namespace Courses.Repository.Implementation
                 DayCareDays = reader.GetInt32("DayCareDays"),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
-                UpdatedOn = reader.GetDateTime("UpdatedOn")
+                UpdatedOn = reader.GetDateTime("UpdatedOn"),
+                EnrollmentIndex = reader.GetInt32("EnrollmentIndex")
             };
         }
     }
