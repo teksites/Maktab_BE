@@ -66,5 +66,9 @@ namespace Courses.Services
         Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByCourse(Guid courseId);
 
         Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByInstitute(Guid instituteId);
+
+        Task<bool> DeleteStudentCourseTransactionEnrollmentByEnrollmentId(Guid studentCourseEnrollmentId);
+        Task<bool> DeleteStudentCourseTransactionEnrollmentByTransactionId(Guid transactionId);
+        Task<bool> DeleteStudentCourseTransactionEnrollmentById(Guid id);
     }
 }

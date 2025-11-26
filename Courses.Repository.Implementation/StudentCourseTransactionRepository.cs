@@ -1193,5 +1193,35 @@ namespace Courses.Repository.Implementation
 
             return await MapToTransactionSingleResponse(reader);
         }
+
+        public async Task<bool> DeleteStudentCourseTransactionEnrollmentByEnrollmentId(Guid studentCourseEnrollmentId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = "DELETE FROM `student_course_transaction_enrollment` WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId";
+            cmd.AddParameter("@StudentCourseEnrollmentId", studentCourseEnrollmentId.ToByteArray());
+            return await cmd.ExecuteNonQueryAsync() > 0;
+        }
+
+        public async Task<bool> DeleteStudentCourseTransactionEnrollmentByTransactionId(Guid transactionId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = "DELETE FROM `student_course_transaction_enrollment` WHERE StudentCourseTransactionId = @StudentCourseTransactionId";
+            cmd.AddParameter("@StudentCourseTransactionId", transactionId.ToByteArray());
+            return await cmd.ExecuteNonQueryAsync() > 0;
+        }
+
+        public async Task<bool> DeleteStudentCourseTransactionEnrollmentById(Guid id)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = "DELETE FROM `student_course_transaction_enrollment` WHERE Id = @Id";
+            cmd.AddParameter("@Id", id.ToByteArray());
+            return await cmd.ExecuteNonQueryAsync() > 0;
+        }
     }
 }

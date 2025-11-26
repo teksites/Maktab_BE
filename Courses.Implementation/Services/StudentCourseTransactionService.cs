@@ -3,6 +3,7 @@ using Courses.Services;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
+using System.Transactions;
 
 namespace Courses.Implementation.Services
 {
@@ -99,5 +100,14 @@ namespace Courses.Implementation.Services
         {
             return _repository.GetTransactionByPaymentCode(paymentCode);
         }
+
+        public Task<bool> DeleteStudentCourseTransactionEnrollmentByEnrollmentId(Guid studentCourseEnrollmentId)
+           => _repository.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(studentCourseEnrollmentId);
+
+        public Task<bool> DeleteStudentCourseTransactionEnrollmentByTransactionId(Guid transactionId)
+           => _repository.DeleteStudentCourseTransactionEnrollmentByTransactionId(transactionId);
+
+        public Task<bool> DeleteStudentCourseTransactionEnrollmentById(Guid id)
+           => _repository.DeleteStudentCourseTransactionEnrollmentById(id);
     }
 }

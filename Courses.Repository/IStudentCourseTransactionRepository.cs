@@ -19,6 +19,10 @@ namespace Courses.Repository
 
         Task<bool> DeleteTransaction(Guid transactionId, bool hardDelete = false);
 
+        Task<bool> DeleteStudentCourseTransactionEnrollmentByEnrollmentId(Guid studentCourseEnrollmentId);
+        Task<bool> DeleteStudentCourseTransactionEnrollmentByTransactionId(Guid transactionId);
+        Task<bool> DeleteStudentCourseTransactionEnrollmentById(Guid id);
+
         Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactions();
 
         Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionByFamily(Guid familyId);

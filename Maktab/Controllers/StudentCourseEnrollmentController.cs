@@ -34,7 +34,6 @@ public class StudentCourseEnrollmentController : ControllerBase
     public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentByFamily(Guid familyId)
         => await _service.GetEnrollmentByFamily(familyId);
 
-
     [HttpPost]
     public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment)
     { 

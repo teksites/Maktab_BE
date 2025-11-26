@@ -1,5 +1,6 @@
 ﻿using Courses.Repository;
 using Courses.Services;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Requests.Policies;
 using MaktabDataContracts.Responses.Course;
@@ -45,24 +46,24 @@ namespace Courses.Implementation.Services
 
                 var transaction = familyCourseTransaction.First();
 
-                var newDayCareFee = (enrollment.WillUseDayCare ? selectedCourseEnrollmentGroup.DayCareFee : 0);
-                decimal newCourseFee = 0;
+                //var newDayCareFee = (enrollment.WillUseDayCare ? selectedCourseEnrollmentGroup.DayCareFee : 0);
+                //decimal newCourseFee = 0;
 
                 //if there is any existing enrollment for the child in the same course for any course group. if it is the same course group then we will not allow registration
                 if (childEnrollment.Any()) // child is already registered for the same course in different course group
                 {
                     enrollment.EnrollmentIndex = childEnrollment.Max(e => e.EnrollmentIndex);
-                    newCourseFee = selectedCourseEnrollmentGroup.Fee;
+                    //newCourseFee = selectedCourseEnrollmentGroup.Fee;
                     //Now update the transaction to include the new enrollment
 
                 }
                 else // child is not registered for any course group of the course
                 {
                     //here we have to add new enrollment and update the existing transaction to include the new enrollment for new child
-                    // We will calculate the discount and apply
-                    var policies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
-                    var discountPolicy = policies.Where(p => p.IsActive && p.InstutePolicy == MaktabDataContracts.Enums.InstutePolicyType.SiblingDiscount).First().Details;
-                    SiblingDiscountPolicy policy = JsonConvert.DeserializeObject<SiblingDiscountPolicy>(discountPolicy);
+                    //// We will calculate the discount and apply
+                    //var policies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
+                    //var discountPolicy = policies.Where(p => p.IsActive && p.InstutePolicy == MaktabDataContracts.Enums.InstutePolicyType.SiblingDiscount).First().Details;
+                    //SiblingDiscountPolicy policy = JsonConvert.DeserializeObject<SiblingDiscountPolicy>(discountPolicy);
 
                     var distinctChildIds = familyTransactions
                         .SelectMany(t => t.Enrollments)
@@ -72,18 +73,18 @@ namespace Courses.Implementation.Services
                     
                     enrollment.EnrollmentIndex = distinctChildIds.Count + 1;
 
-                    decimal discountPercentage = policy.FirstChildFee / 100;
+                    //decimal discountPercentage = policy.FirstChildFee / 100;
 
-                    if (distinctChildIds.Count == 1)
-                    {
-                        discountPercentage = policy.SecondChildFee / 100;
-                    }
-                    else if (distinctChildIds.Count >= 2)
-                    {
-                        discountPercentage = policy.ThirdAndOnwardChildFee / 100;
-                    }
+                    //if (distinctChildIds.Count == 1)
+                    //{
+                    //    discountPercentage = policy.SecondChildFee / 100;
+                    //}
+                    //else if (distinctChildIds.Count >= 2)
+                    //{
+                    //    discountPercentage = policy.ThirdAndOnwardChildFee / 100;
+                    //}
 
-                    newCourseFee = selectedCourseEnrollmentGroup.Fee * discountPercentage;
+                    //newCourseFee = selectedCourseEnrollmentGroup.Fee * discountPercentage;
                 }
 
                 // Add enrollment first
@@ -93,7 +94,7 @@ namespace Courses.Implementation.Services
 
                 // Update the transcation
                 // First create the transaction based on course data
-                var transactionToUpdate = new AddStudentCourseTransaction
+                /*var transactionToUpdate = new AddStudentCourseTransaction
                 {
                     StudentCourseTransactionId = transaction.StudentCourseTransactionId,
                     FamilyId = transaction.FamilyId,
@@ -111,14 +112,13 @@ namespace Courses.Implementation.Services
                     TransactionStatus = transaction.TransactionStatus
                 };
                 var ifTransactionUpdated = await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, transactionToUpdate).ConfigureAwait(false);
+                */
+                var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(transaction.StudentCourseTransactionId,
+                    addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
 
-                if (ifTransactionUpdated)
+                if (!await RecalculateCourseFee(course.CourseId, enrollment.FamilyId).ConfigureAwait(false))//revert if transaction failed
                 {
-                    var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(transaction.StudentCourseTransactionId,
-                        addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
-                }
-                else
-                {
+                    await _studentCourseTransactionService.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
                     await _repository.DeleteEnrollment(addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
                 }
 
@@ -158,7 +158,109 @@ namespace Courses.Implementation.Services
                 return addedEnrollment;
             }
         }
+        private async Task<bool> RecalculateCourseFee(Guid courseId, Guid familyId)
+        {
+            var familyTransaction = (await _studentCourseTransactionService.GetCourseTransactionsByFamily(courseId, familyId).ConfigureAwait(false)).FirstOrDefault();
+            var course = await _courseService.GetCourse(courseId).ConfigureAwait(false);
 
+            if (familyTransaction == null || course == null)
+            {
+                throw new Exception("Transaction or Course not found");
+            }
+            
+            var feeAmountDiscount = familyTransaction.FeeAmountDiscount;
+            var dayCareDiscount = familyTransaction.DayCareDiscount;
+            var paymentCode = familyTransaction.PaymentCode;
+            var transactionStatus = familyTransaction.TransactionStatus;
+            var isActive = familyTransaction.IsActive;
+            var totalAmountPaid = familyTransaction.TotalAmountPaid;
+
+            decimal dayCareFee = 0;
+            decimal courseFee = 0;
+
+            var groupedByChild = familyTransaction.Enrollments
+            .GroupBy(e => e.ChildId)
+            .Select(g => new
+            {
+                ChildId = g.Key,
+                Enrollments = g.ToList()
+            })
+            .ToList();
+
+            int i = 1;
+
+            SiblingDiscountPolicy policy = new SiblingDiscountPolicy();
+            var policyFound = false;
+
+            if (groupedByChild.Count > 1)
+            {
+                var policies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
+                var discountPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == InstutePolicyType.SiblingDiscount).Details;
+                if (!string.IsNullOrEmpty(discountPolicy))
+                {
+                    try
+                    {
+                        policy = JsonConvert.DeserializeObject<SiblingDiscountPolicy>(discountPolicy);
+                        policyFound = true;
+                    }
+                    catch (Exception e)
+                    {
+                        policyFound = false;
+                    }
+                }
+            }
+
+            decimal applicalbeDscountPercentage = 1;
+
+            foreach (var childGroup in groupedByChild)
+            {
+                var enrollments = childGroup.Enrollments;
+                decimal childFee = 0;
+                decimal childDayCareFee = 0;
+
+                if (i == 2 && policyFound)// we have multiple children
+                {
+                    applicalbeDscountPercentage = policy.SecondChildFee / 100;
+                }
+                else if (i > 2 && policyFound)// we have multiple children
+                {
+                    applicalbeDscountPercentage = policy.ThirdAndOnwardChildFee / 100;
+                }
+
+                foreach (var enrollment in enrollments)
+                {
+                    var enrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
+
+                    if (enrollmentGroup != null)
+                    {
+                        childFee += (enrollmentGroup.Fee * applicalbeDscountPercentage);
+                        childDayCareFee += enrollment.WillUseDayCare ? enrollmentGroup.DayCareFee : 0;
+                    }
+                }
+
+                courseFee += childFee;
+                dayCareFee += childDayCareFee;
+                i++;
+            }
+
+            var addStudentCourseTransaction = new AddStudentCourseTransaction();
+            addStudentCourseTransaction.StudentCourseTransactionId = familyTransaction.StudentCourseTransactionId;
+            addStudentCourseTransaction.FamilyId = familyTransaction.FamilyId;
+            addStudentCourseTransaction.PaymentCode = familyTransaction.PaymentCode;
+            addStudentCourseTransaction.TransactionStatus = familyTransaction.TransactionStatus;
+            addStudentCourseTransaction.IsActive = familyTransaction.IsActive;
+            addStudentCourseTransaction.FeeAmountDiscount = familyTransaction.FeeAmountDiscount;
+            addStudentCourseTransaction.DayCareDiscount = familyTransaction.DayCareDiscount;
+            addStudentCourseTransaction.DayCareFee = dayCareFee;
+            addStudentCourseTransaction.PayableFee = courseFee;
+            addStudentCourseTransaction.TotalAmountPaid = familyTransaction.TotalAmountPaid;
+            addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
+                (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
+            addStudentCourseTransaction.Comments = familyTransaction.Comments +"\n Updated the transaction";
+            addStudentCourseTransaction.IsCompletelyPaid = addStudentCourseTransaction.TotalAmountPaid < addStudentCourseTransaction.TotalPayable;
+
+            return await _studentCourseTransactionService.UpdateTransaction(familyTransaction.StudentCourseTransactionId, addStudentCourseTransaction).ConfigureAwait(false);
+        }
         private async Task<AddStudentCourseTransaction> CreateTransactionData(AddStudentCourseEnrollment enrollment, AddStudentCourseTransaction addStudentCourseTransaction)
         {
             //var course = await _courseService.GetCourseGroup(enrollment.CourseEnrollmentGroupId).ConfigureAwait(false);
@@ -212,8 +314,34 @@ namespace Courses.Implementation.Services
         public Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
             => _repository.UpdateEnrollment(enrollmentId, enrollment);
 
-        public Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false)
-            => _repository.DeleteEnrollment(enrollmentId, hardDelete);
+        public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false)
+        {
+            var enrollmentDetails = await _repository.GetEnrollment(enrollmentId).ConfigureAwait(false);
+
+            if (enrollmentDetails == null)
+            {
+                return false;
+            }
+
+            var courseId = enrollmentDetails.CourseId;
+            var famuilyId = enrollmentDetails.FamilyId;
+
+            var ifDeleted = await _studentCourseTransactionService.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(enrollmentId).ConfigureAwait(false);
+            var ifEnrollmentDeleted = false;
+            
+            if (ifDeleted)
+            {
+                ifEnrollmentDeleted = await _repository.DeleteEnrollment(enrollmentId, hardDelete).ConfigureAwait(false);
+            }
+
+            if (ifDeleted && ifEnrollmentDeleted)
+            {
+                return await RecalculateCourseFee(courseId, famuilyId).ConfigureAwait(false);
+            }
+
+           return false;
+
+        }
         public Task<StudentCourseEnrollmentResponse> GetStudentCourseEnrollment(Guid childId, Guid courseId)
             => _repository.GetStudentCourseEnrollment(childId, courseId);
     }
