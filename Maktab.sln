@@ -75,15 +75,27 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Users.Utils.Implementation"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Courses", "Courses", "{B5E2F22C-2456-466D-AAA4-FD130CBF5915}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courses", "Courses\Courses.csproj", "{6B627F2D-B5A4-48DC-AA44-DD8EDB273397}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courses", "Courses\Courses.csproj", "{6B627F2D-B5A4-48DC-AA44-DD8EDB273397}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courses.Implementation", "Courses.Implementation\Courses.Implementation.csproj", "{9862B179-F7F1-4729-9857-4B6954C5A775}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courses.Implementation", "Courses.Implementation\Courses.Implementation.csproj", "{9862B179-F7F1-4729-9857-4B6954C5A775}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courses.Repository", "Courses.Repository\Courses.Repository.csproj", "{35E8ECFD-6CD5-4FFC-BB03-AB00E55FA40B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courses.Repository", "Courses.Repository\Courses.Repository.csproj", "{35E8ECFD-6CD5-4FFC-BB03-AB00E55FA40B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courses.Repository.Implementation", "Courses.Repository.Implementation\Courses.Repository.Implementation.csproj", "{196686D7-DB08-4D92-959C-B6B33D7BACED}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courses.Repository.Implementation", "Courses.Repository.Implementation\Courses.Repository.Implementation.csproj", "{196686D7-DB08-4D92-959C-B6B33D7BACED}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Courses.Registry", "Courses.Registry\Courses.Registry.csproj", "{50E29C02-A88C-4CE9-82AC-B3D10194642C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Courses.Registry", "Courses.Registry\Courses.Registry.csproj", "{50E29C02-A88C-4CE9-82AC-B3D10194642C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Zeffy", "Zeffy", "{C2314088-337D-40DE-9472-E0C82EF167BE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zeffy", "Zeffy\Zeffy.csproj", "{C1572FEA-82C5-4B84-84D1-1644DE3FFD10}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zeffy.Implementation", "Zeffy.Implementation\Zeffy.Implementation.csproj", "{252CDF69-368C-42FF-A80F-65CC803E26EB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zeffy.Registry", "Zeffy.Registry\Zeffy.Registry.csproj", "{7521ADF5-0098-4D06-88BD-377BB8B97415}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zeffy.Repository", "Zeffy.Repository\Zeffy.Repository.csproj", "{5F5CDC23-12A9-4C83-8A7F-91B973B78A98}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zeffy.Repository.Implementation", "Zeffy.Repository.Implementation\Zeffy.Repository.Implementation.csproj", "{AE3CB20C-83D1-401C-9AEC-A799DAD339CD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -215,6 +227,26 @@ Global
 		{50E29C02-A88C-4CE9-82AC-B3D10194642C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{50E29C02-A88C-4CE9-82AC-B3D10194642C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{50E29C02-A88C-4CE9-82AC-B3D10194642C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1572FEA-82C5-4B84-84D1-1644DE3FFD10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1572FEA-82C5-4B84-84D1-1644DE3FFD10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1572FEA-82C5-4B84-84D1-1644DE3FFD10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1572FEA-82C5-4B84-84D1-1644DE3FFD10}.Release|Any CPU.Build.0 = Release|Any CPU
+		{252CDF69-368C-42FF-A80F-65CC803E26EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{252CDF69-368C-42FF-A80F-65CC803E26EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{252CDF69-368C-42FF-A80F-65CC803E26EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{252CDF69-368C-42FF-A80F-65CC803E26EB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7521ADF5-0098-4D06-88BD-377BB8B97415}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7521ADF5-0098-4D06-88BD-377BB8B97415}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7521ADF5-0098-4D06-88BD-377BB8B97415}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7521ADF5-0098-4D06-88BD-377BB8B97415}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F5CDC23-12A9-4C83-8A7F-91B973B78A98}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F5CDC23-12A9-4C83-8A7F-91B973B78A98}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F5CDC23-12A9-4C83-8A7F-91B973B78A98}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F5CDC23-12A9-4C83-8A7F-91B973B78A98}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AE3CB20C-83D1-401C-9AEC-A799DAD339CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AE3CB20C-83D1-401C-9AEC-A799DAD339CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AE3CB20C-83D1-401C-9AEC-A799DAD339CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AE3CB20C-83D1-401C-9AEC-A799DAD339CD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -250,6 +282,11 @@ Global
 		{35E8ECFD-6CD5-4FFC-BB03-AB00E55FA40B} = {B5E2F22C-2456-466D-AAA4-FD130CBF5915}
 		{196686D7-DB08-4D92-959C-B6B33D7BACED} = {B5E2F22C-2456-466D-AAA4-FD130CBF5915}
 		{50E29C02-A88C-4CE9-82AC-B3D10194642C} = {B5E2F22C-2456-466D-AAA4-FD130CBF5915}
+		{C1572FEA-82C5-4B84-84D1-1644DE3FFD10} = {C2314088-337D-40DE-9472-E0C82EF167BE}
+		{252CDF69-368C-42FF-A80F-65CC803E26EB} = {C2314088-337D-40DE-9472-E0C82EF167BE}
+		{7521ADF5-0098-4D06-88BD-377BB8B97415} = {C2314088-337D-40DE-9472-E0C82EF167BE}
+		{5F5CDC23-12A9-4C83-8A7F-91B973B78A98} = {C2314088-337D-40DE-9472-E0C82EF167BE}
+		{AE3CB20C-83D1-401C-9AEC-A799DAD339CD} = {C2314088-337D-40DE-9472-E0C82EF167BE}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7D29B79B-32EC-4337-B8AB-3EABEC6661A0}

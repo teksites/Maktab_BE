@@ -1,0 +1,476 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\ICC School\\Maktab_BE\\Zeffy.Registry\\Zeffy.Registry.csproj": {}
+  },
+  "projects": {
+    "C:\\ICC School\\Maktab_BE\\Courses\\Courses.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\ICC School\\Maktab_BE\\Courses\\Courses.csproj",
+        "projectName": "Courses",
+        "projectPath": "C:\\ICC School\\Maktab_BE\\Courses\\Courses.csproj",
+        "packagesPath": "C:\\Users\\mudassirkhan\\.nuget\\packages\\",
+        "outputPath": "C:\\ICC School\\Maktab_BE\\Courses\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\mudassirkhan\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.202/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\ICC School\\Maktab_BE\\Data\\Data.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\ICC School\\Maktab_BE\\Data\\Data.csproj",
+        "projectName": "Data",
+        "projectPath": "C:\\ICC School\\Maktab_BE\\Data\\Data.csproj",
+        "packagesPath": "C:\\Users\\mudassirkhan\\.nuget\\packages\\",
+        "outputPath": "C:\\ICC School\\Maktab_BE\\Data\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\mudassirkhan\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.202/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\ICC School\\Maktab_BE\\Zeffy.Implementation\\Zeffy.Implementation.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\ICC School\\Maktab_BE\\Zeffy.Implementation\\Zeffy.Implementation.csproj",
+        "projectName": "Zeffy.Implementation",
+        "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Implementation\\Zeffy.Implementation.csproj",
+        "packagesPath": "C:\\Users\\mudassirkhan\\.nuget\\packages\\",
+        "outputPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Implementation\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\mudassirkhan\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\ICC School\\Maktab_BE\\Courses\\Courses.csproj": {
+                "projectPath": "C:\\ICC School\\Maktab_BE\\Courses\\Courses.csproj"
+              },
+              "C:\\ICC School\\Maktab_BE\\Zeffy.Repository\\Zeffy.Repository.csproj": {
+                "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Repository\\Zeffy.Repository.csproj"
+              },
+              "C:\\ICC School\\Maktab_BE\\Zeffy\\Zeffy.csproj": {
+                "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy\\Zeffy.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.4, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.202/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\ICC School\\Maktab_BE\\Zeffy.Registry\\Zeffy.Registry.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\ICC School\\Maktab_BE\\Zeffy.Registry\\Zeffy.Registry.csproj",
+        "projectName": "Zeffy.Registry",
+        "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Registry\\Zeffy.Registry.csproj",
+        "packagesPath": "C:\\Users\\mudassirkhan\\.nuget\\packages\\",
+        "outputPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Registry\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\mudassirkhan\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\ICC School\\Maktab_BE\\Zeffy.Implementation\\Zeffy.Implementation.csproj": {
+                "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Implementation\\Zeffy.Implementation.csproj"
+              },
+              "C:\\ICC School\\Maktab_BE\\Zeffy.Repository.Implementation\\Zeffy.Repository.Implementation.csproj": {
+                "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Repository.Implementation\\Zeffy.Repository.Implementation.csproj"
+              },
+              "C:\\ICC School\\Maktab_BE\\Zeffy.Repository\\Zeffy.Repository.csproj": {
+                "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Repository\\Zeffy.Repository.csproj"
+              },
+              "C:\\ICC School\\Maktab_BE\\Zeffy\\Zeffy.csproj": {
+                "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy\\Zeffy.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.Extensions.DependencyInjection.Abstractions": {
+              "target": "Package",
+              "version": "[8.0.1, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.202/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\ICC School\\Maktab_BE\\Zeffy.Repository.Implementation\\Zeffy.Repository.Implementation.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\ICC School\\Maktab_BE\\Zeffy.Repository.Implementation\\Zeffy.Repository.Implementation.csproj",
+        "projectName": "Zeffy.Repository.Implementation",
+        "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Repository.Implementation\\Zeffy.Repository.Implementation.csproj",
+        "packagesPath": "C:\\Users\\mudassirkhan\\.nuget\\packages\\",
+        "outputPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Repository.Implementation\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\mudassirkhan\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\ICC School\\Maktab_BE\\Data\\Data.csproj": {
+                "projectPath": "C:\\ICC School\\Maktab_BE\\Data\\Data.csproj"
+              },
+              "C:\\ICC School\\Maktab_BE\\Zeffy.Repository\\Zeffy.Repository.csproj": {
+                "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Repository\\Zeffy.Repository.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.4, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.202/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\ICC School\\Maktab_BE\\Zeffy.Repository\\Zeffy.Repository.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\ICC School\\Maktab_BE\\Zeffy.Repository\\Zeffy.Repository.csproj",
+        "projectName": "Zeffy.Repository",
+        "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Repository\\Zeffy.Repository.csproj",
+        "packagesPath": "C:\\Users\\mudassirkhan\\.nuget\\packages\\",
+        "outputPath": "C:\\ICC School\\Maktab_BE\\Zeffy.Repository\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\mudassirkhan\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.202/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\ICC School\\Maktab_BE\\Zeffy\\Zeffy.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\ICC School\\Maktab_BE\\Zeffy\\Zeffy.csproj",
+        "projectName": "Zeffy",
+        "projectPath": "C:\\ICC School\\Maktab_BE\\Zeffy\\Zeffy.csproj",
+        "packagesPath": "C:\\Users\\mudassirkhan\\.nuget\\packages\\",
+        "outputPath": "C:\\ICC School\\Maktab_BE\\Zeffy\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\mudassirkhan\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.202/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

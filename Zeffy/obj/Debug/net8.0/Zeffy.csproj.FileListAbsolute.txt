@@ -1,0 +1,15 @@
+C:\ICC School\Maktab_BE\Zeffy\bin\Debug\net8.0\Zeffy.deps.json
+C:\ICC School\Maktab_BE\Zeffy\bin\Debug\net8.0\Zeffy.dll
+C:\ICC School\Maktab_BE\Zeffy\bin\Debug\net8.0\Zeffy.pdb
+C:\ICC School\Maktab_BE\Zeffy\bin\Debug\net8.0\MaktabDataContracts.dll
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\Zeffy.csproj.AssemblyReference.cache
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\Zeffy.GeneratedMSBuildEditorConfig.editorconfig
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\Zeffy.AssemblyInfoInputs.cache
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\Zeffy.AssemblyInfo.cs
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\Zeffy.csproj.CoreCompileInputs.cache
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\Zeffy.sourcelink.json
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\Zeffy.csproj.Up2Date
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\Zeffy.dll
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\refint\Zeffy.dll
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\Zeffy.pdb
+C:\ICC School\Maktab_BE\Zeffy\obj\Debug\net8.0\ref\Zeffy.dll

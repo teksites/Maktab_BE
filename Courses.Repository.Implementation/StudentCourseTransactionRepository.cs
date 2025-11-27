@@ -79,23 +79,140 @@ namespace Courses.Repository.Implementation
             return affected > 0;
         }
 
+        public async Task<StudentCourseTransactionResponse?> GetTransactionByPaymentCode(string paymentCode)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
 
-        // ----------------------------
-        // Get Transaction by ID
-        // ----------------------------
+            cmd.CommandText = @"
+        SELECT
+            -- Transaction fields
+            sct.StudentCourseTransactionId,
+            sct.FamilyId,
+            sct.PayableFee,
+            sct.DayCareFee,
+            sct.DayCareDiscount,
+            sct.FeeAmountDiscount,
+            sct.TotalPayable,
+            sct.Comments,
+            sct.Status          AS TransactionStatus,
+            sct.PaymentCode,
+            sct.IsActive,
+            sct.TotalAmountPaid,
+            sct.IsCompletelyPaid,
+            sct.CreatedAt,
+            sct.UpdatedOn,
+
+            -- Enrollment fields
+            sce.StudentCourseEnrollmentId,
+            sce.CourseEnrollmentGroupId,
+            sce.CourseId,
+            sce.FamilyId        AS EnrollmentFamilyId,
+            sce.ChildId,
+            sce.IsActive        AS EnrollmentIsActive,
+            sce.WillUseDayCare,
+            sce.DayCareDays,
+            sce.CreatedAt       AS EnrollmentCreatedAt,
+            sce.UpdatedOn       AS EnrollmentUpdatedOn
+
+        FROM student_course_transaction sct
+        JOIN student_course_transaction_enrollment scte
+            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+        JOIN student_course_enrollment sce
+            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+        JOIN course_enrollment_groups ceg
+            ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+
+        WHERE LOWER(sct.PaymentCode) = LOWER(@PaymentCode)
+
+        ORDER BY
+            sct.CreatedAt DESC,
+            sce.CreatedAt;
+    ";
+
+            cmd.AddParameter("@PaymentCode", paymentCode);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            var list = await MapToTransactionResponse(reader);
+
+            return list.FirstOrDefault();
+        }
+
         public async Task<StudentCourseTransactionResponse?> GetTransaction(Guid transactionId)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = "SELECT * FROM student_course_transaction WHERE StudentCourseTransactionId = @TransactionId";
+            cmd.CommandText = @"
+        SELECT
+            -- Transaction fields
+            sct.StudentCourseTransactionId,
+            sct.FamilyId,
+            sct.PayableFee,
+            sct.DayCareFee,
+            sct.DayCareDiscount,
+            sct.FeeAmountDiscount,
+            sct.TotalPayable,
+            sct.Comments,
+            sct.Status          AS TransactionStatus,
+            sct.PaymentCode,
+            sct.IsActive,
+            sct.TotalAmountPaid,
+            sct.IsCompletelyPaid,
+            sct.CreatedAt,
+            sct.UpdatedOn,
+
+            -- Enrollment fields
+            sce.StudentCourseEnrollmentId,
+            sce.CourseEnrollmentGroupId,
+            sce.CourseId,
+            sce.FamilyId        AS EnrollmentFamilyId,
+            sce.ChildId,
+            sce.IsActive        AS EnrollmentIsActive,
+            sce.WillUseDayCare,
+            sce.DayCareDays,
+            sce.CreatedAt       AS EnrollmentCreatedAt,
+            sce.UpdatedOn       AS EnrollmentUpdatedOn
+
+        FROM student_course_transaction sct
+        JOIN student_course_transaction_enrollment scte
+            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+        JOIN student_course_enrollment sce
+            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+        JOIN course_enrollment_groups ceg
+            ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+
+        WHERE sct.StudentCourseTransactionId = @TransactionId
+
+        ORDER BY
+            sct.CreatedAt DESC,
+            sce.CreatedAt;
+    ";
+
             cmd.AddParameter("@TransactionId", transactionId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) return null;
+            var list = await MapToTransactionResponse(reader);
 
-            return await MapToTransactionSingleResponse(reader);
+            return list.FirstOrDefault();
         }
+
+        // ----------------------------
+        // Get Transaction by ID
+        // ----------------------------
+        //public async Task<StudentCourseTransactionResponse?> GetTransaction(Guid transactionId)
+        //{
+        //    using var conn = await Database.CreateAndOpenConnectionAsync();
+        //    using var cmd = conn.CreateCommand();
+
+        //    cmd.CommandText = "SELECT * FROM student_course_transaction WHERE StudentCourseTransactionId = @TransactionId";
+        //    cmd.AddParameter("@TransactionId", transactionId.ToByteArray());
+
+        //    using var reader = await cmd.ExecuteReaderAsync();
+        //    if (!await reader.ReadAsync()) return null;
+
+        //    return await MapToTransactionSingleResponse(reader);
+        //}
 
         // ----------------------------
         // Update Transaction
@@ -1107,7 +1224,7 @@ namespace Courses.Repository.Implementation
                 TotalAmountPaid = reader.GetDecimal("TotalAmountPaid"),
                 Comments = reader.GetString("Comments"),
                 PaymentCode = reader.GetString("PaymentCode"),
-                TransactionStatus = (TransactionStatus)reader.GetInt32("Status"),
+                TransactionStatus = (TransactionStatus)reader.GetInt32("TransactionStatus"),
                 IsActive = reader.GetBoolean("IsActive"),
                 IsCompletelyPaid = reader.GetBoolean("IsCompletelyPaid"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
@@ -1180,19 +1297,19 @@ namespace Courses.Repository.Implementation
             return new string(buffer);
         }
 
-        public async Task<StudentCourseTransactionResponse?> GetTransactionByPaymentCode(string paymentCode)
-        {
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
+        //public async Task<StudentCourseTransactionResponse?> GetTransactionByPaymentCode(string paymentCode)
+        //{
+        //    using var conn = await Database.CreateAndOpenConnectionAsync();
+        //    using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = "SELECT * FROM student_course_transaction WHERE LOWER(PaymentCode) = LOWER(@PaymentCode);";
-            cmd.AddParameter("@PaymentCode", paymentCode);
+        //    cmd.CommandText = "SELECT * FROM student_course_transaction WHERE LOWER(PaymentCode) = LOWER(@PaymentCode);";
+        //    cmd.AddParameter("@PaymentCode", paymentCode);
 
-            using var reader = await cmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) return null;
+        //    using var reader = await cmd.ExecuteReaderAsync();
+        //    if (!await reader.ReadAsync()) return null;
 
-            return await MapToTransactionSingleResponse(reader);
-        }
+        //    return await MapToTransactionSingleResponse(reader);
+        //}
 
         public async Task<bool> DeleteStudentCourseTransactionEnrollmentByEnrollmentId(Guid studentCourseEnrollmentId)
         {

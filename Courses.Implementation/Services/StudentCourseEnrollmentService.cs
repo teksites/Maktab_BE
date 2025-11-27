@@ -158,7 +158,7 @@ namespace Courses.Implementation.Services
                 return addedEnrollment;
             }
         }
-        private async Task<bool> RecalculateCourseFee(Guid courseId, Guid familyId)
+        public async Task<bool> RecalculateCourseFee(Guid courseId, Guid familyId)
         {
             var familyTransaction = (await _studentCourseTransactionService.GetCourseTransactionsByFamily(courseId, familyId).ConfigureAwait(false)).FirstOrDefault();
             var course = await _courseService.GetCourse(courseId).ConfigureAwait(false);

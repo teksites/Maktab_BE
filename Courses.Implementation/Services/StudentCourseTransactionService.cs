@@ -3,7 +3,6 @@ using Courses.Services;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
-using System.Transactions;
 
 namespace Courses.Implementation.Services
 {

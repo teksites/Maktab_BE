@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "eY/a4RJO5vV8xMCMmUaDO/2QSYyMuaoe/BjlnwwftGA1KzZXsBnprLYEHk1d0lVKWQY36xtR55TrUrHrGrcl3w==",
+  "success": true,
+  "projectFilePath": "C:\\ICC School\\Maktab_BE\\Zeffy.Registry\\Zeffy.Registry.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\mudassirkhan\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\8.0.1\\microsoft.extensions.dependencyinjection.abstractions.8.0.1.nupkg.sha512",
+    "C:\\Users\\mudassirkhan\\.nuget\\packages\\newtonsoft.json\\13.0.4\\newtonsoft.json.13.0.4.nupkg.sha512"
+  ],
+  "logs": []
+}

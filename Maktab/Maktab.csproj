@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Courses.Registry\Courses.Registry.csproj" />
+    <ProjectReference Include="..\Zeffy.Registry\Zeffy.Registry.csproj" />
     <ProjectReference Include="..\Data.MySql.Regjstry\Data.MySql.Regjstry.csproj" />
     <ProjectReference Include="..\Elavon.Registry\Elavon.Registry.csproj" />
     <ProjectReference Include="..\Email.Registry\Email.Registry.csproj" />
@@ -27,7 +28,7 @@
     <ProjectReference Include="..\Resiliency.Registry\Resiliency.Registry.csproj" />
     <ProjectReference Include="..\Application.Users.Registry\Users.Registry.csproj" />
     <ProjectReference Include="..\WebMsgSender.Registry\WebMsgSender.Registry.csproj" />
-  </ItemGroup>
+    </ItemGroup>
   <ItemGroup>
     <Reference Include="MaktabDataContracts">
       <HintPath>..\ExternalContracts\MaktabDataContracts.dll</HintPath>

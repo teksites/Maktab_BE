@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "5fA1Gu5PXf87CQzEZJG4a+xHQN+2cbCAgFA2GlynqvA0cpipajznF8D4USRaYCLeIOa8eGe3PmciytuyFBh8ig==",
+  "success": true,
+  "projectFilePath": "C:\\ICC School\\Maktab_BE\\Zeffy.Implementation\\Zeffy.Implementation.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\mudassirkhan\\.nuget\\packages\\newtonsoft.json\\13.0.4\\newtonsoft.json.13.0.4.nupkg.sha512"
+  ],
+  "logs": []
+}

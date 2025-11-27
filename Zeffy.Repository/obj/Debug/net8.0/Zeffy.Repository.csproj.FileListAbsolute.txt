@@ -1,0 +1,15 @@
+C:\ICC School\Maktab_BE\Zeffy.Repository\bin\Debug\net8.0\Zeffy.Repository.deps.json
+C:\ICC School\Maktab_BE\Zeffy.Repository\bin\Debug\net8.0\Zeffy.Repository.dll
+C:\ICC School\Maktab_BE\Zeffy.Repository\bin\Debug\net8.0\Zeffy.Repository.pdb
+C:\ICC School\Maktab_BE\Zeffy.Repository\bin\Debug\net8.0\MaktabDataContracts.dll
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\Zeffy.Repository.csproj.AssemblyReference.cache
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\Zeffy.Repository.GeneratedMSBuildEditorConfig.editorconfig
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\Zeffy.Repository.AssemblyInfoInputs.cache
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\Zeffy.Repository.AssemblyInfo.cs
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\Zeffy.Repository.csproj.CoreCompileInputs.cache
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\Zeffy.Repository.sourcelink.json
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\Zeffy.Re.8EEE5D0E.Up2Date
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\Zeffy.Repository.dll
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\refint\Zeffy.Repository.dll
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\Zeffy.Repository.pdb
+C:\ICC School\Maktab_BE\Zeffy.Repository\obj\Debug\net8.0\ref\Zeffy.Repository.dll

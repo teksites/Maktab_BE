@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Application.Users.Registry;
 using Courses.Registry;
+using Zeffy.Registry;
 using Data.MySql.Regjstry;
 using Email.Registry;
 using Elavon.Registry;
@@ -173,6 +174,7 @@ namespace Maktab
             services.AddWebMsgSender();
             services.AddElavonServices();
             services.AddCoursesServices();
+            services.AddZeffyServices();
 
             // Quartz jobs
             services.AddQuartz(q =>
