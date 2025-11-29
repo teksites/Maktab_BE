@@ -24,13 +24,19 @@ namespace Courses.Implementation.Services
             _policyService = policyService;
         }
 
-        public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment)
+        public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment, bool ifAddedByAdmin = false)
         {
 
             var familyTransactions = await _studentCourseTransactionService.GetCourseTransactionsByFamily(enrollment.CourseId, enrollment.FamilyId).ConfigureAwait(false);
 
             var familyCourseTransaction = familyTransactions.Where(x => x.Enrollments.All(y => y.CourseId == enrollment.CourseId));
             var course = await _courseService.GetCourse(enrollment.CourseId).ConfigureAwait(false);
+
+            if (!course.IsRegistrationOpened || !ifAddedByAdmin)
+            {
+                throw new Exception("The registration is closed. Contact Admin please");
+            }
+
             var selectedCourseEnrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
 
             if (familyCourseTransaction.Any())// We have the transaction for the same course for same child or other child at the moment
@@ -126,6 +132,7 @@ namespace Courses.Implementation.Services
             }
             else // there is no previous transaction for the course for any child of the family. we will calculate new transaction and apply regisrtration fee
             {
+                enrollment.EnrollmentIndex = 1;
                 var addedEnrollment = await _repository.AddEnrollment(enrollment).ConfigureAwait(false);
                 StudentCourseTransactionResponse transaction = null;
 
@@ -314,11 +321,19 @@ namespace Courses.Implementation.Services
         public Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
             => _repository.UpdateEnrollment(enrollmentId, enrollment);
 
-        public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false)
+        public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false, bool ifDeletedByAdmin = false)
         {
             var enrollmentDetails = await _repository.GetEnrollment(enrollmentId).ConfigureAwait(false);
-
+            
             if (enrollmentDetails == null)
+            {
+                return false;
+            }
+          
+            var courseDetails = await _courseService.GetCourse(enrollmentDetails.CourseId).ConfigureAwait(false);
+            var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x=> x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
+
+            if (!courseDetails.IsRegistrationOpened || !ifDeletedByAdmin)
             {
                 return false;
             }

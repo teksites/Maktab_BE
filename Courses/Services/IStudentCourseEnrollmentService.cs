@@ -5,8 +5,8 @@ namespace Courses.Services
 {
     public interface IStudentCourseEnrollmentService
     {
-        Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment);
-        Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false);
+        Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment, bool ifAddedByAdmin = false);
+        Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false, bool ifDeletedByAdmin = false);
         Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollments(Guid courseId);
         Task<StudentCourseEnrollmentResponse> GetEnrollment(Guid enrollmentId);
         Task<StudentCourseEnrollmentResponse> GetStudentCourseEnrollment(Guid childId, Guid courseId);

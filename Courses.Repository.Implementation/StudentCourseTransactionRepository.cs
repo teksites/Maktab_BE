@@ -114,7 +114,8 @@ namespace Courses.Repository.Implementation
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn
+            sce.UpdatedOn       AS EnrollmentUpdatedOn,
+            sce.EnrollmentIndex as EnrollmentIndex
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -173,7 +174,8 @@ namespace Courses.Repository.Implementation
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn
+            sce.UpdatedOn       AS EnrollmentUpdatedOn,
+            sce.EnrollmentIndex as EnrollmentIndex
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -370,7 +372,8 @@ namespace Courses.Repository.Implementation
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn
+            sce.UpdatedOn       AS EnrollmentUpdatedOn,
+            sce.EnrollmentIndex as EnrollmentIndex
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -511,7 +514,8 @@ namespace Courses.Repository.Implementation
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn
+            sce.UpdatedOn       AS EnrollmentUpdatedOn,
+            sce.EnrollmentIndex as EnrollmentIndex
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -567,7 +571,8 @@ namespace Courses.Repository.Implementation
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn
+            sce.UpdatedOn       AS EnrollmentUpdatedOn,
+            sce.EnrollmentIndex as EnrollmentIndex
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -718,7 +723,8 @@ namespace Courses.Repository.Implementation
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn
+            sce.UpdatedOn       AS EnrollmentUpdatedOn,
+            sce.EnrollmentIndex as EnrollmentIndex
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -778,7 +784,8 @@ namespace Courses.Repository.Implementation
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn
+            sce.UpdatedOn       AS EnrollmentUpdatedOn,
+            sce.EnrollmentIndex as EnrollmentIndex
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -836,7 +843,8 @@ namespace Courses.Repository.Implementation
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn
+            sce.UpdatedOn       AS EnrollmentUpdatedOn,
+            sce.EnrollmentIndex as EnrollmentIndex
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -891,7 +899,8 @@ namespace Courses.Repository.Implementation
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn
+            sce.UpdatedOn       AS EnrollmentUpdatedOn,
+            sce.EnrollmentIndex as EnrollmentIndex
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -1175,6 +1184,7 @@ namespace Courses.Repository.Implementation
             var ordDayCareDays = reader.GetOrdinal("DayCareDays");
             var ordEnrollmentCreatedAt = reader.GetOrdinal("EnrollmentCreatedAt");
             var ordEnrollmentUpdatedOn = reader.GetOrdinal("EnrollmentUpdatedOn");
+            var ordEnrollmentIndex = reader.GetOrdinal("EnrollmentIndex");
 
             var lookup = new Dictionary<Guid, StudentCourseTransactionResponse>();
 
@@ -1225,7 +1235,8 @@ namespace Courses.Repository.Implementation
                     WillUseDayCare = reader.GetBoolean(ordWillUseDayCare),
                     DayCareDays = reader.GetInt32(ordDayCareDays),
                     CreatedAt = reader.GetDateTime(ordEnrollmentCreatedAt),
-                    UpdatedOn = reader.GetDateTime(ordEnrollmentUpdatedOn)
+                    UpdatedOn = reader.GetDateTime(ordEnrollmentUpdatedOn),
+                    EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex)
                 };
 
                 tx.Enrollments.Add(enrollment);

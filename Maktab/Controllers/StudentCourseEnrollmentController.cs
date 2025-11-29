@@ -8,6 +8,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System;
 using Microsoft.AspNetCore.Http;
+using MaktabDataContracts.Enums;
+using MaktabDataContracts.Requests.Addresses;
+using MaktabDataContracts.Responses.Addresses;
 
 [Route("api/student-course-enrollments")]
 [ApiController]
@@ -46,12 +49,33 @@ public class StudentCourseEnrollmentController : ControllerBase
 
         return response;
     }
-    
+
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
+    [HttpPost("byadmin")]
+    public async Task<StudentCourseEnrollmentResponse> AddEnrollmentByAdmin(AddStudentCourseEnrollment enrollment)
+    {
+        var response = await _service.AddEnrollment(enrollment, true).ConfigureAwait(false);
+
+        if (response == null)
+        {
+            throw new BadHttpRequestException("Child already registered in the course");
+        }
+
+        return response;
+    }
+
+
     [HttpPut("{enrollmentId:guid}")]
     public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
         => await _service.UpdateEnrollment(enrollmentId, enrollment);
 
     [HttpDelete("{enrollmentId:guid}")]
     public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false)
-        => await _service.DeleteEnrollment(enrollmentId, hardDelete);
+        => await _service.DeleteEnrollment(enrollmentId, hardDelete, false);
+
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
+    [HttpDelete("byadmin/{enrollmentId:guid}")]
+    public async Task<bool> DeleteEnrollmentByAdmin(Guid enrollmentId, bool hardDelete = false)
+        => await _service.DeleteEnrollment(enrollmentId, hardDelete, true);
+
 }
