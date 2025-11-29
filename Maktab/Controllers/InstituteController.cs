@@ -25,13 +25,11 @@ public class InstituteController : ControllerBase
     }
 
     // INSTITUTES
-    [ApiAuthorize]
     [HttpGet]
     public async Task<IEnumerable<InstituteResponse>> GetAllInstitutes(bool onlyActive = true)
         => await _instituteService.GetAllInstitutes(onlyActive);
 
-    [ApiAuthorize]
-    [HttpGet("{instituteId:guid}")]
+     [HttpGet("{instituteId:guid}")]
     public async Task<InstituteResponse> GetInstitute(Guid instituteId)
         => await _instituteService.GetInstitute(instituteId);
 
