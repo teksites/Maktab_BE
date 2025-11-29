@@ -32,7 +32,7 @@ namespace Courses.Implementation.Services
             var familyCourseTransaction = familyTransactions.Where(x => x.Enrollments.All(y => y.CourseId == enrollment.CourseId));
             var course = await _courseService.GetCourse(enrollment.CourseId).ConfigureAwait(false);
 
-            if (!course.IsRegistrationOpened || !ifAddedByAdmin)
+            if (!course.IsRegistrationOpened && !ifAddedByAdmin)
             {
                 throw new Exception("The registration is closed. Contact Admin please");
             }
@@ -330,7 +330,7 @@ namespace Courses.Implementation.Services
             var courseDetails = await _courseService.GetCourse(enrollmentDetails.CourseId).ConfigureAwait(false);
             //var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
 
-            if (!courseDetails.IsRegistrationOpened || !ifUpdatedByAdmin)
+            if (!courseDetails.IsRegistrationOpened && !ifUpdatedByAdmin)
             {
                 return false;
             }
@@ -349,7 +349,7 @@ namespace Courses.Implementation.Services
           
             var courseDetails = await _courseService.GetCourse(enrollmentDetails.CourseId).ConfigureAwait(false);
             
-            if (!courseDetails.IsRegistrationOpened || !ifDeletedByAdmin)
+            if (!courseDetails.IsRegistrationOpened && !ifDeletedByAdmin)
             {
                 return false;
             }
