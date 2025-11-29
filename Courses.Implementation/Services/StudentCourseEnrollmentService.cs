@@ -136,7 +136,7 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.PaymentCode = $"GENERATECODE";
                 addStudentCourseTransaction.TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.AwaitingPayment;
                 addStudentCourseTransaction.IsActive = true;
-                addStudentCourseTransaction.PayableFee = selectedCourseEnrollmentGroup.Fee; // get from course
+                addStudentCourseTransaction.PayableFee = (decimal)selectedCourseEnrollmentGroup.Fee; // get from course
                 addStudentCourseTransaction.FeeAmountDiscount = 0;
                 addStudentCourseTransaction.DayCareDiscount = 0;
                 addStudentCourseTransaction.DayCareFee = enrollment.WillUseDayCare ? selectedCourseEnrollmentGroup.DayCareFee : 0;//add day care fee in course group
@@ -175,8 +175,8 @@ namespace Courses.Implementation.Services
             var isActive = familyTransaction.IsActive;
             var totalAmountPaid = familyTransaction.TotalAmountPaid;
 
-            decimal dayCareFee = 0;
-            decimal courseFee = 0;
+            float dayCareFee = 0;
+            float courseFee = 0;
 
             var groupedByChild = familyTransaction.Enrollments
             .GroupBy(e => e.ChildId)
@@ -210,17 +210,17 @@ namespace Courses.Implementation.Services
                 }
             }
 
-            decimal applicalbeDscountPercentage = 1;
+            float applicalbeDscountPercentage = 1;
 
             foreach (var childGroup in groupedByChild)
             {
                 var enrollments = childGroup.Enrollments;
-                decimal childFee = 0;
-                decimal childDayCareFee = 0;
+                float childFee = 0;
+                float childDayCareFee = 0;
 
                 if (i == 2 && policyFound)// we have multiple children
                 {
-                    applicalbeDscountPercentage = policy.SecondChildFee / 100;
+                    applicalbeDscountPercentage = (float) policy.SecondChildFee / 100;
                 }
                 else if (i > 2 && policyFound)// we have multiple children
                 {
@@ -251,8 +251,8 @@ namespace Courses.Implementation.Services
             addStudentCourseTransaction.IsActive = familyTransaction.IsActive;
             addStudentCourseTransaction.FeeAmountDiscount = familyTransaction.FeeAmountDiscount;
             addStudentCourseTransaction.DayCareDiscount = familyTransaction.DayCareDiscount;
-            addStudentCourseTransaction.DayCareFee = dayCareFee;
-            addStudentCourseTransaction.PayableFee = courseFee;
+            addStudentCourseTransaction.DayCareFee = (decimal)dayCareFee;
+            addStudentCourseTransaction.PayableFee = (decimal)courseFee;
             addStudentCourseTransaction.TotalAmountPaid = familyTransaction.TotalAmountPaid;
             addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
                 (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
