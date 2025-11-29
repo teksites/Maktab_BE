@@ -224,7 +224,7 @@ namespace Courses.Implementation.Services
                 }
                 else if (i > 2 && policyFound)// we have multiple children
                 {
-                    applicalbeDscountPercentage = policy.ThirdAndOnwardChildFee / 100;
+                    applicalbeDscountPercentage = (float) policy.ThirdAndOnwardChildFee / 100;
                 }
 
                 foreach (var enrollment in enrollments)
