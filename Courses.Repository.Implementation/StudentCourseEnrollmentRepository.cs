@@ -113,16 +113,23 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
+            //cmd.CommandText = @"
+            //    UPDATE student_course_enrollment 
+            //    SET CourseEnrollmentGroupId=@CourseEnrollmentGroupId,
+            //        CourseId=@CourseId,
+            //        ChildId=@ChildId,
+            //        FamilyId=@FamilyId,
+            //        WillUseDayCare=@WillUseDayCare,
+            //        DayCareDays=@DayCareDays,
+            //        UpdatedOn=@UpdatedOn,
+            //        EnrollmentIndex = @EnrollmentIndex
+            //    WHERE StudentCourseEnrollmentId=@EnrollmentId";
+
             cmd.CommandText = @"
                 UPDATE student_course_enrollment 
-                SET CourseEnrollmentGroupId=@CourseEnrollmentGroupId,
-                    CourseId=@CourseId,
-                    ChildId=@ChildId,
-                    FamilyId=@FamilyId,
-                    WillUseDayCare=@WillUseDayCare,
+                SET WillUseDayCare=@WillUseDayCare,
                     DayCareDays=@DayCareDays,
-                    UpdatedOn=@UpdatedOn,
-                    EnrollmentIndex = @EnrollmentIndex
+                    UpdatedOn=@UpdatedOn
                 WHERE StudentCourseEnrollmentId=@EnrollmentId";
 
             cmd.AddParameter("@EnrollmentId", enrollmentId.ToByteArray());

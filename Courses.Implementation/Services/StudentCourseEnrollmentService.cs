@@ -318,9 +318,26 @@ namespace Courses.Implementation.Services
         public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollments(Guid courseId)
             => _repository.GetAllEnrollmentsByCourse(courseId);
 
-        public Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
-            => _repository.UpdateEnrollment(enrollmentId, enrollment);
+        public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment, bool ifUpdatedByAdmin = false)
+        {
+            var enrollmentDetails = await _repository.GetEnrollment(enrollmentId).ConfigureAwait(false);
 
+            if (enrollmentDetails == null)
+            {
+                return false;
+            }
+
+            var courseDetails = await _courseService.GetCourse(enrollmentDetails.CourseId).ConfigureAwait(false);
+            //var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
+
+            if (!courseDetails.IsRegistrationOpened || !ifUpdatedByAdmin)
+            {
+                return false;
+            }
+
+            return await _repository.UpdateEnrollment(enrollmentId, enrollment).ConfigureAwait(false);
+        }
+      
         public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false, bool ifDeletedByAdmin = false)
         {
             var enrollmentDetails = await _repository.GetEnrollment(enrollmentId).ConfigureAwait(false);
@@ -331,12 +348,13 @@ namespace Courses.Implementation.Services
             }
           
             var courseDetails = await _courseService.GetCourse(enrollmentDetails.CourseId).ConfigureAwait(false);
-            var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x=> x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
-
+            
             if (!courseDetails.IsRegistrationOpened || !ifDeletedByAdmin)
             {
                 return false;
             }
+
+            var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
 
             var courseId = enrollmentDetails.CourseId;
             var famuilyId = enrollmentDetails.FamilyId;

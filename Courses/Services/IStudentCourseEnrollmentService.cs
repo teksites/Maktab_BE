@@ -11,7 +11,7 @@ namespace Courses.Services
         Task<StudentCourseEnrollmentResponse> GetEnrollment(Guid enrollmentId);
         Task<StudentCourseEnrollmentResponse> GetStudentCourseEnrollment(Guid childId, Guid courseId);
         Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentByFamily(Guid familyId);
-        Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment);
+        Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment, bool ifUpdatedByAdmin = false);
         Task<bool> RecalculateCourseFee(Guid courseId, Guid familyId);
     }
 }

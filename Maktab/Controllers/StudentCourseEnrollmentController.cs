@@ -65,9 +65,15 @@ public class StudentCourseEnrollmentController : ControllerBase
     }
 
 
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
+    [HttpPut("byadmin/{enrollmentId:guid}")]
+    public async Task<bool> UpdateEnrollmentByAdmin(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
+        => await _service.UpdateEnrollment(enrollmentId, enrollment, true);
+
+
     [HttpPut("{enrollmentId:guid}")]
     public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
-        => await _service.UpdateEnrollment(enrollmentId, enrollment);
+        => await _service.UpdateEnrollment(enrollmentId, enrollment, false);
 
     [HttpDelete("{enrollmentId:guid}")]
     public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false)
