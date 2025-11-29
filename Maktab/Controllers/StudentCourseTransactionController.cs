@@ -42,7 +42,7 @@ public class StudentCourseTransactionController : ControllerBase
     [HttpGet("family/{familyId:guid}/course/{courseId:guid}")]
     public async Task<IEnumerable<StudentCourseTransactionResponse>> GetFamilyTransactionsByCourse(Guid familyId, Guid courseId)
     {
-        return await _service.GetCourseTransactionsByFamily(familyId, courseId).ConfigureAwait(false);
+        return await _service.GetCourseTransactionsByFamily( courseId, familyId).ConfigureAwait(false);
     }
 
     [HttpGet("paymentcode/{paymentCode}")]
