@@ -29,9 +29,9 @@ namespace Courses.Repository.Implementation
 
             cmd.CommandText = @"
                 INSERT INTO student_course_transaction
-                (StudentCourseTransactionId, FamilyId, PayableFee, DayCareFee, FeeAmountDiscount, TotalPayable, Comments, Status, PaymentCode, IsActive, TotalAmountPaid, IsCompletelyPaid, CreatedAt, UpdatedOn, DayCareFee, DayCareDiscount)
+                (StudentCourseTransactionId, FamilyId, PayableFee, FeeAmountDiscount, TotalPayable, Comments, Status, PaymentCode, IsActive, TotalAmountPaid, IsCompletelyPaid, CreatedAt, UpdatedOn, DayCareFee, DayCareDiscount)
                 VALUES
-                (@TransactionId, @FamilyId, @PayableFee, @DayCareFee, @FeeAmountDiscount, @TotalPayable, @Comments, @Status, @PaymentCode, @IsActive, @TotalAmountPaid, @IsCompletelyPaid, @CreatedAt, @UpdatedOn, @DayCareFee, @DayCareDiscount)
+                (@TransactionId, @FamilyId, @PayableFee, @FeeAmountDiscount, @TotalPayable, @Comments, @Status, @PaymentCode, @IsActive, @TotalAmountPaid, @IsCompletelyPaid, @CreatedAt, @UpdatedOn, @DayCareFee, @DayCareDiscount)
             ";
 
             cmd.AddParameter("@TransactionId", transactionId.ToByteArray())
@@ -55,7 +55,8 @@ namespace Courses.Repository.Implementation
             //if (transaction.StudentCourseEnrollmentIds?.Count > 0)
               //  await AddEnrollmentsToTransaction(transactionId, transaction.StudentCourseEnrollmentIds);
 
-            return await GetTransaction(transactionId) ?? throw new Exception("Failed to retrieve transaction");
+            //return await GetTransaction(transactionId) ?? throw new Exception("Failed to retrieve transaction");
+            return await GetTransactionSimple(transactionId) ?? throw new Exception("Failed to retrieve transaction");
         }
 
         public async Task<bool> AddEnrollmentsToTransaction(Guid studentCourseTransactionId, Guid studentCourseEnrollmentId)
@@ -200,19 +201,43 @@ namespace Courses.Repository.Implementation
         // ----------------------------
         // Get Transaction by ID
         // ----------------------------
-        //public async Task<StudentCourseTransactionResponse?> GetTransaction(Guid transactionId)
-        //{
-        //    using var conn = await Database.CreateAndOpenConnectionAsync();
-        //    using var cmd = conn.CreateCommand();
+        public async Task<StudentCourseTransactionResponse?> GetTransactionSimple(Guid transactionId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
 
-        //    cmd.CommandText = "SELECT * FROM student_course_transaction WHERE StudentCourseTransactionId = @TransactionId";
-        //    cmd.AddParameter("@TransactionId", transactionId.ToByteArray());
+            cmd.CommandText = "SELECT * FROM student_course_transaction WHERE StudentCourseTransactionId = @TransactionId";
+            cmd.AddParameter("@TransactionId", transactionId.ToByteArray());
 
-        //    using var reader = await cmd.ExecuteReaderAsync();
-        //    if (!await reader.ReadAsync()) return null;
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
 
-        //    return await MapToTransactionSingleResponse(reader);
-        //}
+            return await MapToTransactionSimpleResponse(reader);
+        }
+
+
+        private async Task<StudentCourseTransactionResponse> MapToTransactionSimpleResponse(DbDataReader reader)
+        {
+            return new StudentCourseTransactionResponse
+            {
+                //StudentCourseEnrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId"),
+                StudentCourseTransactionId = reader.GetGuidFromByteArray("StudentCourseTransactionId"),
+                FamilyId = reader.GetGuidFromByteArray("FamilyId"),
+                PayableFee = reader.GetDecimal("PayableFee"),
+                DayCareFee = reader.GetDecimal("DayCareFee"),
+                DayCareDiscount = reader.GetDecimal("DayCareDiscount"),
+                FeeAmountDiscount = reader.GetDecimal("FeeAmountDiscount"),
+                TotalPayable = reader.GetDecimal("TotalPayable"),
+                TotalAmountPaid = reader.GetDecimal("TotalAmountPaid"),
+                Comments = reader.GetString("Comments"),
+                PaymentCode = reader.GetString("PaymentCode"),
+                TransactionStatus = (TransactionStatus)reader.GetInt32("Status"),
+                IsActive = reader.GetBoolean("IsActive"),
+                IsCompletelyPaid = reader.GetBoolean("IsCompletelyPaid"),
+                CreatedAt = reader.GetDateTime("CreatedAt"),
+                UpdatedOn = reader.GetDateTime("UpdatedOn")
+            };
+        }
 
         // ----------------------------
         // Update Transaction

@@ -25,6 +25,8 @@ namespace Maktab.Controllers
         [ApiAuthorize(true, true)]
         [HttpPost("users/session/login")]
         public async Task<IActionResult> Authenticate([FromBody] UserCredential credential)
+        
+        
         {
             var authenticationResponse = await _loginService.Authenticate(credential.UserName, credential.Password, Request.Host.Value).ConfigureAwait(false);
 

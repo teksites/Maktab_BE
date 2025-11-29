@@ -148,7 +148,7 @@ namespace Courses.Implementation.Services
                 try
                 {
                     var addedTransaction = await _studentCourseTransactionService.AddTransaction(addStudentCourseTransaction).ConfigureAwait(false);
-                    var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(addedTransaction.StudentCourseEnrollmentId,
+                    var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(addedTransaction.StudentCourseTransactionId,
                               addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
                 }
                 catch(Exception e)

@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Zeffy.Registry")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9bf071df4eedb2ae244e8012e1c401ccb3bfa4ac")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+65ff1789e7c73f8f65225037c93a82f47620829e")]
 [assembly: System.Reflection.AssemblyProductAttribute("Zeffy.Registry")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Zeffy.Registry")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
