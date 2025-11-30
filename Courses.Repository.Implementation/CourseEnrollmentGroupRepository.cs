@@ -20,11 +20,11 @@ namespace Courses.Repository.Implementation
                 INSERT INTO course_enrollment_groups 
                 (CourseEnrollmentGroupId, CourseId, InstituteId, GroupTitle, GroupTitleFr, 
                  Details, DetailsFr, IsActive, CreatedAt, UpdatedOn, MaxStudents, 
-                 AcedemicGroup, Fee, IfRegistrationOpen)
+                 AcedemicGroup, Fee, IfRegistrationOpen, DayCareFee)
                 VALUES 
                 (@CourseEnrollmentGroupId, @CourseId, @InstituteId, @GroupTitle, @GroupTitleFr,
                  @Details, @DetailsFr, @IsActive, @CreatedAt, @UpdatedOn, @MaxStudents,
-                 @AcedemicGroup, @Fee, @IfRegistrationOpen)";
+                 @AcedemicGroup, @Fee, @IfRegistrationOpen, @DayCareFee)";
 
             var groupId = Guid.NewGuid();
 
@@ -41,6 +41,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@MaxStudents", group.MaxStudents);
             cmd.AddParameter("@AcedemicGroup", (int) AcedemicGroupHelper.FromStrings(group.AcedemicGroups));
             cmd.AddParameter("@Fee", group.Fee);
+            cmd.AddParameter("@DayCareFee", group.DayCareFee);
             cmd.AddParameter("@IfRegistrationOpen", group.IfRegistrationOpen);
 
             await cmd.ExecuteNonQueryAsync();
@@ -98,6 +99,7 @@ namespace Courses.Repository.Implementation
                     MaxStudents = @MaxStudents,
                     AcedemicGroup = @AcedemicGroup,
                     Fee = @Fee,
+                    DayCareFee = @DayCareFee,
                     IfRegistrationOpen = @IfRegistrationOpen
                 WHERE CourseEnrollmentGroupId = @CourseEnrollmentGroupId";
 
@@ -110,6 +112,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@MaxStudents", group.MaxStudents);
             cmd.AddParameter("@AcedemicGroup",  AcedemicGroupHelper.FromStrings(group.AcedemicGroups));
             cmd.AddParameter("@Fee", group.Fee);
+            cmd.AddParameter("@DayCareFee", group.DayCareFee);
             cmd.AddParameter("@IfRegistrationOpen", group.IfRegistrationOpen);
 
             return await cmd.ExecuteNonQueryAsync() > 0;
@@ -213,6 +216,7 @@ namespace Courses.Repository.Implementation
                 MaxStudents = reader.IsDBNull("MaxStudents") ? 0 : reader.GetInt32("MaxStudents"),
                 AcedemicGroups = AcedemicGroupHelper.FromInt( reader.GetInt32("AcedemicGroup")),
                 Fee = reader.GetInt32("Fee"),
+                DayCareFee = reader.GetInt32("DayCareFee"),
                 IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen")
             };
         }

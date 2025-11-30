@@ -203,17 +203,24 @@ namespace Courses.Implementation.Services
             if (groupedByChild.Count > 1)
             {
                 var policies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
-                var discountPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == InstutePolicyType.SiblingDiscount).Details;
-                if (!string.IsNullOrEmpty(discountPolicy))
+                if (!policies.Any())
                 {
-                    try
+                    policyFound = false;
+                }
+                else
+                { 
+                var discountPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == InstutePolicyType.SiblingDiscount).Details;
+                    if (!string.IsNullOrEmpty(discountPolicy))
                     {
-                        policy = JsonConvert.DeserializeObject<SiblingDiscountPolicy>(discountPolicy);
-                        policyFound = true;
-                    }
-                    catch (Exception e)
-                    {
-                        policyFound = false;
+                        try
+                        {
+                            policy = JsonConvert.DeserializeObject<SiblingDiscountPolicy>(discountPolicy);
+                            policyFound = true;
+                        }
+                        catch (Exception e)
+                        {
+                            policyFound = false;
+                        }
                     }
                 }
             }
