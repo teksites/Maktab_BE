@@ -358,7 +358,9 @@ namespace Courses.Implementation.Services
             var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
 
             var courseId = enrollmentDetails.CourseId;
-            var famuilyId = enrollmentDetails.FamilyId;
+            var familyId = enrollmentDetails.FamilyId;
+            var familyTransaction = (await _studentCourseTransactionService.GetCourseTransactionsByFamily(courseId, familyId).ConfigureAwait(false)).FirstOrDefault();
+
 
             var ifDeleted = await _studentCourseTransactionService.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(enrollmentId).ConfigureAwait(false);
             var ifEnrollmentDeleted = false;
@@ -368,9 +370,19 @@ namespace Courses.Implementation.Services
                 ifEnrollmentDeleted = await _repository.DeleteEnrollment(enrollmentId, hardDelete).ConfigureAwait(false);
             }
 
+
+
             if (ifDeleted && ifEnrollmentDeleted)
             {
-                return await RecalculateCourseFee(courseId, famuilyId).ConfigureAwait(false);
+                if (familyTransaction.Enrollments.Count <= 1)
+                {
+                    var ifFeePaid = familyTransaction.TotalAmountPaid > 0;
+                    await _studentCourseTransactionService.DeleteTransaction(familyTransaction.StudentCourseTransactionId, !ifFeePaid).ConfigureAwait(false);
+                }
+                else
+                {
+                    return await RecalculateCourseFee(courseId, familyId).ConfigureAwait(false);
+                }
             }
 
            return false;
