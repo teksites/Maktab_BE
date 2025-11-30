@@ -165,6 +165,7 @@ namespace Courses.Implementation.Services
                 return addedEnrollment;
             }
         }
+
         public async Task<bool> RecalculateCourseFee(Guid courseId, Guid familyId)
         {
             var familyTransaction = (await _studentCourseTransactionService.GetCourseTransactionsByFamily(courseId, familyId).ConfigureAwait(false)).FirstOrDefault();
@@ -262,7 +263,7 @@ namespace Courses.Implementation.Services
             addStudentCourseTransaction.PayableFee = (decimal)courseFee;
             addStudentCourseTransaction.TotalAmountPaid = familyTransaction.TotalAmountPaid;
             addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
-                (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
+                (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount + addStudentCourseTransaction.TotalAmountPaid);
             addStudentCourseTransaction.Comments = familyTransaction.Comments +"\n Updated the transaction";
             addStudentCourseTransaction.IsCompletelyPaid = addStudentCourseTransaction.TotalAmountPaid < addStudentCourseTransaction.TotalPayable;
 
