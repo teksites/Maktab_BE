@@ -377,7 +377,7 @@ namespace Courses.Implementation.Services
                 if (familyTransaction.Enrollments.Count <= 1)
                 {
                     var ifFeePaid = familyTransaction.TotalAmountPaid > 0;
-                    await _studentCourseTransactionService.DeleteTransaction(familyTransaction.StudentCourseTransactionId, !ifFeePaid).ConfigureAwait(false);
+                    return await _studentCourseTransactionService.DeleteTransaction(familyTransaction.StudentCourseTransactionId, !ifFeePaid).ConfigureAwait(false);
                 }
                 else
                 {
