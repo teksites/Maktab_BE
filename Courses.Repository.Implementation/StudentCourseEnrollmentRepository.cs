@@ -25,6 +25,8 @@ namespace Courses.Repository.Implementation
                 (@StudentCourseEnrollmentId, @CourseEnrollmentGroupId, @CourseId, @ChildId, @FamilyId, 
                  @WillUseDayCare, @DayCareDays, @IsActive, @CreatedAt, @UpdatedOn, @EnrollmentIndex)";
 
+            enrollment.IsActive = true;
+
             cmd.AddParameter("@StudentCourseEnrollmentId", enrollmentId.ToByteArray());
             cmd.AddParameter("@CourseEnrollmentGroupId", enrollment.CourseEnrollmentGroupId.ToByteArray());
             cmd.AddParameter("@CourseId", enrollment.CourseId.ToByteArray());
