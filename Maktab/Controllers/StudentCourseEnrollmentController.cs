@@ -29,7 +29,7 @@ public class StudentCourseEnrollmentController : ControllerBase
     public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollments(Guid courseId)
         => await _service.GetAllEnrollments(courseId);
 
-    [HttpGet("family/{familyId:guid}/course/{courseId:guid}")]
+    [HttpGet("recalculate-fee/family/{familyId:guid}/course/{courseId:guid}")]
     public async Task<bool> RecalculateCourseFee(Guid courseId, Guid familyId)
         => await _service.RecalculateCourseFee(courseId, familyId);
 
