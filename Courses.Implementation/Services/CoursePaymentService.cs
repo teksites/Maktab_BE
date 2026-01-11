@@ -32,13 +32,12 @@ namespace Courses.Services.Implementation
             //update the transaction for the paid amount
 
             //transaction.TotalAmountPaid = totalPaid;
-
             AddStudentCourseTransaction updatedTransaction = new AddStudentCourseTransaction
             {
                 FamilyId = transaction.FamilyId,
                 FeeAmountDiscount = transaction.FeeAmountDiscount,
                 StudentCourseTransactionId = transaction.StudentCourseTransactionId,
-                Comments = transaction.Comments + $"\n added payment: {payment.AmountPaid} via payment mode: {payment.PaymentMode.ToString()}",
+                Comments = transaction.Comments + $"\n added payment: {payment.AmountPaid} via payment mode: {payment.PaymentMode.ToString()} on date: {DateTime.UtcNow}",
                 DayCareDiscount = transaction.DayCareDiscount,
                 DayCareFee = transaction.DayCareFee,
                 TotalAmountPaid = totalPaid,

@@ -154,3 +154,9 @@
 /Zeffy.Repository.Implementation/obj/Debug/net8.0/Zeffy.Repository.Implementation.sourcelink.json
 /Zeffy.Implementation/bin/Debug/net8.0/MaktabDataContracts.dll
 /Zeffy.Implementation/bin/Debug/net8.0/Zeffy.Implementation.deps.json
+/Zeffy/obj/Debug/net8.0/Zeffy.csproj.AssemblyReference.cache
+*.BuildWithSkipAnalyzers
+/Zeffy.Registry/bin/Debug/net8.0/MaktabDataContracts.dll
+/Zeffy.Repository/bin/Debug/net8.0/MaktabDataContracts.dll
+/Zeffy.Repository/obj/Debug/net8.0/Zeffy.Repository.csproj.AssemblyReference.cache
+/Zeffy.Repository.Implementation/bin/Debug/net8.0/MaktabDataContracts.dll

@@ -115,7 +115,8 @@ namespace Courses.Repository.Implementation
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
             sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex
+            sce.EnrollmentIndex as EnrollmentIndex,
+            crcs.RegistrationFee AS CourseRegistrationFee
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -124,6 +125,8 @@ namespace Courses.Repository.Implementation
             ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
         JOIN course_enrollment_groups ceg
             ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+        JOIN courses crcs
+            ON ceg.CourseId = crcs.CourseId
 
         WHERE LOWER(sct.PaymentCode) = LOWER(@PaymentCode)
 
@@ -175,7 +178,8 @@ namespace Courses.Repository.Implementation
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
             sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex
+            sce.EnrollmentIndex as EnrollmentIndex,
+            crcs.RegistrationFee AS CourseRegistrationFee
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -184,6 +188,8 @@ namespace Courses.Repository.Implementation
             ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
         JOIN course_enrollment_groups ceg
             ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+        JOIN courses crcs
+            ON ceg.CourseId = crcs.CourseId
 
         WHERE sct.StudentCourseTransactionId = @TransactionId
 
@@ -515,7 +521,8 @@ namespace Courses.Repository.Implementation
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
             sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex
+            sce.EnrollmentIndex as EnrollmentIndex,
+            crcs.RegistrationFee AS CourseRegistrationFee
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -524,6 +531,8 @@ namespace Courses.Repository.Implementation
             ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
         JOIN course_enrollment_groups ceg
             ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+        JOIN courses crcs
+            ON ceg.CourseId = crcs.CourseId
 
         WHERE
             sct.FamilyId = @FamilyId
@@ -724,7 +733,8 @@ namespace Courses.Repository.Implementation
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
             sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex
+            sce.EnrollmentIndex as EnrollmentIndex,
+            crcs.RegistrationFee AS CourseRegistrationFee
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -733,6 +743,8 @@ namespace Courses.Repository.Implementation
             ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
         JOIN course_enrollment_groups ceg
             ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+        JOIN courses crcs
+            ON ceg.CourseId = crcs.CourseId
 
         WHERE
             sct.FamilyId   = @FamilyId
@@ -785,13 +797,16 @@ namespace Courses.Repository.Implementation
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
             sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex
+            sce.EnrollmentIndex as EnrollmentIndex,
+            crcs.RegistrationFee AS CourseRegistrationFee
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
             ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
         JOIN student_course_enrollment sce
             ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+        JOIN courses crcs
+            ON ceg.CourseId = crcs.CourseId
 
         WHERE
             sct.FamilyId = @FamilyId
@@ -844,13 +859,16 @@ namespace Courses.Repository.Implementation
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
             sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex
+            sce.EnrollmentIndex as EnrollmentIndex,
+            crcs.RegistrationFee AS CourseRegistrationFee
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
             ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
         JOIN student_course_enrollment sce
             ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+        JOIN courses crcs
+            ON ceg.CourseId = crcs.CourseId
 
         WHERE
             sce.CourseId = @CourseId
@@ -900,7 +918,8 @@ namespace Courses.Repository.Implementation
             sce.DayCareDays,
             sce.CreatedAt       AS EnrollmentCreatedAt,
             sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex
+            sce.EnrollmentIndex as EnrollmentIndex,
+            crcs.RegistrationFee AS CourseRegistrationFee
 
         FROM student_course_transaction sct
         JOIN student_course_transaction_enrollment scte
@@ -909,6 +928,8 @@ namespace Courses.Repository.Implementation
             ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
         JOIN course_enrollment_groups ceg
             ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+        JOIN courses crcs
+            ON ceg.CourseId = crcs.CourseId
 
         WHERE
             ceg.InstituteId = @InstituteId
@@ -1185,7 +1206,8 @@ namespace Courses.Repository.Implementation
             var ordEnrollmentCreatedAt = reader.GetOrdinal("EnrollmentCreatedAt");
             var ordEnrollmentUpdatedOn = reader.GetOrdinal("EnrollmentUpdatedOn");
             var ordEnrollmentIndex = reader.GetOrdinal("EnrollmentIndex");
-
+            var ordCourseRegistrationFee = reader.GetOrdinal("CourseRegistrationFee");
+            
             var lookup = new Dictionary<Guid, StudentCourseTransactionResponse>();
 
             while (await reader.ReadAsync())
@@ -1215,6 +1237,7 @@ namespace Courses.Repository.Implementation
                         IsCompletelyPaid = reader.GetBoolean(ordIsCompletelyPaid),
                         CreatedAt = reader.GetDateTime(ordTxCreatedAt),
                         UpdatedOn = reader.GetDateTime(ordTxUpdatedOn),
+                        RegistrationFee = reader.GetInt32(ordCourseRegistrationFee),
                         Enrollments = new List<StudentCourseEnrollmentResponse>()
                     };
 
@@ -1236,7 +1259,8 @@ namespace Courses.Repository.Implementation
                     DayCareDays = reader.GetInt32(ordDayCareDays),
                     CreatedAt = reader.GetDateTime(ordEnrollmentCreatedAt),
                     UpdatedOn = reader.GetDateTime(ordEnrollmentUpdatedOn),
-                    EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex)
+                    EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex),
+                   // RegistrationFee = reader.GetInt32(RegistrationFee)
                 };
 
                 tx.Enrollments.Add(enrollment);

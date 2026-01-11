@@ -1,5 +1,6 @@
 ﻿using Cumulus.Data;
 using Data;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
 using System.Data.Common;
@@ -191,24 +192,99 @@ namespace Courses.Repository.Implementation
             return GetEnrollmentsByColumnAsync("FamilyId", familyId);
         }
 
-        private async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentsByColumnAsync(string columnName, Guid value)
-        {
-            var results = new List<StudentCourseEnrollmentResponse>();
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
+        //private async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentsByColumnAsync(string columnName, Guid value)
+        //{
+        //    var results = new List<StudentCourseEnrollmentResponse>();
+        //    using var conn = await Database.CreateAndOpenConnectionAsync();
+        //    using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = $"SELECT * FROM student_course_enrollment WHERE {columnName}=@Value AND IsActive=TRUE";
-            cmd.AddParameter("@Value", value.ToByteArray());
+        //    cmd.CommandText = $"SELECT * FROM student_course_enrollment WHERE {columnName}=@Value AND IsActive=TRUE";
+        //    cmd.AddParameter("@Value", value.ToByteArray());
 
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-                results.Add(MapToEnrollmentResponse(reader));
+        //    using var reader = await cmd.ExecuteReaderAsync();
+        //    while (await reader.ReadAsync())
+        //        results.Add(MapToEnrollmentResponse(reader));
 
-            return results;
-        }
+        //    return results;
+        //}
 
 
         // Helper: Map DbDataReader to StudentCourseEnrollmentResponse
+        //private StudentCourseEnrollmentResponse MapToEnrollmentResponse(DbDataReader reader)
+        //{
+        //    return new StudentCourseEnrollmentResponse
+        //    {
+        //        StudentCourseEnrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId"),
+        //        CourseEnrollmentGroupId = reader.GetGuidFromByteArray("CourseEnrollmentGroupId"),
+        //        CourseId = reader.GetGuidFromByteArray("CourseId"),
+        //        ChildId = reader.GetGuidFromByteArray("ChildId"),
+        //        FamilyId = reader.GetGuidFromByteArray("FamilyId"),
+        //        WillUseDayCare = reader.GetBoolean("WillUseDayCare"),
+        //        DayCareDays = reader.GetInt32("DayCareDays"),
+        //        IsActive = reader.GetBoolean("IsActive"),
+        //        CreatedAt = reader.GetDateTime("CreatedAt"),
+        //        UpdatedOn = reader.GetDateTime("UpdatedOn"),
+        //        EnrollmentIndex = reader.GetInt32("EnrollmentIndex")
+        //    };
+        //}
+
+        private async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentsByColumnAsync(
+    string columnName, Guid value)
+        {
+            var lookup = new Dictionary<Guid, StudentCourseEnrollmentResponse>();
+
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = $@"
+        SELECT
+            sce.StudentCourseEnrollmentId,
+            sce.CourseEnrollmentGroupId,
+            sce.CourseId,
+            sce.ChildId,
+            sce.FamilyId,
+            sce.WillUseDayCare,
+            sce.DayCareDays,
+            sce.IsActive,
+            sce.CreatedAt,
+            sce.UpdatedOn,
+            sce.EnrollmentIndex,
+            ci.FirstName AS ChildFirstName,
+            ci.LastName AS ChildLastName,
+            ui.UserId,
+            ui.FirstName AS UserFirstName,
+            ui.LastName AS UserLastName,
+            ui.Email,
+            ui.Phone,
+            ui.Relationship
+        FROM student_course_enrollment sce
+        INNER JOIN child_information ci ON ci.ChildId = sce.ChildId
+        LEFT JOIN user_info ui ON ui.FamilyId = sce.FamilyId AND ui.IsActive = b'1'
+        WHERE sce.{columnName} = @Value AND sce.IsActive = TRUE";
+
+            cmd.AddParameter("@Value", value.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                var enrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId");
+
+                if (!lookup.TryGetValue(enrollmentId, out var enrollment))
+                {
+                    enrollment = MapToEnrollmentResponse(reader);
+                    lookup[enrollmentId] = enrollment;
+                }
+
+                if (!reader.IsDBNull("UserId"))
+                {
+                    enrollment.FamilyMembers.Add(MapToFamilyInfo(reader));
+                }
+            }
+
+            return lookup.Values;
+        }
+
         private StudentCourseEnrollmentResponse MapToEnrollmentResponse(DbDataReader reader)
         {
             return new StudentCourseEnrollmentResponse
@@ -218,13 +294,33 @@ namespace Courses.Repository.Implementation
                 CourseId = reader.GetGuidFromByteArray("CourseId"),
                 ChildId = reader.GetGuidFromByteArray("ChildId"),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
+
+                ChildName = $"{reader.GetString("ChildFirstName")} {reader.GetString("ChildLastName")}",
+
                 WillUseDayCare = reader.GetBoolean("WillUseDayCare"),
                 DayCareDays = reader.GetInt32("DayCareDays"),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn"),
-                EnrollmentIndex = reader.GetInt32("EnrollmentIndex")
+                EnrollmentIndex = reader.GetInt32("EnrollmentIndex"),
+
+                FamilyMembers = new List<FamilyInfo>()
             };
         }
+
+        private FamilyInfo MapToFamilyInfo(DbDataReader reader)
+        {
+            return new FamilyInfo
+            {
+                UserId = reader.GetGuidFromByteArray("UserId"),
+                UserName = $"{reader.GetString("UserFirstName")} {reader.GetString("UserLastName")}",
+                Email = reader.GetString("Email"),
+                Phone = reader.GetString("Phone"),
+                Relationship = (Relationship)reader.GetInt32("Relationship")
+            };
+        }
+
+
+
     }
 }

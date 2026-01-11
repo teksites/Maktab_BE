@@ -149,7 +149,7 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.DayCareFee = enrollment.WillUseDayCare ? selectedCourseEnrollmentGroup.DayCareFee : 0;//add day care fee in course group
                 addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
                     (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
-                addStudentCourseTransaction.Comments = "New Enrollment";
+                addStudentCourseTransaction.Comments = $"New Enrollment on {DateTime.UtcNow.ToString()}";
                 addStudentCourseTransaction.IsCompletelyPaid = false;
 
                 try
@@ -239,7 +239,11 @@ namespace Courses.Implementation.Services
                 }
                 else if (i > 2 && policyFound)// we have multiple children
                 {
-                    applicalbeDscountPercentage = (float) policy.ThirdAndOnwardChildFee / 100;
+                    applicalbeDscountPercentage = (float) policy.ThirdChildFee / 100;
+                }
+                else if (i > 3 && policyFound)// we have multiple children
+                {
+                    applicalbeDscountPercentage = (float)policy.FourthAndOnwardChildFee / 100;
                 }
 
                 foreach (var enrollment in enrollments)
@@ -271,7 +275,7 @@ namespace Courses.Implementation.Services
             addStudentCourseTransaction.TotalAmountPaid = familyTransaction.TotalAmountPaid;
             addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
                 (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount + addStudentCourseTransaction.TotalAmountPaid);
-            addStudentCourseTransaction.Comments = familyTransaction.Comments +"\n Updated the transaction";
+            addStudentCourseTransaction.Comments = familyTransaction.Comments +$"\n Updated the transaction on {DateTime.UtcNow.ToString()}";
             addStudentCourseTransaction.IsCompletelyPaid = addStudentCourseTransaction.TotalAmountPaid < addStudentCourseTransaction.TotalPayable;
 
             return await _studentCourseTransactionService.UpdateTransaction(familyTransaction.StudentCourseTransactionId, addStudentCourseTransaction).ConfigureAwait(false);
@@ -301,7 +305,7 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.DayCareFee = enrollmentGroup.DayCareFee;//add day care fee in course group
                 addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) - 
                     (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount) ;
-                addStudentCourseTransaction.Comments = "New Enrollment";
+                addStudentCourseTransaction.Comments = $"New Enrollment on {DateTime.UtcNow.ToString()}";
                 addStudentCourseTransaction.IsCompletelyPaid = false;
             }
             else //exisiting
