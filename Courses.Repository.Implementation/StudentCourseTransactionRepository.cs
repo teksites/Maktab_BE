@@ -15,6 +15,12 @@ namespace Courses.Repository.Implementation
     {
         public StudentCourseTransactionRepository(IDatabase database) : base(database) { }
 
+        public async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsPerCourseAsync(Guid courseId)
+        {
+            // Delegate to your existing implementation
+            return await GetAllTransactionsByCourse(courseId);
+        }
+
         // ----------------------------
         // Add Transaction
         // ----------------------------
@@ -23,49 +29,72 @@ namespace Courses.Repository.Implementation
             var transactionId = Guid.NewGuid();
 
             using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
+            using var dbTx = await conn.BeginTransactionAsync();
 
-            var paymentCode = await GenerateUniquePaymentCodeAsync(conn).ConfigureAwait(false);
+            try
+            {
+                var paymentCode = await GenerateUniquePaymentCodeAsync(conn).ConfigureAwait(false);
 
-            cmd.CommandText = @"
-                INSERT INTO student_course_transaction
-                (StudentCourseTransactionId, FamilyId, PayableFee, FeeAmountDiscount, TotalPayable, Comments, Status, PaymentCode, IsActive, TotalAmountPaid, IsCompletelyPaid, CreatedAt, UpdatedOn, DayCareFee, DayCareDiscount)
-                VALUES
-                (@TransactionId, @FamilyId, @PayableFee, @FeeAmountDiscount, @TotalPayable, @Comments, @Status, @PaymentCode, @IsActive, @TotalAmountPaid, @IsCompletelyPaid, @CreatedAt, @UpdatedOn, @DayCareFee, @DayCareDiscount)
-            ";
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.Transaction = dbTx;
 
-            cmd.AddParameter("@TransactionId", transactionId.ToByteArray())
-               .AddParameter("@FamilyId", transaction.FamilyId.ToByteArray())
-               .AddParameter("@PayableFee", transaction.PayableFee)
-               .AddParameter("@DayCareFee", transaction.DayCareFee)
-               .AddParameter("@DayCareDiscount", transaction.DayCareDiscount)
-               .AddParameter("@FeeAmountDiscount", transaction.FeeAmountDiscount)
-               .AddParameter("@TotalPayable", transaction.TotalPayable)
-               .AddParameter("@Comments", transaction.Comments)
-               .AddParameter("@Status", (int)transaction.TransactionStatus)
-               .AddParameter("@PaymentCode", paymentCode)
-               .AddParameter("@IsActive", transaction.IsActive)
-               .AddParameter("@TotalAmountPaid", transaction.TotalAmountPaid)
-               .AddParameter("@IsCompletelyPaid", transaction.IsCompletelyPaid)
-               .AddParameter("@CreatedAt", DateTime.UtcNow)
-               .AddParameter("@UpdatedOn", DateTime.UtcNow);
+                    cmd.CommandText = @"
+                        INSERT INTO student_course_transaction
+                        (StudentCourseTransactionId, FamilyId, PayableFee, DayCareFee, DayCareDiscount,
+                         FeeAmountDiscount, TotalPayable, Comments, Status, PaymentCode, IsActive,
+                         TotalAmountPaid, IsCompletelyPaid, CreatedAt, UpdatedOn)
+                        VALUES
+                        (@TransactionId, @FamilyId, @PayableFee, @DayCareFee, @DayCareDiscount,
+                         @FeeAmountDiscount, @TotalPayable, @Comments, @Status, @PaymentCode, @IsActive,
+                         @TotalAmountPaid, @IsCompletelyPaid, @CreatedAt, @UpdatedOn)
+                    ";
 
-            await cmd.ExecuteNonQueryAsync();
+                    cmd.AddParameter("@TransactionId", transactionId.ToByteArray())
+                       .AddParameter("@FamilyId", transaction.FamilyId.ToByteArray())
+                       .AddParameter("@PayableFee", transaction.PayableFee)
+                       .AddParameter("@DayCareFee", transaction.DayCareFee)
+                       // schema: DayCareDiscount INT
+                       .AddParameter("@DayCareDiscount", (int)transaction.DayCareDiscount)
+                       .AddParameter("@FeeAmountDiscount", (int)transaction.FeeAmountDiscount)
+                       .AddParameter("@TotalPayable", transaction.TotalPayable)
+                       .AddParameter("@Comments", (object?)transaction.Comments ?? DBNull.Value)
+                       .AddParameter("@Status", (int)transaction.TransactionStatus)
+                       .AddParameter("@PaymentCode", paymentCode)
+                       .AddParameter("@IsActive", transaction.IsActive)
+                       .AddParameter("@TotalAmountPaid", transaction.TotalAmountPaid)
+                       .AddParameter("@IsCompletelyPaid", transaction.IsCompletelyPaid)
+                       .AddParameter("@CreatedAt", DateTime.UtcNow)
+                       .AddParameter("@UpdatedOn", DateTime.UtcNow);
 
-            //if (transaction.StudentCourseEnrollmentIds?.Count > 0)
-              //  await AddEnrollmentsToTransaction(transactionId, transaction.StudentCourseEnrollmentIds);
+                    await cmd.ExecuteNonQueryAsync();
+                }
 
-            //return await GetTransaction(transactionId) ?? throw new Exception("Failed to retrieve transaction");
-            return await GetTransactionSimple(transactionId) ?? throw new Exception("Failed to retrieve transaction");
+                // If you want to link enrollments when creating a transaction:
+                if (transaction.StudentCourseEnrollmentIds?.Count > 0)
+                {
+                    await AddEnrollmentsToTransactionInternal(conn, dbTx, transactionId, transaction.StudentCourseEnrollmentIds);
+                }
+
+                await dbTx.CommitAsync();
+                return await GetTransactionSimple(transactionId) ?? throw new Exception("Failed to retrieve transaction");
+            }
+            catch
+            {
+                await dbTx.RollbackAsync();
+                throw;
+            }
         }
 
+        // ----------------------------
+        // Add Single Enrollment Link
+        // ----------------------------
         public async Task<bool> AddEnrollmentsToTransaction(Guid studentCourseTransactionId, Guid studentCourseEnrollmentId)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            // Same transaction id param reused for all rows
-            cmd.AddParameter("@Id", Guid.NewGuid().ToByteArray());  // Id (PK)
+            cmd.AddParameter("@Id", Guid.NewGuid().ToByteArray());  // PK
             cmd.AddParameter("@StudentCourseTransactionId", studentCourseTransactionId.ToByteArray());
             cmd.AddParameter("@StudentCourseEnrollmentId", studentCourseEnrollmentId.ToByteArray());
 
@@ -80,60 +109,59 @@ namespace Courses.Repository.Implementation
             return affected > 0;
         }
 
+        // ----------------------------
+        // Get Transaction by PaymentCode (case-insensitive)
+        // ----------------------------
         public async Task<StudentCourseTransactionResponse?> GetTransactionByPaymentCode(string paymentCode)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-        SELECT
-            -- Transaction fields
-            sct.StudentCourseTransactionId,
-            sct.FamilyId,
-            sct.PayableFee,
-            sct.DayCareFee,
-            sct.DayCareDiscount,
-            sct.FeeAmountDiscount,
-            sct.TotalPayable,
-            sct.Comments,
-            sct.Status          AS TransactionStatus,
-            sct.PaymentCode,
-            sct.IsActive,
-            sct.TotalAmountPaid,
-            sct.IsCompletelyPaid,
-            sct.CreatedAt,
-            sct.UpdatedOn,
+                SELECT
+                    sct.StudentCourseTransactionId,
+                    sct.FamilyId,
+                    sct.PayableFee,
+                    sct.DayCareFee,
+                    sct.DayCareDiscount,
+                    sct.FeeAmountDiscount,
+                    sct.TotalPayable,
+                    sct.Comments,
+                    sct.Status AS TransactionStatus,
+                    sct.PaymentCode,
+                    sct.IsActive,
+                    sct.TotalAmountPaid,
+                    sct.IsCompletelyPaid,
+                    sct.CreatedAt,
+                    sct.UpdatedOn,
 
-            -- Enrollment fields
-            sce.StudentCourseEnrollmentId,
-            sce.CourseEnrollmentGroupId,
-            sce.CourseId,
-            sce.FamilyId        AS EnrollmentFamilyId,
-            sce.ChildId,
-            sce.IsActive        AS EnrollmentIsActive,
-            sce.WillUseDayCare,
-            sce.DayCareDays,
-            sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex,
-            crcs.RegistrationFee AS CourseRegistrationFee
+                    sce.StudentCourseEnrollmentId,
+                    sce.CourseEnrollmentGroupId,
+                    sce.CourseId,
+                    sce.FamilyId AS EnrollmentFamilyId,
+                    sce.ChildId,
+                    sce.IsActive AS EnrollmentIsActive,
+                    sce.WillUseDayCare,
+                    sce.DayCareDays,
+                    sce.CreatedAt AS EnrollmentCreatedAt,
+                    sce.UpdatedOn AS EnrollmentUpdatedOn,
+                    sce.EnrollmentIndex as EnrollmentIndex,
+                    crcs.RegistrationFee AS CourseRegistrationFee
 
-        FROM student_course_transaction sct
-        JOIN student_course_transaction_enrollment scte
-            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
-        JOIN student_course_enrollment sce
-            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
-        JOIN course_enrollment_groups ceg
-            ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
-        JOIN courses crcs
-            ON ceg.CourseId = crcs.CourseId
+                FROM student_course_transaction sct
+                JOIN student_course_transaction_enrollment scte
+                    ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+                JOIN student_course_enrollment sce
+                    ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN course_enrollment_groups ceg
+                    ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN courses crcs
+                    ON ceg.CourseId = crcs.CourseId
 
-        WHERE LOWER(sct.PaymentCode) = LOWER(@PaymentCode)
+                WHERE LOWER(sct.PaymentCode) = LOWER(@PaymentCode)
 
-        ORDER BY
-            sct.CreatedAt DESC,
-            sce.CreatedAt;
-    ";
+                ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
+            ";
 
             cmd.AddParameter("@PaymentCode", paymentCode);
 
@@ -143,60 +171,58 @@ namespace Courses.Repository.Implementation
             return list.FirstOrDefault();
         }
 
+        // ----------------------------
+        // Get Transaction by ID (detailed w/ enrollments)
+        // ----------------------------
         public async Task<StudentCourseTransactionResponse?> GetTransaction(Guid transactionId)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-        SELECT
-            -- Transaction fields
-            sct.StudentCourseTransactionId,
-            sct.FamilyId,
-            sct.PayableFee,
-            sct.DayCareFee,
-            sct.DayCareDiscount,
-            sct.FeeAmountDiscount,
-            sct.TotalPayable,
-            sct.Comments,
-            sct.Status          AS TransactionStatus,
-            sct.PaymentCode,
-            sct.IsActive,
-            sct.TotalAmountPaid,
-            sct.IsCompletelyPaid,
-            sct.CreatedAt,
-            sct.UpdatedOn,
+                SELECT
+                    sct.StudentCourseTransactionId,
+                    sct.FamilyId,
+                    sct.PayableFee,
+                    sct.DayCareFee,
+                    sct.DayCareDiscount,
+                    sct.FeeAmountDiscount,
+                    sct.TotalPayable,
+                    sct.Comments,
+                    sct.Status AS TransactionStatus,
+                    sct.PaymentCode,
+                    sct.IsActive,
+                    sct.TotalAmountPaid,
+                    sct.IsCompletelyPaid,
+                    sct.CreatedAt,
+                    sct.UpdatedOn,
 
-            -- Enrollment fields
-            sce.StudentCourseEnrollmentId,
-            sce.CourseEnrollmentGroupId,
-            sce.CourseId,
-            sce.FamilyId        AS EnrollmentFamilyId,
-            sce.ChildId,
-            sce.IsActive        AS EnrollmentIsActive,
-            sce.WillUseDayCare,
-            sce.DayCareDays,
-            sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex,
-            crcs.RegistrationFee AS CourseRegistrationFee
+                    sce.StudentCourseEnrollmentId,
+                    sce.CourseEnrollmentGroupId,
+                    sce.CourseId,
+                    sce.FamilyId AS EnrollmentFamilyId,
+                    sce.ChildId,
+                    sce.IsActive AS EnrollmentIsActive,
+                    sce.WillUseDayCare,
+                    sce.DayCareDays,
+                    sce.CreatedAt AS EnrollmentCreatedAt,
+                    sce.UpdatedOn AS EnrollmentUpdatedOn,
+                    sce.EnrollmentIndex as EnrollmentIndex,
+                    crcs.RegistrationFee AS CourseRegistrationFee
 
-        FROM student_course_transaction sct
-        JOIN student_course_transaction_enrollment scte
-            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
-        JOIN student_course_enrollment sce
-            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
-        JOIN course_enrollment_groups ceg
-            ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
-        JOIN courses crcs
-            ON ceg.CourseId = crcs.CourseId
+                FROM student_course_transaction sct
+                JOIN student_course_transaction_enrollment scte
+                    ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+                JOIN student_course_enrollment sce
+                    ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN course_enrollment_groups ceg
+                    ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN courses crcs
+                    ON ceg.CourseId = crcs.CourseId
 
-        WHERE sct.StudentCourseTransactionId = @TransactionId
-
-        ORDER BY
-            sct.CreatedAt DESC,
-            sce.CreatedAt;
-    ";
+                WHERE sct.StudentCourseTransactionId = @TransactionId
+                ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
+            ";
 
             cmd.AddParameter("@TransactionId", transactionId.ToByteArray());
 
@@ -207,7 +233,7 @@ namespace Courses.Repository.Implementation
         }
 
         // ----------------------------
-        // Get Transaction by ID
+        // Get Transaction Simple (no joins)
         // ----------------------------
         public async Task<StudentCourseTransactionResponse?> GetTransactionSimple(Guid transactionId)
         {
@@ -223,21 +249,19 @@ namespace Courses.Repository.Implementation
             return await MapToTransactionSimpleResponse(reader);
         }
 
-
         private async Task<StudentCourseTransactionResponse> MapToTransactionSimpleResponse(DbDataReader reader)
         {
             return new StudentCourseTransactionResponse
             {
-                //StudentCourseEnrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId"),
                 StudentCourseTransactionId = reader.GetGuidFromByteArray("StudentCourseTransactionId"),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
                 PayableFee = reader.GetDecimal("PayableFee"),
                 DayCareFee = reader.GetDecimal("DayCareFee"),
-                DayCareDiscount = reader.GetDecimal("DayCareDiscount"),
-                FeeAmountDiscount = reader.GetDecimal("FeeAmountDiscount"),
+                DayCareDiscount = Convert.ToDecimal(reader.GetInt32("DayCareDiscount")),
+                FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32("FeeAmountDiscount")),
                 TotalPayable = reader.GetDecimal("TotalPayable"),
                 TotalAmountPaid = reader.GetDecimal("TotalAmountPaid"),
-                Comments = reader.GetString("Comments"),
+                Comments = reader.IsDBNull("Comments") ? string.Empty : reader.GetString("Comments"),
                 PaymentCode = reader.GetString("PaymentCode"),
                 TransactionStatus = (TransactionStatus)reader.GetInt32("Status"),
                 IsActive = reader.GetBoolean("IsActive"),
@@ -277,10 +301,10 @@ namespace Courses.Repository.Implementation
                .AddParameter("@FamilyId", transaction.FamilyId.ToByteArray())
                .AddParameter("@PayableFee", transaction.PayableFee)
                .AddParameter("@DayCareFee", transaction.DayCareFee)
-               .AddParameter("@DayCareDiscount", transaction.DayCareDiscount)
-               .AddParameter("@FeeAmountDiscount", transaction.FeeAmountDiscount)
+               .AddParameter("@DayCareDiscount", (int)transaction.DayCareDiscount)
+               .AddParameter("@FeeAmountDiscount", (int)transaction.FeeAmountDiscount)
                .AddParameter("@TotalPayable", transaction.TotalPayable)
-               .AddParameter("@Comments", transaction.Comments)
+               .AddParameter("@Comments", (object?)transaction.Comments ?? DBNull.Value)
                .AddParameter("@Status", (int)transaction.TransactionStatus)
                .AddParameter("@PaymentCode", transaction.PaymentCode)
                .AddParameter("@IsActive", transaction.IsActive)
@@ -311,7 +335,7 @@ namespace Courses.Repository.Implementation
         }
 
         // ----------------------------
-        // Get All Transactions
+        // Get All Transactions (simple list)
         // ----------------------------
         public async Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactions()
         {
@@ -330,372 +354,127 @@ namespace Courses.Repository.Implementation
             return results;
         }
 
-        
+        // ✅ FIXED: previously had broken SQL and wrong assumption about schema
         public async Task<StudentCourseTransactionResponse> GetTransactionByFamilyForCurrentSession(Guid familyId, Guid instituteId)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = "SELECT * FROM student_course_transaction WHERE FamilyId = @FamilyId and ";
+            // “Current session” is ambiguous; safest interpretation:
+            // return most recent transaction for this family where enrollments belong to courses under this institute.
+            cmd.CommandText = @"
+                SELECT
+                    sct.StudentCourseTransactionId,
+                    sct.FamilyId,
+                    sct.PayableFee,
+                    sct.DayCareFee,
+                    sct.DayCareDiscount,
+                    sct.FeeAmountDiscount,
+                    sct.TotalPayable,
+                    sct.Comments,
+                    sct.Status AS TransactionStatus,
+                    sct.PaymentCode,
+                    sct.IsActive,
+                    sct.TotalAmountPaid,
+                    sct.IsCompletelyPaid,
+                    sct.CreatedAt,
+                    sct.UpdatedOn,
+
+                    sce.StudentCourseEnrollmentId,
+                    sce.CourseEnrollmentGroupId,
+                    sce.CourseId,
+                    sce.FamilyId AS EnrollmentFamilyId,
+                    sce.ChildId,
+                    sce.IsActive AS EnrollmentIsActive,
+                    sce.WillUseDayCare,
+                    sce.DayCareDays,
+                    sce.CreatedAt AS EnrollmentCreatedAt,
+                    sce.UpdatedOn AS EnrollmentUpdatedOn,
+                    sce.EnrollmentIndex as EnrollmentIndex,
+                    crcs.RegistrationFee AS CourseRegistrationFee
+
+                FROM student_course_transaction sct
+                JOIN student_course_transaction_enrollment scte
+                    ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+                JOIN student_course_enrollment sce
+                    ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN course_enrollment_groups ceg
+                    ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN courses crcs
+                    ON ceg.CourseId = crcs.CourseId
+                WHERE
+                    sct.FamilyId = @FamilyId
+                    AND crcs.InstituteId = @InstituteId
+                ORDER BY sct.CreatedAt DESC, sce.CreatedAt
+                LIMIT 500;
+            ";
+
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
+            cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) return null;
-
-            return await MapToTransactionSingleResponse(reader);
+            var list = await MapToTransactionResponse(reader);
+            return list.FirstOrDefault();
         }
 
-        /*public async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsByFamilyForCourse(Guid courseId, Guid familyId)
-        {
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
-
-            cmd.CommandText = @"
-        SELECT
-            -- Transaction fields
-            sct.StudentCourseTransactionId,
-            sct.FamilyId,
-            sct.PayableFee,
-            sct.DayCareFee,
-            sct.FeeAmountDiscount,
-            sct.TotalPayable,
-            sct.Comments,
-            sct.Status          AS TransactionStatus,
-            sct.PaymentCode,
-            sct.IsActive,
-            sct.TotalAmountPaid,
-            sct.IsCompletelyPaid,
-            sct.CreatedAt,
-            sct.UpdatedOn,
-
-            -- Enrollment fields
-            sce.StudentCourseEnrollmentId,
-            sce.CourseEnrollmentGroupId,
-            sce.CourseId,
-            sce.FamilyId        AS EnrollmentFamilyId,
-            sce.ChildId,
-            sce.IsActive        AS EnrollmentIsActive,
-            sce.WillUseDayCare,
-            sce.DayCareDays,
-            sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex
-
-        FROM student_course_transaction sct
-        JOIN student_course_transaction_enrollment scte
-            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
-        JOIN student_course_enrollment sce
-            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
-
-        WHERE
-            sct.FamilyId = @FamilyId
-            AND sce.CourseId = @CourseId
-
-        ORDER BY
-            sct.CreatedAt DESC,
-            sce.CreatedAt;
-    ";
-
-            cmd.AddParameter("@FamilyId", familyId.ToByteArray());
-            cmd.AddParameter("@CourseId", courseId.ToByteArray());
-
-            using var reader = await cmd.ExecuteReaderAsync();
-
-            if (!reader.HasRows)
-                return Enumerable.Empty<StudentCourseTransactionResponse>();
-
-            // ---- Cache ordinals (speed + safety) ----
-            var ordTxId = reader.GetOrdinal("StudentCourseTransactionId");
-            var ordTxFamilyId = reader.GetOrdinal("FamilyId");
-            var ordPayableFee = reader.GetOrdinal("PayableFee");
-            var ordDayCareFee = reader.GetOrdinal("DayCareFee");
-            var ordFeeAmountDiscount = reader.GetOrdinal("FeeAmountDiscount");
-            var ordTotalPayable = reader.GetOrdinal("TotalPayable");
-            var ordComments = reader.GetOrdinal("Comments");
-            var ordStatus = reader.GetOrdinal("TransactionStatus");
-            var ordPaymentCode = reader.GetOrdinal("PaymentCode");
-            var ordTxIsActive = reader.GetOrdinal("IsActive");
-            var ordTotalAmountPaid = reader.GetOrdinal("TotalAmountPaid");
-            var ordIsCompletelyPaid = reader.GetOrdinal("IsCompletelyPaid");
-            var ordTxCreatedAt = reader.GetOrdinal("CreatedAt");
-            var ordTxUpdatedOn = reader.GetOrdinal("UpdatedOn");
-
-            var ordEnrollmentId = reader.GetOrdinal("StudentCourseEnrollmentId");
-            var ordGroupId = reader.GetOrdinal("CourseEnrollmentGroupId");
-            var ordCourseId = reader.GetOrdinal("CourseId");
-            var ordEnrollmentFamilyId = reader.GetOrdinal("EnrollmentFamilyId");
-            var ordChildId = reader.GetOrdinal("ChildId");
-            var ordEnrollmentIsActive = reader.GetOrdinal("EnrollmentIsActive");
-            var ordWillUseDayCare = reader.GetOrdinal("WillUseDayCare");
-            var ordDayCareDays = reader.GetOrdinal("DayCareDays");
-            var ordEnrollmentCreatedAt = reader.GetOrdinal("EnrollmentCreatedAt");
-            var ordEnrollmentUpdatedOn = reader.GetOrdinal("EnrollmentUpdatedOn");
-
-            // ---- Aggregate results ----
-            var lookup = new Dictionary<Guid, StudentCourseTransactionResponse>();
-
-            while (await reader.ReadAsync())
-            {
-                var txId = reader.GetGuid(ordTxId);
-
-                if (!lookup.TryGetValue(txId, out var tx))
-                {
-                    tx = new StudentCourseTransactionResponse
-                    {
-                        StudentCourseTransactionId = txId,
-                        FamilyId = reader.GetGuid(ordTxFamilyId),
-                        PayableFee = reader.GetDecimal(ordPayableFee),
-                        DayCareFee = reader.GetDecimal(ordDayCareFee),
-                        FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32(ordFeeAmountDiscount)),
-                        TotalPayable = reader.GetDecimal(ordTotalPayable),
-                        Comments = reader.IsDBNull(ordComments)
-                                          ? string.Empty
-                                          : reader.GetString(ordComments),
-                        TransactionStatus = (TransactionStatus)reader.GetInt32(ordStatus),
-                        PaymentCode = reader.GetString(ordPaymentCode),
-                        IsActive = reader.GetBoolean(ordTxIsActive),
-                        TotalAmountPaid = reader.GetDecimal(ordTotalAmountPaid),
-                        IsCompletelyPaid = reader.GetBoolean(ordIsCompletelyPaid),
-                        CreatedAt = reader.GetDateTime(ordTxCreatedAt),
-                        UpdatedOn = reader.GetDateTime(ordTxUpdatedOn),
-                        Enrollments = new List<StudentCourseEnrollmentResponse>()
-                    };
-
-                    // Primary enrollment at top-level
-                    tx.StudentCourseEnrollmentId = reader.GetGuid(ordEnrollmentId);
-
-                    lookup.Add(txId, tx);
-                }
-
-                // Add enrollment row
-                tx.Enrollments.Add(new StudentCourseEnrollmentResponse
-                {
-                    StudentCourseEnrollmentId = reader.GetGuid(ordEnrollmentId),
-                    CourseEnrollmentGroupId = reader.GetGuid(ordGroupId),
-                    CourseId = reader.GetGuid(ordCourseId),
-                    FamilyId = reader.GetGuid(ordEnrollmentFamilyId),
-                    ChildId = reader.GetGuid(ordChildId),
-                    IsActive = reader.GetBoolean(ordEnrollmentIsActive),
-                    WillUseDayCare = reader.GetBoolean(ordWillUseDayCare),
-                    DayCareDays = reader.GetInt32(ordDayCareDays),
-                    CreatedAt = reader.GetDateTime(ordEnrollmentCreatedAt),
-                    UpdatedOn = reader.GetDateTime(ordEnrollmentUpdatedOn)
-                });
-            }
-
-            return lookup.Values.ToList();
-        }*/
-
+        // ----------------------------
+        // Get Transactions by Family (detailed)
+        // ----------------------------
         public async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionByFamily(Guid familyId)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-        SELECT
-            -- Transaction fields
-            sct.StudentCourseTransactionId,
-            sct.FamilyId,
-            sct.PayableFee,
-            sct.DayCareFee,
-            sct.DayCareDiscount,
-            sct.FeeAmountDiscount,
-            sct.TotalPayable,
-            sct.Comments,
-            sct.Status          AS TransactionStatus,
-            sct.PaymentCode,
-            sct.IsActive,
-            sct.TotalAmountPaid,
-            sct.IsCompletelyPaid,
-            sct.CreatedAt,
-            sct.UpdatedOn,
+                SELECT
+                    sct.StudentCourseTransactionId,
+                    sct.FamilyId,
+                    sct.PayableFee,
+                    sct.DayCareFee,
+                    sct.DayCareDiscount,
+                    sct.FeeAmountDiscount,
+                    sct.TotalPayable,
+                    sct.Comments,
+                    sct.Status AS TransactionStatus,
+                    sct.PaymentCode,
+                    sct.IsActive,
+                    sct.TotalAmountPaid,
+                    sct.IsCompletelyPaid,
+                    sct.CreatedAt,
+                    sct.UpdatedOn,
 
-            -- Enrollment fields
-            sce.StudentCourseEnrollmentId,
-            sce.CourseEnrollmentGroupId,
-            sce.CourseId,
-            sce.FamilyId        AS EnrollmentFamilyId,
-            sce.ChildId,
-            sce.IsActive        AS EnrollmentIsActive,
-            sce.WillUseDayCare,
-            sce.DayCareDays,
-            sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex,
-            crcs.RegistrationFee AS CourseRegistrationFee
+                    sce.StudentCourseEnrollmentId,
+                    sce.CourseEnrollmentGroupId,
+                    sce.CourseId,
+                    sce.FamilyId AS EnrollmentFamilyId,
+                    sce.ChildId,
+                    sce.IsActive AS EnrollmentIsActive,
+                    sce.WillUseDayCare,
+                    sce.DayCareDays,
+                    sce.CreatedAt AS EnrollmentCreatedAt,
+                    sce.UpdatedOn AS EnrollmentUpdatedOn,
+                    sce.EnrollmentIndex as EnrollmentIndex,
+                    crcs.RegistrationFee AS CourseRegistrationFee
 
-        FROM student_course_transaction sct
-        JOIN student_course_transaction_enrollment scte
-            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
-        JOIN student_course_enrollment sce
-            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
-        JOIN course_enrollment_groups ceg
-            ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
-        JOIN courses crcs
-            ON ceg.CourseId = crcs.CourseId
+                FROM student_course_transaction sct
+                JOIN student_course_transaction_enrollment scte
+                    ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+                JOIN student_course_enrollment sce
+                    ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN course_enrollment_groups ceg
+                    ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN courses crcs
+                    ON ceg.CourseId = crcs.CourseId
 
-        WHERE
-            sct.FamilyId = @FamilyId
-
-        ORDER BY
-            sct.CreatedAt DESC,
-            sce.CreatedAt;
-    ";
+                WHERE sct.FamilyId = @FamilyId
+                ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
+            ";
 
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
             return await MapToTransactionResponse(reader);
         }
-        /*public async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionByFamilyForInstitute(Guid familyId, Guid instituteId)
-        {
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
-
-            cmd.CommandText = @"
-        SELECT
-            -- Transaction fields
-            sct.StudentCourseTransactionId,
-            sct.FamilyId,
-            sct.PayableFee,
-            sct.DayCareFee,
-            sct.FeeAmountDiscount,
-            sct.TotalPayable,
-            sct.Comments,
-            sct.Status          AS TransactionStatus,
-            sct.PaymentCode,
-            sct.IsActive,
-            sct.TotalAmountPaid,
-            sct.IsCompletelyPaid,
-            sct.CreatedAt,
-            sct.UpdatedOn,
-
-            -- Enrollment fields
-            sce.StudentCourseEnrollmentId,
-            sce.CourseEnrollmentGroupId,
-            sce.CourseId,
-            sce.FamilyId        AS EnrollmentFamilyId,
-            sce.ChildId,
-            sce.IsActive        AS EnrollmentIsActive,
-            sce.WillUseDayCare,
-            sce.DayCareDays,
-            sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex
-
-        FROM student_course_transaction sct
-        JOIN student_course_transaction_enrollment scte
-            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
-        JOIN student_course_enrollment sce
-            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
-        JOIN course_enrollment_groups ceg
-            ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
-
-        WHERE
-            sct.FamilyId     = @FamilyId
-            AND ceg.InstituteId = @InstituteId
-
-        ORDER BY
-            sct.CreatedAt DESC,
-            sce.CreatedAt;
-    ";
-
-            cmd.AddParameter("@FamilyId", familyId.ToByteArray());
-            cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
-
-            using var reader = await cmd.ExecuteReaderAsync();
-
-            if (!reader.HasRows)
-            {
-                // Better to return empty list instead of null for IEnumerable
-                return Enumerable.Empty<StudentCourseTransactionResponse>();
-            }
-
-            // Cache ordinals once
-            var ordTxId = reader.GetOrdinal("StudentCourseTransactionId");
-            var ordTxFamilyId = reader.GetOrdinal("FamilyId");
-            var ordPayableFee = reader.GetOrdinal("PayableFee");
-            var ordDayCareFee = reader.GetOrdinal("DayCareFee");
-            var ordFeeAmountDiscount = reader.GetOrdinal("FeeAmountDiscount");
-            var ordTotalPayable = reader.GetOrdinal("TotalPayable");
-            var ordComments = reader.GetOrdinal("Comments");
-            var ordStatus = reader.GetOrdinal("TransactionStatus");
-            var ordPaymentCode = reader.GetOrdinal("PaymentCode");
-            var ordTxIsActive = reader.GetOrdinal("IsActive");
-            var ordTotalAmountPaid = reader.GetOrdinal("TotalAmountPaid");
-            var ordIsCompletelyPaid = reader.GetOrdinal("IsCompletelyPaid");
-            var ordTxCreatedAt = reader.GetOrdinal("CreatedAt");
-            var ordTxUpdatedOn = reader.GetOrdinal("UpdatedOn");
-
-            var ordEnrollmentId = reader.GetOrdinal("StudentCourseEnrollmentId");
-            var ordGroupId = reader.GetOrdinal("CourseEnrollmentGroupId");
-            var ordCourseId = reader.GetOrdinal("CourseId");
-            var ordEnrollmentFamilyId = reader.GetOrdinal("EnrollmentFamilyId");
-            var ordChildId = reader.GetOrdinal("ChildId");
-            var ordEnrollmentIsActive = reader.GetOrdinal("EnrollmentIsActive");
-            var ordWillUseDayCare = reader.GetOrdinal("WillUseDayCare");
-            var ordDayCareDays = reader.GetOrdinal("DayCareDays");
-            var ordEnrollmentCreatedAt = reader.GetOrdinal("EnrollmentCreatedAt");
-            var ordEnrollmentUpdatedOn = reader.GetOrdinal("EnrollmentUpdatedOn");
-
-            var lookup = new Dictionary<Guid, StudentCourseTransactionResponse>();
-
-            while (await reader.ReadAsync())
-            {
-                var transactionId = reader.GetGuid(ordTxId);
-
-                if (!lookup.TryGetValue(transactionId, out var tx))
-                {
-                    tx = new StudentCourseTransactionResponse
-                    {
-                        StudentCourseTransactionId = transactionId,
-                        FamilyId = reader.GetGuid(ordTxFamilyId),
-                        PayableFee = reader.GetDecimal(ordPayableFee),
-                        DayCareFee = reader.GetDecimal(ordDayCareFee),
-
-                        // DB is int, DTO is decimal; if needed you can change this mapping:
-                        FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32(ordFeeAmountDiscount)),
-
-                        TotalPayable = reader.GetDecimal(ordTotalPayable),
-                        Comments = reader.IsDBNull(ordComments)
-                                          ? string.Empty
-                                          : reader.GetString(ordComments),
-                        TransactionStatus = (TransactionStatus)reader.GetInt32(ordStatus),
-                        PaymentCode = reader.GetString(ordPaymentCode),
-                        IsActive = reader.GetBoolean(ordTxIsActive),
-                        TotalAmountPaid = reader.GetDecimal(ordTotalAmountPaid),
-                        IsCompletelyPaid = reader.GetBoolean(ordIsCompletelyPaid),
-                        CreatedAt = reader.GetDateTime(ordTxCreatedAt),
-                        UpdatedOn = reader.GetDateTime(ordTxUpdatedOn),
-                        Enrollments = new List<StudentCourseEnrollmentResponse>()
-                    };
-
-                    // Set a “primary” enrollment Id at top-level (first one encountered)
-                    tx.StudentCourseEnrollmentId = reader.GetGuid(ordEnrollmentId);
-
-                    lookup.Add(transactionId, tx);
-                }
-
-                var enrollment = new StudentCourseEnrollmentResponse
-                {
-                    StudentCourseEnrollmentId = reader.GetGuid(ordEnrollmentId),
-                    CourseEnrollmentGroupId = reader.GetGuid(ordGroupId),
-                    CourseId = reader.GetGuid(ordCourseId),
-                    FamilyId = reader.GetGuid(ordEnrollmentFamilyId),
-                    ChildId = reader.GetGuid(ordChildId),
-                    IsActive = reader.GetBoolean(ordEnrollmentIsActive),
-                    WillUseDayCare = reader.GetBoolean(ordWillUseDayCare),
-                    DayCareDays = reader.GetInt32(ordDayCareDays),
-                    CreatedAt = reader.GetDateTime(ordEnrollmentCreatedAt),
-                    UpdatedOn = reader.GetDateTime(ordEnrollmentUpdatedOn)
-                };
-
-                tx.Enrollments.Add(enrollment);
-            }
-
-            return lookup.Values.ToList();
-        }
-*/
 
         public async Task<IEnumerable<StudentCourseTransactionResponse>> GetInstituteTransactionsByFamily(Guid familyId, Guid instituteId)
         {
@@ -703,57 +482,50 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-        SELECT
-            -- Transaction fields
-            sct.StudentCourseTransactionId,
-            sct.FamilyId,
-            sct.PayableFee,
-            sct.DayCareFee,
-            sct.DayCareDiscount,
-            sct.FeeAmountDiscount,
-            sct.TotalPayable,
-            sct.Comments,
-            sct.Status          AS TransactionStatus,
-            sct.PaymentCode,
-            sct.IsActive,
-            sct.TotalAmountPaid,
-            sct.IsCompletelyPaid,
-            sct.CreatedAt,
-            sct.UpdatedOn,
+                SELECT
+                    sct.StudentCourseTransactionId,
+                    sct.FamilyId,
+                    sct.PayableFee,
+                    sct.DayCareFee,
+                    sct.DayCareDiscount,
+                    sct.FeeAmountDiscount,
+                    sct.TotalPayable,
+                    sct.Comments,
+                    sct.Status AS TransactionStatus,
+                    sct.PaymentCode,
+                    sct.IsActive,
+                    sct.TotalAmountPaid,
+                    sct.IsCompletelyPaid,
+                    sct.CreatedAt,
+                    sct.UpdatedOn,
 
+                    sce.StudentCourseEnrollmentId,
+                    sce.CourseEnrollmentGroupId,
+                    sce.CourseId,
+                    sce.FamilyId AS EnrollmentFamilyId,
+                    sce.ChildId,
+                    sce.IsActive AS EnrollmentIsActive,
+                    sce.WillUseDayCare,
+                    sce.DayCareDays,
+                    sce.CreatedAt AS EnrollmentCreatedAt,
+                    sce.UpdatedOn AS EnrollmentUpdatedOn,
+                    sce.EnrollmentIndex as EnrollmentIndex,
+                    crcs.RegistrationFee AS CourseRegistrationFee
 
-            -- Enrollment fields
-            sce.StudentCourseEnrollmentId,
-            sce.CourseEnrollmentGroupId,
-            sce.CourseId,
-            sce.FamilyId        AS EnrollmentFamilyId,
-            sce.ChildId,
-            sce.IsActive        AS EnrollmentIsActive,
-            sce.WillUseDayCare,
-            sce.DayCareDays,
-            sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex,
-            crcs.RegistrationFee AS CourseRegistrationFee
+                FROM student_course_transaction sct
+                JOIN student_course_transaction_enrollment scte
+                    ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+                JOIN student_course_enrollment sce
+                    ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN course_enrollment_groups ceg
+                    ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN courses crcs
+                    ON ceg.CourseId = crcs.CourseId
 
-        FROM student_course_transaction sct
-        JOIN student_course_transaction_enrollment scte
-            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
-        JOIN student_course_enrollment sce
-            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
-        JOIN course_enrollment_groups ceg
-            ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
-        JOIN courses crcs
-            ON ceg.CourseId = crcs.CourseId
-
-        WHERE
-            sct.FamilyId   = @FamilyId
-            AND ceg.InstituteId = @InstituteId
-
-        ORDER BY
-            sct.CreatedAt DESC,
-            sce.CreatedAt;
-    ";
+                WHERE sct.FamilyId = @FamilyId
+                  AND crcs.InstituteId = @InstituteId
+                ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
+            ";
 
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
             cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
@@ -768,54 +540,48 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-        SELECT
-            -- Transaction fields
-            sct.StudentCourseTransactionId,
-            sct.FamilyId,
-            sct.PayableFee,
-            sct.DayCareFee,
-            sct.DayCareDiscount,
-            sct.FeeAmountDiscount,
-            sct.TotalPayable,
-            sct.Comments,
-            sct.Status          AS TransactionStatus,
-            sct.PaymentCode,
-            sct.IsActive,
-            sct.TotalAmountPaid,
-            sct.IsCompletelyPaid,
-            sct.CreatedAt,
-            sct.UpdatedOn,
+                SELECT
+                    sct.StudentCourseTransactionId,
+                    sct.FamilyId,
+                    sct.PayableFee,
+                    sct.DayCareFee,
+                    sct.DayCareDiscount,
+                    sct.FeeAmountDiscount,
+                    sct.TotalPayable,
+                    sct.Comments,
+                    sct.Status AS TransactionStatus,
+                    sct.PaymentCode,
+                    sct.IsActive,
+                    sct.TotalAmountPaid,
+                    sct.IsCompletelyPaid,
+                    sct.CreatedAt,
+                    sct.UpdatedOn,
 
-            -- Enrollment fields
-            sce.StudentCourseEnrollmentId,
-            sce.CourseEnrollmentGroupId,
-            sce.CourseId,
-            sce.FamilyId        AS EnrollmentFamilyId,
-            sce.ChildId,
-            sce.IsActive        AS EnrollmentIsActive,
-            sce.WillUseDayCare,
-            sce.DayCareDays,
-            sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex,
-            crcs.RegistrationFee AS CourseRegistrationFee
+                    sce.StudentCourseEnrollmentId,
+                    sce.CourseEnrollmentGroupId,
+                    sce.CourseId,
+                    sce.FamilyId AS EnrollmentFamilyId,
+                    sce.ChildId,
+                    sce.IsActive AS EnrollmentIsActive,
+                    sce.WillUseDayCare,
+                    sce.DayCareDays,
+                    sce.CreatedAt AS EnrollmentCreatedAt,
+                    sce.UpdatedOn AS EnrollmentUpdatedOn,
+                    sce.EnrollmentIndex as EnrollmentIndex,
+                    crcs.RegistrationFee AS CourseRegistrationFee
 
-        FROM student_course_transaction sct
-        JOIN student_course_transaction_enrollment scte
-            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
-        JOIN student_course_enrollment sce
-            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
-        JOIN courses crcs
-            ON ceg.CourseId = crcs.CourseId
+                FROM student_course_transaction sct
+                JOIN student_course_transaction_enrollment scte
+                    ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+                JOIN student_course_enrollment sce
+                    ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN courses crcs
+                    ON sce.CourseId = crcs.CourseId
 
-        WHERE
-            sct.FamilyId = @FamilyId
-            AND sce.CourseId = @CourseId
-
-        ORDER BY
-            sct.CreatedAt DESC,
-            sce.CreatedAt;
-    ";
+                WHERE sct.FamilyId = @FamilyId
+                  AND sce.CourseId = @CourseId
+                ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
+            ";
 
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
@@ -830,114 +596,103 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-        SELECT
-            -- Transaction fields
-            sct.StudentCourseTransactionId,
-            sct.FamilyId,
-            sct.PayableFee,
-            sct.DayCareFee,
-            sct.DayCareDiscount,
-            sct.FeeAmountDiscount,
-            sct.TotalPayable,
-            sct.Comments,
-            sct.Status          AS TransactionStatus,
-            sct.PaymentCode,
-            sct.IsActive,
-            sct.TotalAmountPaid,
-            sct.IsCompletelyPaid,
-            sct.CreatedAt,
-            sct.UpdatedOn,
+                SELECT
+                    sct.StudentCourseTransactionId,
+                    sct.FamilyId,
+                    sct.PayableFee,
+                    sct.DayCareFee,
+                    sct.DayCareDiscount,
+                    sct.FeeAmountDiscount,
+                    sct.TotalPayable,
+                    sct.Comments,
+                    sct.Status AS TransactionStatus,
+                    sct.PaymentCode,
+                    sct.IsActive,
+                    sct.TotalAmountPaid,
+                    sct.IsCompletelyPaid,
+                    sct.CreatedAt,
+                    sct.UpdatedOn,
 
-            -- Enrollment fields
-            sce.StudentCourseEnrollmentId,
-            sce.CourseEnrollmentGroupId,
-            sce.CourseId,
-            sce.FamilyId        AS EnrollmentFamilyId,
-            sce.ChildId,
-            sce.IsActive        AS EnrollmentIsActive,
-            sce.WillUseDayCare,
-            sce.DayCareDays,
-            sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex,
-            crcs.RegistrationFee AS CourseRegistrationFee
+                    sce.StudentCourseEnrollmentId,
+                    sce.CourseEnrollmentGroupId,
+                    sce.CourseId,
+                    sce.FamilyId AS EnrollmentFamilyId,
+                    sce.ChildId,
+                    sce.IsActive AS EnrollmentIsActive,
+                    sce.WillUseDayCare,
+                    sce.DayCareDays,
+                    sce.CreatedAt AS EnrollmentCreatedAt,
+                    sce.UpdatedOn AS EnrollmentUpdatedOn,
+                    sce.EnrollmentIndex as EnrollmentIndex,
+                    crcs.RegistrationFee AS CourseRegistrationFee
 
-        FROM student_course_transaction sct
-        JOIN student_course_transaction_enrollment scte
-            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
-        JOIN student_course_enrollment sce
-            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
-        JOIN courses crcs
-            ON ceg.CourseId = crcs.CourseId
+                FROM student_course_transaction sct
+                JOIN student_course_transaction_enrollment scte
+                    ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+                JOIN student_course_enrollment sce
+                    ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN courses crcs
+                    ON sce.CourseId = crcs.CourseId
 
-        WHERE
-            sce.CourseId = @CourseId
-
-        ORDER BY
-            sct.CreatedAt DESC,
-            sce.CreatedAt;
-    ";
+                WHERE sce.CourseId = @CourseId
+                ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
+            ";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
             return await MapToTransactionResponse(reader);
         }
+
         public async Task<IEnumerable<StudentCourseTransactionResponse>> GetAllTransactionsByInstitute(Guid instituteId)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-        SELECT
-            -- Transaction fields
-            sct.StudentCourseTransactionId,
-            sct.FamilyId,
-            sct.PayableFee,
-            sct.DayCareFee,
-            sct.DayCareDiscount,
-            sct.FeeAmountDiscount,
-            sct.TotalPayable,
-            sct.Comments,
-            sct.Status          AS TransactionStatus,
-            sct.PaymentCode,
-            sct.IsActive,
-            sct.TotalAmountPaid,
-            sct.IsCompletelyPaid,
-            sct.CreatedAt,
-            sct.UpdatedOn,
+                SELECT
+                    sct.StudentCourseTransactionId,
+                    sct.FamilyId,
+                    sct.PayableFee,
+                    sct.DayCareFee,
+                    sct.DayCareDiscount,
+                    sct.FeeAmountDiscount,
+                    sct.TotalPayable,
+                    sct.Comments,
+                    sct.Status AS TransactionStatus,
+                    sct.PaymentCode,
+                    sct.IsActive,
+                    sct.TotalAmountPaid,
+                    sct.IsCompletelyPaid,
+                    sct.CreatedAt,
+                    sct.UpdatedOn,
 
-            -- Enrollment fields
-            sce.StudentCourseEnrollmentId,
-            sce.CourseEnrollmentGroupId,
-            sce.CourseId,
-            sce.FamilyId        AS EnrollmentFamilyId,
-            sce.ChildId,
-            sce.IsActive        AS EnrollmentIsActive,
-            sce.WillUseDayCare,
-            sce.DayCareDays,
-            sce.CreatedAt       AS EnrollmentCreatedAt,
-            sce.UpdatedOn       AS EnrollmentUpdatedOn,
-            sce.EnrollmentIndex as EnrollmentIndex,
-            crcs.RegistrationFee AS CourseRegistrationFee
+                    sce.StudentCourseEnrollmentId,
+                    sce.CourseEnrollmentGroupId,
+                    sce.CourseId,
+                    sce.FamilyId AS EnrollmentFamilyId,
+                    sce.ChildId,
+                    sce.IsActive AS EnrollmentIsActive,
+                    sce.WillUseDayCare,
+                    sce.DayCareDays,
+                    sce.CreatedAt AS EnrollmentCreatedAt,
+                    sce.UpdatedOn AS EnrollmentUpdatedOn,
+                    sce.EnrollmentIndex as EnrollmentIndex,
+                    crcs.RegistrationFee AS CourseRegistrationFee
 
-        FROM student_course_transaction sct
-        JOIN student_course_transaction_enrollment scte
-            ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
-        JOIN student_course_enrollment sce
-            ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
-        JOIN course_enrollment_groups ceg
-            ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
-        JOIN courses crcs
-            ON ceg.CourseId = crcs.CourseId
+                FROM student_course_transaction sct
+                JOIN student_course_transaction_enrollment scte
+                    ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+                JOIN student_course_enrollment sce
+                    ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN course_enrollment_groups ceg
+                    ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN courses crcs
+                    ON ceg.CourseId = crcs.CourseId
 
-        WHERE
-            ceg.InstituteId = @InstituteId
-
-        ORDER BY
-            sct.CreatedAt DESC,
-            sce.CreatedAt;
-    ";
+                WHERE crcs.InstituteId = @InstituteId
+                ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
+            ";
 
             cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
 
@@ -945,28 +700,125 @@ namespace Courses.Repository.Implementation
             return await MapToTransactionResponse(reader);
         }
 
-
         // ----------------------------
-        // Enrollments
+        // Enrollments (bulk)
         // ----------------------------
         public async Task<bool> AddEnrollmentsToTransaction(Guid transactionId, IEnumerable<Guid> enrollmentIds)
         {
+            if (enrollmentIds == null) return false;
+
+            var ids = enrollmentIds
+                .Where(x => x != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            if (ids.Count == 0) return false;
+
             using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
+            using var dbTx = await conn.BeginTransactionAsync();
 
-            var values = enrollmentIds.Select(e => $"('{transactionId}', '{e}')");
-            cmd.CommandText = $"INSERT INTO student_course_enrollment (StudentCourseTransactionId, StudentCourseEnrollmentId) VALUES {string.Join(",", values)}";
-
-            return await cmd.ExecuteNonQueryAsync() > 0;
+            try
+            {
+                await AddEnrollmentsToTransactionInternal(conn, dbTx, transactionId, ids);
+                await dbTx.CommitAsync();
+                return true;
+            }
+            catch
+            {
+                await dbTx.RollbackAsync();
+                throw;
+            }
         }
 
+        private async Task AddEnrollmentsToTransactionInternal(DbConnection conn, DbTransaction dbTx, Guid transactionId, IEnumerable<Guid> enrollmentIds)
+        {
+            // 🔥 Extra Safety: verify all enrollment IDs exist to avoid FK error mid-insert
+            // (If you prefer "fail fast", keep it; if you want silent skip, change behavior.)
+            var ids = enrollmentIds.ToList();
+            if (ids.Count == 0) return;
+
+            // chunk to avoid huge SQL
+            const int chunkSize = 200;
+
+            for (int offset = 0; offset < ids.Count; offset += chunkSize)
+            {
+                var chunk = ids.Skip(offset).Take(chunkSize).ToList();
+
+                // Exists-check
+                if (!await EnrollmentIdsExistAsync(conn, dbTx, chunk))
+                    throw new Exception("One or more StudentCourseEnrollmentIds do not exist. Aborting to prevent FK failure.");
+
+                using var cmd = conn.CreateCommand();
+                cmd.Transaction = dbTx;
+
+                var values = new List<string>(chunk.Count);
+
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    var pId = $"@Id{i}";
+                    var pTx = $"@Tx{i}";
+                    var pEn = $"@En{i}";
+
+                    values.Add($"({pId}, {pTx}, {pEn})");
+
+                    cmd.AddParameter(pId, Guid.NewGuid().ToByteArray());
+                    cmd.AddParameter(pTx, transactionId.ToByteArray());
+                    cmd.AddParameter(pEn, chunk[i].ToByteArray());
+                }
+
+                cmd.CommandText = $@"
+                    INSERT INTO student_course_transaction_enrollment
+                        (Id, StudentCourseTransactionId, StudentCourseEnrollmentId)
+                    VALUES {string.Join(", ", values)};
+                ";
+
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        private async Task<bool> EnrollmentIdsExistAsync(DbConnection conn, DbTransaction dbTx, List<Guid> enrollmentIds)
+        {
+            // Build IN (@p0, @p1, ...) with binary(16)
+            using var cmd = conn.CreateCommand();
+            cmd.Transaction = dbTx;
+
+            var inParams = new List<string>(enrollmentIds.Count);
+
+            for (int i = 0; i < enrollmentIds.Count; i++)
+            {
+                var p = $"@e{i}";
+                inParams.Add(p);
+                cmd.AddParameter(p, enrollmentIds[i].ToByteArray());
+            }
+
+            cmd.CommandText = $@"
+                SELECT COUNT(*) 
+                FROM student_course_enrollment
+                WHERE StudentCourseEnrollmentId IN ({string.Join(", ", inParams)});
+            ";
+
+            var countObj = await cmd.ExecuteScalarAsync();
+            var count = Convert.ToInt32(countObj);
+
+            return count == enrollmentIds.Count;
+        }
+
+        // ✅ FIXED: correct table relationship (must go through student_course_transaction_enrollment)
         public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentsForTransaction(Guid transactionId)
         {
             var results = new List<StudentCourseEnrollmentResponse>();
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = "SELECT * FROM student_course_enrollment WHERE StudentCourseTransactionId = @TransactionId";
+            cmd.CommandText = @"
+                SELECT sce.*
+                FROM student_course_transaction_enrollment scte
+                JOIN student_course_enrollment sce
+                    ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                WHERE scte.StudentCourseTransactionId = @TransactionId
+                ORDER BY sce.CreatedAt;
+            ";
+
             cmd.AddParameter("@TransactionId", transactionId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -974,7 +826,17 @@ namespace Courses.Repository.Implementation
             {
                 results.Add(new StudentCourseEnrollmentResponse
                 {
-                    StudentCourseEnrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId")
+                    StudentCourseEnrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId"),
+                    CourseEnrollmentGroupId = reader.GetGuidFromByteArray("CourseEnrollmentGroupId"),
+                    CourseId = reader.GetGuidFromByteArray("CourseId"),
+                    FamilyId = reader.GetGuidFromByteArray("FamilyId"),
+                    ChildId = reader.GetGuidFromByteArray("ChildId"),
+                    IsActive = reader.GetBoolean("IsActive"),
+                    WillUseDayCare = reader.GetBoolean("WillUseDayCare"),
+                    DayCareDays = reader.GetInt32("DayCareDays"),
+                    CreatedAt = reader.GetDateTime("CreatedAt"),
+                    UpdatedOn = reader.GetDateTime("UpdatedOn"),
+                    EnrollmentIndex = reader.GetInt32("EnrollmentIndex")
                 });
             }
 
@@ -993,8 +855,13 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 SELECT p.* 
                 FROM course_payment p
-                INNER JOIN student_course_transaction t ON p.StudentCourseTransactionId = t.StudentCourseTransactionId
-                WHERE p.FamilyId = @FamilyId";
+                INNER JOIN student_course_transaction t 
+                    ON p.StudentCourseTransactionId = t.StudentCourseTransactionId
+                WHERE p.FamilyId = @FamilyId
+                  AND p.IsActive = 1
+                ORDER BY p.CreatedAt DESC;
+            ";
+
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -1014,7 +881,7 @@ namespace Courses.Repository.Implementation
         }
 
         // ----------------------------
-        // Pending Amounts
+        // Pending Amounts (fixed for your real schema)
         // ----------------------------
         public async Task<IEnumerable<PendingAmountResponse>> GetPendingAmountsReportAsync(
             Guid? instituteId = null, Guid? courseId = null, Guid? courseGroupId = null, Guid? familyId = null, string? paymentCode = null)
@@ -1024,27 +891,70 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             var filters = new List<string>();
-            if (instituteId.HasValue) { filters.Add("t.InstituteId = @InstituteId"); cmd.AddParameter("@InstituteId", instituteId.Value.ToByteArray()); }
-            if (courseId.HasValue) { filters.Add("t.CourseId = @CourseId"); cmd.AddParameter("@CourseId", courseId.Value.ToByteArray()); }
-            if (courseGroupId.HasValue) { filters.Add("t.CourseGroupId = @CourseGroupId"); cmd.AddParameter("@CourseGroupId", courseGroupId.Value.ToByteArray()); }
-            if (familyId.HasValue) { filters.Add("t.FamilyId = @FamilyId"); cmd.AddParameter("@FamilyId", familyId.Value.ToByteArray()); }
-            if (string.IsNullOrEmpty(paymentCode)) { filters.Add("t.PaymentCode = @PaymentCode"); cmd.AddParameter("@PaymentCode", paymentCode); }
+
+            // real base table alias: sct
+            if (familyId.HasValue)
+            {
+                filters.Add("sct.FamilyId = @FamilyId");
+                cmd.AddParameter("@FamilyId", familyId.Value.ToByteArray());
+            }
+
+            // ✅ FIX: only add paymentCode filter when it is NOT null/empty
+            if (!string.IsNullOrWhiteSpace(paymentCode))
+            {
+                filters.Add("LOWER(sct.PaymentCode) = LOWER(@PaymentCode)");
+                cmd.AddParameter("@PaymentCode", paymentCode);
+            }
+
+            if (instituteId.HasValue)
+            {
+                filters.Add("crs.InstituteId = @InstituteId");
+                cmd.AddParameter("@InstituteId", instituteId.Value.ToByteArray());
+            }
+
+            if (courseId.HasValue)
+            {
+                filters.Add("crs.CourseId = @CourseId");
+                cmd.AddParameter("@CourseId", courseId.Value.ToByteArray());
+            }
+
+            if (courseGroupId.HasValue)
+            {
+                filters.Add("ceg.CourseEnrollmentGroupId = @CourseGroupId");
+                cmd.AddParameter("@CourseGroupId", courseGroupId.Value.ToByteArray());
+            }
 
             var whereClause = filters.Count > 0 ? "WHERE " + string.Join(" AND ", filters) : string.Empty;
 
             cmd.CommandText = $@"
-                SELECT t.InstituteId, i.Name AS InstituteName,
-                       t.CourseId, c.Name AS CourseName,
-                       t.CourseGroupId AS CourseEnrollmentGroupId, g.Name AS CourseGroupName,
-                       t.FamilyId,
-                       t.PaymentCode,
-                       SUM(t.TotalPayable - t.TotalAmountPaid) AS PendingAmount
-                FROM student_course_transaction t
-                LEFT JOIN institute i ON t.InstituteId = i.InstituteId
-                LEFT JOIN course c ON t.CourseId = c.CourseId
-                LEFT JOIN course_enrollment_group g ON t.CourseGroupId = g.CourseEnrollmentGroupId
+                SELECT
+                    crs.InstituteId AS InstituteId,
+                    ins.Name AS InstituteName,
+                    crs.CourseId AS CourseId,
+                    crs.Name AS CourseName,
+                    ceg.CourseEnrollmentGroupId AS CourseEnrollmentGroupId,
+                    ceg.GroupTitle AS CourseGroupName,
+                    sct.FamilyId AS FamilyId,
+                    sct.PaymentCode AS PaymentCode,
+                    SUM(sct.TotalPayable - sct.TotalAmountPaid) AS PendingAmount
+                FROM student_course_transaction sct
+                JOIN student_course_transaction_enrollment scte
+                    ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
+                JOIN student_course_enrollment sce
+                    ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN course_enrollment_groups ceg
+                    ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN courses crs
+                    ON ceg.CourseId = crs.CourseId
+                JOIN institutes ins
+                    ON crs.InstituteId = ins.InstituteId
                 {whereClause}
-                GROUP BY t.InstituteId, i.Name, t.CourseId, c.Name, t.CourseGroupId, g.Name, t.FamilyId, t.PaymentCode
+                GROUP BY
+                    crs.InstituteId, ins.Name,
+                    crs.CourseId, crs.Name,
+                    ceg.CourseEnrollmentGroupId, ceg.GroupTitle,
+                    sct.FamilyId, sct.PaymentCode
+                ORDER BY PendingAmount DESC;
             ";
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -1064,14 +974,6 @@ namespace Courses.Repository.Implementation
             }
 
             return results;
-        }
-
-        // ----------------------------
-        // Get Transactions Per Course
-        // ----------------------------
-        public async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsPerCourseAsync(Guid courseId)
-        {
-            return await GetTransactionsByColumn("CourseId", courseId);
         }
 
         // ----------------------------
@@ -1101,59 +1003,6 @@ namespace Courses.Repository.Implementation
             return pending.Sum(p => p.PendingAmount);
         }
 
-        //public async Task<StudentCoursePaymentResponse> GetStudentCourseTransactionByPaymentCode(string paymentCode)
-        //{
-        //    var pending = await GetPendingAmountsReportAsync(paymentCode: paymentCode);
-        //    return pending.Sum(p => p.PendingAmount);
-        //}
-
-
-        /*
-                public async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsPerCourseAsync(Guid courseId)
-                {
-                    var results = new List<StudentCourseTransactionResponse>();
-                    using var conn = await Database.CreateAndOpenConnectionAsync();
-                    using var cmd = conn.CreateCommand();
-
-                    cmd.CommandText = @"SELECT * FROM student_course_transaction WHERE CourseId=@CourseId AND IsActive=TRUE";
-                    cmd.AddParameter("@CourseId", courseId.ToByteArray());
-
-                    using var reader = await cmd.ExecuteReaderAsync();
-                    while (await reader.ReadAsync())
-                    {
-                        results.Add(await MapToTransactionResponse(reader));
-                    }
-
-                    return results;
-                }
-
-                // Pending amount calculations
-                public async Task<decimal> GetPendingAmountByCourse(Guid courseId)
-                {
-                    return await GetPendingAmount(@"SELECT SUM(AmountDue - AmountPaid) FROM student_course_transaction WHERE CourseId=@CourseId AND IsActive=TRUE",
-                                                  ("@CourseId", courseId));
-                }
-
-                public async Task<decimal> GetPendingAmountByFamily(Guid familyId)
-                {
-                    return await GetPendingAmount(@"SELECT SUM(AmountDue - AmountPaid) FROM student_course_transaction WHERE FamilyId=@FamilyId AND IsActive=TRUE",
-                                                  ("@FamilyId", familyId));
-                }
-
-                public async Task<decimal> GetPendingAmountByCourseGroup(Guid courseGroupId)
-                {
-                    return await GetPendingAmount(@"SELECT SUM(AmountDue - AmountPaid) FROM student_course_transaction WHERE CourseEnrollmentGroupId=@CourseGroupId AND IsActive=TRUE",
-                                                  ("@CourseGroupId", courseGroupId));
-                }
-
-                public async Task<decimal> GetPendingAmountByInstitute(Guid instituteId)
-                {
-                    return await GetPendingAmount(@"SELECT SUM(AmountDue - AmountPaid) FROM student_course_transaction t
-                                           INNER JOIN course c ON t.CourseId = c.CourseId
-                                           WHERE c.InstituteId=@InstituteId AND t.IsActive=TRUE",
-                                                  ("@InstituteId", instituteId));
-                }
-        */
         // Reusable helper
         private async Task<decimal> GetPendingAmount(string query, (string name, Guid value) param)
         {
@@ -1170,15 +1019,11 @@ namespace Courses.Repository.Implementation
         // ----------------------------
         // Private Helpers
         // ----------------------------
-
-
-        private static async Task<IEnumerable<StudentCourseTransactionResponse>> MapToTransactionResponse(
-    DbDataReader reader)
+        private static async Task<IEnumerable<StudentCourseTransactionResponse>> MapToTransactionResponse(DbDataReader reader)
         {
             if (!reader.HasRows)
                 return Enumerable.Empty<StudentCourseTransactionResponse>();
 
-            // ---- Cache ordinals ----
             var ordTxId = reader.GetOrdinal("StudentCourseTransactionId");
             var ordTxFamilyId = reader.GetOrdinal("FamilyId");
             var ordPayableFee = reader.GetOrdinal("PayableFee");
@@ -1207,7 +1052,7 @@ namespace Courses.Repository.Implementation
             var ordEnrollmentUpdatedOn = reader.GetOrdinal("EnrollmentUpdatedOn");
             var ordEnrollmentIndex = reader.GetOrdinal("EnrollmentIndex");
             var ordCourseRegistrationFee = reader.GetOrdinal("CourseRegistrationFee");
-            
+
             var lookup = new Dictionary<Guid, StudentCourseTransactionResponse>();
 
             while (await reader.ReadAsync())
@@ -1222,14 +1067,10 @@ namespace Courses.Repository.Implementation
                         FamilyId = reader.GetGuid(ordTxFamilyId),
                         PayableFee = reader.GetDecimal(ordPayableFee),
                         DayCareFee = reader.GetDecimal(ordDayCareFee),
-                        DayCareDiscount = reader.GetDecimal(ordDayCareDiscount),
-                        // DB: int, DTO: decimal
+                        DayCareDiscount = Convert.ToDecimal(reader.GetInt32(ordDayCareDiscount)),
                         FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32(ordFeeAmountDiscount)),
-
                         TotalPayable = reader.GetDecimal(ordTotalPayable),
-                        Comments = reader.IsDBNull(ordComments)
-                                          ? string.Empty
-                                          : reader.GetString(ordComments),
+                        Comments = reader.IsDBNull(ordComments) ? string.Empty : reader.GetString(ordComments),
                         TransactionStatus = (TransactionStatus)reader.GetInt32(ordStatus),
                         PaymentCode = reader.GetString(ordPaymentCode),
                         IsActive = reader.GetBoolean(ordTxIsActive),
@@ -1241,13 +1082,11 @@ namespace Courses.Repository.Implementation
                         Enrollments = new List<StudentCourseEnrollmentResponse>()
                     };
 
-                    // “Primary” enrollment Id at top-level
                     tx.StudentCourseEnrollmentId = reader.GetGuid(ordEnrollmentId);
-
                     lookup.Add(txId, tx);
                 }
 
-                var enrollment = new StudentCourseEnrollmentResponse
+                tx.Enrollments.Add(new StudentCourseEnrollmentResponse
                 {
                     StudentCourseEnrollmentId = reader.GetGuid(ordEnrollmentId),
                     CourseEnrollmentGroupId = reader.GetGuid(ordGroupId),
@@ -1259,11 +1098,8 @@ namespace Courses.Repository.Implementation
                     DayCareDays = reader.GetInt32(ordDayCareDays),
                     CreatedAt = reader.GetDateTime(ordEnrollmentCreatedAt),
                     UpdatedOn = reader.GetDateTime(ordEnrollmentUpdatedOn),
-                    EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex),
-                   // RegistrationFee = reader.GetInt32(RegistrationFee)
-                };
-
-                tx.Enrollments.Add(enrollment);
+                    EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex)
+                });
             }
 
             return lookup.Values.ToList();
@@ -1273,18 +1109,17 @@ namespace Courses.Repository.Implementation
         {
             return new StudentCourseTransactionResponse
             {
-                //StudentCourseEnrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId"),
                 StudentCourseTransactionId = reader.GetGuidFromByteArray("StudentCourseTransactionId"),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
                 PayableFee = reader.GetDecimal("PayableFee"),
                 DayCareFee = reader.GetDecimal("DayCareFee"),
-                DayCareDiscount = reader.GetDecimal("DayCareDiscount"),
-                FeeAmountDiscount = reader.GetDecimal("FeeAmountDiscount"),
+                DayCareDiscount = Convert.ToDecimal(reader.GetInt32("DayCareDiscount")),
+                FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32("FeeAmountDiscount")),
                 TotalPayable = reader.GetDecimal("TotalPayable"),
                 TotalAmountPaid = reader.GetDecimal("TotalAmountPaid"),
-                Comments = reader.GetString("Comments"),
+                Comments = reader.IsDBNull("Comments") ? string.Empty : reader.GetString("Comments"),
                 PaymentCode = reader.GetString("PaymentCode"),
-                TransactionStatus = (TransactionStatus)reader.GetInt32("TransactionStatus"),
+                TransactionStatus = (TransactionStatus)reader.GetInt32("Status"),
                 IsActive = reader.GetBoolean("IsActive"),
                 IsCompletelyPaid = reader.GetBoolean("IsCompletelyPaid"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
@@ -1302,44 +1137,24 @@ namespace Courses.Repository.Implementation
 
                 using var checkCmd = conn.CreateCommand();
                 checkCmd.CommandText = @"
-            SELECT 1
-            FROM student_course_transaction
-            WHERE PaymentCode = @Code
-            LIMIT 1;
-        ";
+                    SELECT 1
+                    FROM student_course_transaction
+                    WHERE PaymentCode = @Code
+                    LIMIT 1;
+                ";
                 checkCmd.AddParameter("@Code", code);
 
                 var exists = await checkCmd.ExecuteScalarAsync();
 
                 if (exists == null || exists == DBNull.Value)
-                {
-                    return code; // unique
-                }
+                    return code;
             }
 
             throw new Exception("Failed to generate a unique payment code after several attempts.");
         }
-        private async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsByColumn(string columnName, Guid columnValue)
-        {
-            var results = new List<StudentCourseTransactionResponse>();
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
-
-            cmd.CommandText = $"SELECT * FROM student_course_transaction WHERE {columnName} = @{columnName}";
-            cmd.AddParameter($"@{columnName}", columnValue.ToByteArray());
-
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                results.Add(await MapToTransactionSingleResponse(reader));
-            }
-
-            return results;
-        }
 
         private static readonly char[] PaymentCodeChars =
-        "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".ToCharArray();
-        // Excludes I, O, 1, 0 for readability
+            "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".ToCharArray(); // excludes I,O,1,0
 
         private static string Generate6CharCode()
         {
@@ -1350,26 +1165,10 @@ namespace Courses.Repository.Implementation
             rng.GetBytes(bytes);
 
             for (int i = 0; i < buffer.Length; i++)
-            {
                 buffer[i] = PaymentCodeChars[bytes[i] % PaymentCodeChars.Length];
-            }
 
             return new string(buffer);
         }
-
-        //public async Task<StudentCourseTransactionResponse?> GetTransactionByPaymentCode(string paymentCode)
-        //{
-        //    using var conn = await Database.CreateAndOpenConnectionAsync();
-        //    using var cmd = conn.CreateCommand();
-
-        //    cmd.CommandText = "SELECT * FROM student_course_transaction WHERE LOWER(PaymentCode) = LOWER(@PaymentCode);";
-        //    cmd.AddParameter("@PaymentCode", paymentCode);
-
-        //    using var reader = await cmd.ExecuteReaderAsync();
-        //    if (!await reader.ReadAsync()) return null;
-
-        //    return await MapToTransactionSingleResponse(reader);
-        //}
 
         public async Task<bool> DeleteStudentCourseTransactionEnrollmentByEnrollmentId(Guid studentCourseEnrollmentId)
         {

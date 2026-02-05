@@ -57,8 +57,11 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@PolicyHyperLink", (object?)course.PolicyHyperLink ?? DBNull.Value);
             cmd.AddParameter("@IsCourseCompleted", course.IsCourseCompleted);
             cmd.AddParameter("@IsRegistrationOpened", course.IsRegistrationOpened);
-            cmd.AddParameter("@RegistrationStartDate", course.RegistrationStartDate);
-            cmd.AddParameter("@RegistrationEndDate", course.RegistrationEndDate);
+
+            // ✅ FIX: DBNull-safe nullable DateTime parameters
+            cmd.AddParameter("@RegistrationStartDate", (object?)course.RegistrationStartDate ?? DBNull.Value);
+            cmd.AddParameter("@RegistrationEndDate", (object?)course.RegistrationEndDate ?? DBNull.Value);
+
             cmd.AddParameter("@CourseSession", (int)course.CourseSession);
             cmd.AddParameter("@RegistrationFee", (int)course.RegistrationFee);
 
@@ -179,8 +182,11 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@PolicyHyperLink", (object?)course.PolicyHyperLink ?? DBNull.Value);
             cmd.AddParameter("@IsCourseCompleted", course.IsCourseCompleted);
             cmd.AddParameter("@IsRegistrationOpened", course.IsRegistrationOpened);
-            cmd.AddParameter("@RegistrationStartDate", course.RegistrationStartDate);
-            cmd.AddParameter("@RegistrationEndDate", course.RegistrationEndDate);
+
+            // ✅ FIX: DBNull-safe nullable DateTime parameters
+            cmd.AddParameter("@RegistrationStartDate", (object?)course.RegistrationStartDate ?? DBNull.Value);
+            cmd.AddParameter("@RegistrationEndDate", (object?)course.RegistrationEndDate ?? DBNull.Value);
+
             cmd.AddParameter("@CourseSession", (int)course.CourseSession);
             cmd.AddParameter("@RegistrationFee", (int)course.RegistrationFee);
 
@@ -230,6 +236,8 @@ namespace Courses.Repository.Implementation
         private async Task<CourseResponseDetailed> MapToCourseResponse(DbDataReader reader)
         {
             var courseId = reader.GetGuidFromByteArray("CourseId");
+
+            // Keep your original behavior:
             var registrationStart = reader.GetNullableDateTimeUtc("RegistrationStartDate") ?? reader.GetDateTimeUtc("StartDate");
             var registrationEnd = reader.GetNullableDateTimeUtc("RegistrationEndDate") ?? reader.GetDateTimeUtc("EndDate");
 
@@ -258,7 +266,7 @@ namespace Courses.Repository.Implementation
                 RegistrationFee = (int)reader.GetInt32("RegistrationFee")
             };
 
-            // Load enrollment groups using DI
+            // Load enrollment groups using DI (kept as-is)
             course.CourseEnrollmentGroups = (await _groupRepo.GetAllGroups(courseId, true)).ToList();
 
             // Merge unique academic groups
@@ -269,6 +277,8 @@ namespace Courses.Repository.Implementation
 
             return course;
         }
+
+        // ✅ FIXED: prevents duplicates + returns deterministic EnrollmentGroupActive
         public async Task<IEnumerable<CourseSessionInfoResponse>> GetFamilyCourseSessionInfo(Guid familyId, Guid? instituteId)
         {
             var results = new List<CourseSessionInfoResponse>();
@@ -277,34 +287,47 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             var sql = new StringBuilder(@"
-        SELECT
-            sce.FamilyId AS FamilyId,
-            c.InstituteId AS InstituteId,
-            c.CourseId AS CourseId,
-            c.CourseSession AS CourseSession,
-            c.IsCourseCompleted AS IsCourseCompleted,
-            c.IsRegistrationOpened AS IsRegistrationOpened,
-            c.RegistrationStartDate AS RegistrationStartDate,
-            c.RegistrationEndDate AS RegistrationEndDate,
-            c.IsActive AS CourseActive,
-            ceg.IsActive AS EnrollmentGroupActive
-        FROM courses c
-        INNER JOIN course_enrollment_groups ceg
-            ON c.CourseId = ceg.CourseId
-        INNER JOIN student_course_enrollment sce
-            ON ceg.CourseEnrollmentGroupId = sce.CourseEnrollmentGroupId
-        WHERE sce.FamilyId = @FamilyId");
+                SELECT
+                    sce.FamilyId AS FamilyId,
+                    c.InstituteId AS InstituteId,
+                    c.CourseId AS CourseId,
+                    c.CourseSession AS CourseSession,
+                    c.IsCourseCompleted AS IsCourseCompleted,
+                    c.IsRegistrationOpened AS IsRegistrationOpened,
+                    c.RegistrationStartDate AS RegistrationStartDate,
+                    c.RegistrationEndDate AS RegistrationEndDate,
+                    c.IsActive AS CourseActive,
+                    MAX(ceg.IsActive) AS EnrollmentGroupActive
+                FROM courses c
+                INNER JOIN course_enrollment_groups ceg
+                    ON c.CourseId = ceg.CourseId
+                INNER JOIN student_course_enrollment sce
+                    ON ceg.CourseEnrollmentGroupId = sce.CourseEnrollmentGroupId
+                WHERE sce.FamilyId = @FamilyId
+                  AND sce.IsActive = 1
+            ");
 
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
 
-            // Only add InstituteId filter if provided
             if (instituteId.HasValue)
             {
                 sql.Append(" AND c.InstituteId = @InstituteId");
                 cmd.AddParameter("@InstituteId", instituteId.Value.ToByteArray());
             }
 
-            sql.Append(" ORDER BY c.CreatedAt DESC");
+            sql.Append(@"
+                GROUP BY
+                    sce.FamilyId,
+                    c.InstituteId,
+                    c.CourseId,
+                    c.CourseSession,
+                    c.IsCourseCompleted,
+                    c.IsRegistrationOpened,
+                    c.RegistrationStartDate,
+                    c.RegistrationEndDate,
+                    c.IsActive
+                ORDER BY MAX(c.CreatedAt) DESC;
+            ");
 
             cmd.CommandText = sql.ToString();
 
@@ -316,8 +339,17 @@ namespace Courses.Repository.Implementation
 
             return results;
         }
+
+        // ✅ FIXED mapper: reads aggregated EnrollmentGroupActive and uses nullable UTC helper
         private CourseSessionInfoResponse MapToCourseSessionInfoResponse(DbDataReader reader)
         {
+            // EnrollmentGroupActive comes from MAX(ceg.IsActive) → could be 0/1, and may come back as sbyte/byte/int depending on provider.
+            object rawActive = reader["EnrollmentGroupActive"];
+            bool enrollmentGroupActive =
+                rawActive != null &&
+                rawActive != DBNull.Value &&
+                Convert.ToInt32(rawActive) == 1;
+
             return new CourseSessionInfoResponse
             {
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
@@ -328,16 +360,11 @@ namespace Courses.Repository.Implementation
                 IsCourseCompleted = reader.GetBoolean("IsCourseCompleted"),
                 IsRegistrationOpened = reader.GetBoolean("IsRegistrationOpened"),
 
-                RegistrationStartDate = reader.IsDBNull(reader.GetOrdinal("RegistrationStartDate"))
-                    ? null
-                    : reader.GetDateTime("RegistrationStartDate"),
-
-                RegistrationEndDate = reader.IsDBNull(reader.GetOrdinal("RegistrationEndDate"))
-                    ? null
-                    : reader.GetDateTime("RegistrationEndDate"),
+                RegistrationStartDate = reader.GetNullableDateTimeUtc("RegistrationStartDate"),
+                RegistrationEndDate = reader.GetNullableDateTimeUtc("RegistrationEndDate"),
 
                 CourseActive = reader.GetBoolean("CourseActive"),
-                EnrollmentGroupActive = reader.GetBoolean("EnrollmentGroupActive")
+                EnrollmentGroupActive = enrollmentGroupActive
             };
         }
     }

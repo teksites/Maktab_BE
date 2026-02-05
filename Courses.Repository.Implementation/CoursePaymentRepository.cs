@@ -60,7 +60,8 @@ namespace Courses.Repository.Implementation
 
             await cmd.ExecuteNonQueryAsync();
 
-            return await GetPayment(paymentId);
+            // ✅ Fix: method returns non-nullable
+            return await GetPayment(paymentId) ?? throw new Exception("Failed to retrieve created payment.");
         }
 
         public async Task<bool> UpdatePayment(Guid paymentId, AddCoursePayment payment)
@@ -71,11 +72,11 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 UPDATE course_payment
                 SET
-                    AmountPaid = @AmountPaid,
-                    Comments   = @Comments,
+                    AmountPaid  = @AmountPaid,
+                    Comments    = @Comments,
                     PaymentMode = @PaymentMode,
-                    IsActive   = @IsActive,
-                    UpdatedOn  = @UpdatedOn
+                    IsActive    = @IsActive,
+                    UpdatedOn   = @UpdatedOn
                 WHERE CoursePaymentId = @CoursePaymentId";
 
             cmd.AddParameter("@CoursePaymentId", paymentId.ToByteArray());
@@ -96,19 +97,19 @@ namespace Courses.Repository.Implementation
             if (hardDelete)
             {
                 cmd.CommandText = @"DELETE FROM course_payment WHERE CoursePaymentId = @CoursePaymentId";
+                cmd.AddParameter("@CoursePaymentId", paymentId.ToByteArray());
             }
             else
             {
                 cmd.CommandText = @"
                     UPDATE course_payment
-                    SET IsActive = FALSE,
+                    SET IsActive = 0,
                         UpdatedOn = @UpdatedOn
                     WHERE CoursePaymentId = @CoursePaymentId";
 
                 cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
+                cmd.AddParameter("@CoursePaymentId", paymentId.ToByteArray());
             }
-
-            cmd.AddParameter("@CoursePaymentId", paymentId.ToByteArray());
 
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
@@ -138,7 +139,8 @@ namespace Courses.Repository.Implementation
                 SELECT * 
                 FROM course_payment 
                 WHERE StudentCourseTransactionId = @StudentCourseTransactionId
-                  AND IsActive = TRUE";
+                  AND IsActive = 1
+                ORDER BY CreatedAt DESC;";
 
             cmd.AddParameter("@StudentCourseTransactionId", transactionId.ToByteArray());
 
@@ -160,7 +162,7 @@ namespace Courses.Repository.Implementation
                 SELECT COALESCE(SUM(AmountPaid), 0) AS TotalPaid
                 FROM course_payment
                 WHERE StudentCourseTransactionId = @StudentCourseTransactionId
-                  AND IsActive = TRUE";
+                  AND IsActive = 1;";
 
             cmd.AddParameter("@StudentCourseTransactionId", transactionId.ToByteArray());
 
