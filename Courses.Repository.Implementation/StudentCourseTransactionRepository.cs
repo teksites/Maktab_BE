@@ -146,6 +146,16 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    ceg.GroupTitle AS GroupTitle,
+                    ceg.GroupTitleFr AS GroupTitleFr,
+                    ci.FirstName AS ChildFirstName,
+                    ci.LastName AS ChildLastName,
+                    ui.UserId AS ParentUserId,
+                    ui.FirstName AS ParentFirstName,
+                    ui.LastName AS ParentLastName,
+                    ui.Email AS ParentEmail,
+                    ui.Phone AS ParentPhone,
+                    ui.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -155,6 +165,10 @@ namespace Courses.Repository.Implementation
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
                 JOIN course_enrollment_groups ceg
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN child_information ci
+                    ON ci.ChildId = sce.ChildId
+                LEFT JOIN user_info ui
+                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -208,6 +222,16 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    ceg.GroupTitle AS GroupTitle,
+                    ceg.GroupTitleFr AS GroupTitleFr,
+                    ci.FirstName AS ChildFirstName,
+                    ci.LastName AS ChildLastName,
+                    ui.UserId AS ParentUserId,
+                    ui.FirstName AS ParentFirstName,
+                    ui.LastName AS ParentLastName,
+                    ui.Email AS ParentEmail,
+                    ui.Phone AS ParentPhone,
+                    ui.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -217,6 +241,10 @@ namespace Courses.Repository.Implementation
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
                 JOIN course_enrollment_groups ceg
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN child_information ci
+                    ON ci.ChildId = sce.ChildId
+                LEFT JOIN user_info ui
+                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -391,6 +419,16 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    ceg.GroupTitle AS GroupTitle,
+                    ceg.GroupTitleFr AS GroupTitleFr,
+                    ci.FirstName AS ChildFirstName,
+                    ci.LastName AS ChildLastName,
+                    ui.UserId AS ParentUserId,
+                    ui.FirstName AS ParentFirstName,
+                    ui.LastName AS ParentLastName,
+                    ui.Email AS ParentEmail,
+                    ui.Phone AS ParentPhone,
+                    ui.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -400,6 +438,10 @@ namespace Courses.Repository.Implementation
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
                 JOIN course_enrollment_groups ceg
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN child_information ci
+                    ON ci.ChildId = sce.ChildId
+                LEFT JOIN user_info ui
+                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
                 WHERE
@@ -454,6 +496,16 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    ceg.GroupTitle AS GroupTitle,
+                    ceg.GroupTitleFr AS GroupTitleFr,
+                    ci.FirstName AS ChildFirstName,
+                    ci.LastName AS ChildLastName,
+                    ui.UserId AS ParentUserId,
+                    ui.FirstName AS ParentFirstName,
+                    ui.LastName AS ParentLastName,
+                    ui.Email AS ParentEmail,
+                    ui.Phone AS ParentPhone,
+                    ui.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -463,6 +515,10 @@ namespace Courses.Repository.Implementation
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
                 JOIN course_enrollment_groups ceg
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN child_information ci
+                    ON ci.ChildId = sce.ChildId
+                LEFT JOIN user_info ui
+                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -510,6 +566,16 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    ceg.GroupTitle AS GroupTitle,
+                    ceg.GroupTitleFr AS GroupTitleFr,
+                    ci.FirstName AS ChildFirstName,
+                    ci.LastName AS ChildLastName,
+                    ui.UserId AS ParentUserId,
+                    ui.FirstName AS ParentFirstName,
+                    ui.LastName AS ParentLastName,
+                    ui.Email AS ParentEmail,
+                    ui.Phone AS ParentPhone,
+                    ui.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -519,6 +585,10 @@ namespace Courses.Repository.Implementation
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
                 JOIN course_enrollment_groups ceg
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN child_information ci
+                    ON ci.ChildId = sce.ChildId
+                LEFT JOIN user_info ui
+                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -568,6 +638,16 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    ceg.GroupTitle AS GroupTitle,
+                    ceg.GroupTitleFr AS GroupTitleFr,
+                    ci.FirstName AS ChildFirstName,
+                    ci.LastName AS ChildLastName,
+                    ui.UserId AS ParentUserId,
+                    ui.FirstName AS ParentFirstName,
+                    ui.LastName AS ParentLastName,
+                    ui.Email AS ParentEmail,
+                    ui.Phone AS ParentPhone,
+                    ui.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -575,8 +655,14 @@ namespace Courses.Repository.Implementation
                     ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
                 JOIN student_course_enrollment sce
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN course_enrollment_groups ceg
+                    ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN child_information ci
+                    ON ci.ChildId = sce.ChildId
+                LEFT JOIN user_info ui
+                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
                 JOIN courses crcs
-                    ON sce.CourseId = crcs.CourseId
+                    ON ceg.CourseId = crcs.CourseId
 
                 WHERE sct.FamilyId = @FamilyId
                   AND sce.CourseId = @CourseId
@@ -624,6 +710,16 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    ceg.GroupTitle AS GroupTitle,
+                    ceg.GroupTitleFr AS GroupTitleFr,
+                    ci.FirstName AS ChildFirstName,
+                    ci.LastName AS ChildLastName,
+                    ui.UserId AS ParentUserId,
+                    ui.FirstName AS ParentFirstName,
+                    ui.LastName AS ParentLastName,
+                    ui.Email AS ParentEmail,
+                    ui.Phone AS ParentPhone,
+                    ui.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -631,8 +727,14 @@ namespace Courses.Repository.Implementation
                     ON sct.StudentCourseTransactionId = scte.StudentCourseTransactionId
                 JOIN student_course_enrollment sce
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN course_enrollment_groups ceg
+                    ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN child_information ci
+                    ON ci.ChildId = sce.ChildId
+                LEFT JOIN user_info ui
+                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
                 JOIN courses crcs
-                    ON sce.CourseId = crcs.CourseId
+                    ON ceg.CourseId = crcs.CourseId
 
                 WHERE sce.CourseId = @CourseId
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
@@ -678,6 +780,16 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    ceg.GroupTitle AS GroupTitle,
+                    ceg.GroupTitleFr AS GroupTitleFr,
+                    ci.FirstName AS ChildFirstName,
+                    ci.LastName AS ChildLastName,
+                    ui.UserId AS ParentUserId,
+                    ui.FirstName AS ParentFirstName,
+                    ui.LastName AS ParentLastName,
+                    ui.Email AS ParentEmail,
+                    ui.Phone AS ParentPhone,
+                    ui.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -687,6 +799,10 @@ namespace Courses.Repository.Implementation
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
                 JOIN course_enrollment_groups ceg
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN child_information ci
+                    ON ci.ChildId = sce.ChildId
+                LEFT JOIN user_info ui
+                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -1051,13 +1167,27 @@ namespace Courses.Repository.Implementation
             var ordEnrollmentCreatedAt = reader.GetOrdinal("EnrollmentCreatedAt");
             var ordEnrollmentUpdatedOn = reader.GetOrdinal("EnrollmentUpdatedOn");
             var ordEnrollmentIndex = reader.GetOrdinal("EnrollmentIndex");
+            var ordGroupTitle = reader.GetOrdinal("GroupTitle");
+            var ordGroupTitleFr = reader.GetOrdinal("GroupTitleFr");
+            var ordChildFirstName = reader.GetOrdinal("ChildFirstName");
+            var ordChildLastName = reader.GetOrdinal("ChildLastName");
+            var ordParentUserId = reader.GetOrdinal("ParentUserId");
+            var ordParentFirstName = reader.GetOrdinal("ParentFirstName");
+            var ordParentLastName = reader.GetOrdinal("ParentLastName");
+            var ordParentEmail = reader.GetOrdinal("ParentEmail");
+            var ordParentPhone = reader.GetOrdinal("ParentPhone");
+            var ordParentRelationship = reader.GetOrdinal("ParentRelationship");
             var ordCourseRegistrationFee = reader.GetOrdinal("CourseRegistrationFee");
 
             var lookup = new Dictionary<Guid, StudentCourseTransactionResponse>();
+            var enrollmentIdsByTx = new Dictionary<Guid, HashSet<Guid>>();
+            var familyInfoIdsByTx = new Dictionary<Guid, HashSet<Guid>>();
 
             while (await reader.ReadAsync())
             {
                 var txId = reader.GetGuid(ordTxId);
+                var enrollmentId = reader.GetGuid(ordEnrollmentId);
+                var childName = $"{reader.GetString(ordChildFirstName)} {reader.GetString(ordChildLastName)}".Trim();
 
                 if (!lookup.TryGetValue(txId, out var tx))
                 {
@@ -1079,27 +1209,65 @@ namespace Courses.Repository.Implementation
                         CreatedAt = reader.GetDateTime(ordTxCreatedAt),
                         UpdatedOn = reader.GetDateTime(ordTxUpdatedOn),
                         RegistrationFee = reader.GetInt32(ordCourseRegistrationFee),
-                        Enrollments = new List<StudentCourseEnrollmentResponse>()
+                        Enrollments = new List<StudentCourseEnrollmentResponse>(),
+                        FamilyInformation = new List<FamilyInformationResponse>()
                     };
 
-                    tx.StudentCourseEnrollmentId = reader.GetGuid(ordEnrollmentId);
+                    tx.StudentCourseEnrollmentId = enrollmentId;
                     lookup.Add(txId, tx);
+                    enrollmentIdsByTx[txId] = new HashSet<Guid>();
+                    familyInfoIdsByTx[txId] = new HashSet<Guid>();
                 }
 
-                tx.Enrollments.Add(new StudentCourseEnrollmentResponse
+                if (!enrollmentIdsByTx.TryGetValue(txId, out var enrollmentIds))
                 {
-                    StudentCourseEnrollmentId = reader.GetGuid(ordEnrollmentId),
-                    CourseEnrollmentGroupId = reader.GetGuid(ordGroupId),
-                    CourseId = reader.GetGuid(ordCourseId),
-                    FamilyId = reader.GetGuid(ordEnrollmentFamilyId),
-                    ChildId = reader.GetGuid(ordChildId),
-                    IsActive = reader.GetBoolean(ordEnrollmentIsActive),
-                    WillUseDayCare = reader.GetBoolean(ordWillUseDayCare),
-                    DayCareDays = reader.GetInt32(ordDayCareDays),
-                    CreatedAt = reader.GetDateTime(ordEnrollmentCreatedAt),
-                    UpdatedOn = reader.GetDateTime(ordEnrollmentUpdatedOn),
-                    EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex)
-                });
+                    enrollmentIds = new HashSet<Guid>();
+                    enrollmentIdsByTx[txId] = enrollmentIds;
+                }
+
+                if (enrollmentIds.Add(enrollmentId))
+                {
+                    tx.Enrollments.Add(new StudentCourseEnrollmentResponse
+                    {
+                        StudentCourseEnrollmentId = enrollmentId,
+                        CourseEnrollmentGroupId = reader.GetGuid(ordGroupId),
+                        CourseId = reader.GetGuid(ordCourseId),
+                        FamilyId = reader.GetGuid(ordEnrollmentFamilyId),
+                        ChildId = reader.GetGuid(ordChildId),
+                        ChildName = childName,
+                        IsActive = reader.GetBoolean(ordEnrollmentIsActive),
+                        WillUseDayCare = reader.GetBoolean(ordWillUseDayCare),
+                        DayCareDays = reader.GetInt32(ordDayCareDays),
+                        CreatedAt = reader.GetDateTime(ordEnrollmentCreatedAt),
+                        UpdatedOn = reader.GetDateTime(ordEnrollmentUpdatedOn),
+                        EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex),
+                        GroupTitle = reader.IsDBNull(ordGroupTitle) ? string.Empty : reader.GetString(ordGroupTitle),
+                        GroupTitleFr = reader.IsDBNull(ordGroupTitleFr) ? string.Empty : reader.GetString(ordGroupTitleFr)
+                    });
+                }
+
+                if (!reader.IsDBNull(ordParentUserId))
+                {
+                    var parentUserId = reader.GetGuid(ordParentUserId);
+                    if (!familyInfoIdsByTx.TryGetValue(txId, out var familyInfoIds))
+                    {
+                        familyInfoIds = new HashSet<Guid>();
+                        familyInfoIdsByTx[txId] = familyInfoIds;
+                    }
+
+                    if (familyInfoIds.Add(parentUserId))
+                    {
+                        var relationship = (Relationship)reader.GetInt32(ordParentRelationship);
+                        tx.FamilyInformation.Add(new FamilyInformationResponse
+                        {
+                            Name = $"{reader.GetString(ordParentFirstName)} {reader.GetString(ordParentLastName)}".Trim(),
+                            Email = reader.IsDBNull(ordParentEmail) ? string.Empty : reader.GetString(ordParentEmail),
+                            Phone = reader.IsDBNull(ordParentPhone) ? string.Empty : reader.GetString(ordParentPhone),
+                            RelationshipType = relationship,
+                            RelationshipName = relationship.ToString()
+                        });
+                    }
+                }
             }
 
             return lookup.Values.ToList();
