@@ -197,26 +197,32 @@ namespace Application.Users.Repository.Implementation
 
         public async Task<IEnumerable<OtherContactInformation>> GetFamilyOtherContacts(
             Guid familyId,
-            ContactType contactType)
+            ContactType? contactType = null)
         {
             var results = new List<OtherContactInformation>();
-            // var typeList = contactTypes?.ToList() ?? new List<ContactType>();
 
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"  SELECT 
+            var sql = new StringBuilder(@"SELECT
             ContactId, FamilyId, FirstName, LastName, Phone, ContactType, Relationship, IsActive, CreatedAt, UpdatedOn
-              FROM maktab.other_contacts_information 
-              WHERE FamilyId = @FamilyId AND IsActive = 1 and ContactType = @ContactType";
+              FROM maktab.other_contacts_information
+              WHERE FamilyId = @FamilyId AND IsActive = 1");
+
+            if (contactType.HasValue)
+            {
+                sql.Append(" AND ContactType = @ContactType");
+            }
+
+            cmd.CommandText = sql.ToString();
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
-            cmd.AddParameter("@ContactType", (int)contactType);
+
+            if (contactType.HasValue)
+            {
+                cmd.AddParameter("@ContactType", (int)contactType.Value);
+            }
 
             using var reader = await cmd.ExecuteReaderAsync();//.ConfigureAwait(false);
-            //       if (!await reader.ReadAsync())
-            //         return null;
-            //   return MapToEnrollmentResponse(reader);
-            //using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())//.ConfigureAwait(false))
             {
                 results.Add(new OtherContactInformation

@@ -86,8 +86,23 @@ namespace Application.Users.Implementation
         
         public async Task<IEnumerable<OtherContactResponse>> GetFamilyOtherContacts(Guid familyId, IEnumerable<ContactType> contactTypes)
         {
-            return (await _repository.GetFamilyOtherContacts(familyId, contactTypes.First())).
-                Select(MaptToOtherContactResonse).ToList();
+            var types = (contactTypes ?? Enumerable.Empty<ContactType>()).Distinct().ToList();
+
+            if (!types.Any())
+            {
+                var contacts = await _repository.GetFamilyOtherContacts(familyId).ConfigureAwait(false);
+                return (contacts ?? Enumerable.Empty<OtherContactInformation>())
+                    .Select(MaptToOtherContactResonse)
+                    .ToList();
+            }
+
+            var contactTasks = types.Select(type => _repository.GetFamilyOtherContacts(familyId, type));
+            var contactsByType = await Task.WhenAll(contactTasks).ConfigureAwait(false);
+
+            return contactsByType
+                .SelectMany(contacts => contacts ?? Enumerable.Empty<OtherContactInformation>())
+                .Select(MaptToOtherContactResonse)
+                .ToList();
         }
 
         Task<OtherContactResponse> UpdateOtherContactResponse(UpdateOtherContact otherContactInformation)

@@ -11,7 +11,7 @@ namespace Users.Repository
         Task<bool> DeleteFamilyOtherContact(Guid familyId, bool ifHardDelete = false);
         Task<OtherContactInformation> GetOtherContact(Guid otherContact);
         Task<OtherContactInformation> GetOtherContactByPhoneNumber(string phoneNumber);
-        Task<IEnumerable<OtherContactInformation>> GetFamilyOtherContacts(Guid familyId, ContactType contactTypes);
+        Task<IEnumerable<OtherContactInformation>> GetFamilyOtherContacts(Guid familyId, ContactType? contactType = null);
         Task<OtherContactInformation> UpdateOtherContact(OtherContactInformation otherContactInformation);
     }
 }

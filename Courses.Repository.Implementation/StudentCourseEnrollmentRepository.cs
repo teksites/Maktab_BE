@@ -46,30 +46,64 @@ namespace Courses.Repository.Implementation
         // Get a single enrollment by ID
         public async Task<StudentCourseEnrollmentResponse?> GetEnrollment(Guid enrollmentId)
         {
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
-
-            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE StudentCourseEnrollmentId=@EnrollmentId";
-            cmd.AddParameter("@EnrollmentId", enrollmentId.ToByteArray());
-
-            using var reader = await cmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) return null;
-            return MapToEnrollmentResponse(reader);
+            var results = await GetEnrollmentsByColumnAsync("StudentCourseEnrollmentId", enrollmentId);
+            return results.FirstOrDefault();
         }
 
         public async Task<StudentCourseEnrollmentResponse> GetStudentCourseEnrollment(Guid childId, Guid courseId)
         {
+            var lookup = new Dictionary<Guid, StudentCourseEnrollmentResponse>();
+
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE ChildId = @ChildId and CourseId = @CourseId";
+            cmd.CommandText = @"
+        SELECT
+            sce.StudentCourseEnrollmentId,
+            sce.CourseEnrollmentGroupId,
+            sce.CourseId,
+            sce.ChildId,
+            sce.FamilyId,
+            sce.WillUseDayCare,
+            sce.DayCareDays,
+            sce.IsActive,
+            sce.CreatedAt,
+            sce.UpdatedOn,
+            sce.EnrollmentIndex,
+            ci.FirstName AS ChildFirstName,
+            ci.LastName AS ChildLastName,
+            ui.UserId,
+            ui.FirstName AS UserFirstName,
+            ui.LastName AS UserLastName,
+            ui.Email,
+            ui.Phone,
+            ui.Relationship
+        FROM student_course_enrollment sce
+        INNER JOIN child_information ci ON ci.ChildId = sce.ChildId
+        LEFT JOIN user_info ui ON ui.FamilyId = sce.FamilyId AND ui.IsActive = b'1'
+        WHERE sce.ChildId = @ChildId AND sce.CourseId = @CourseId AND sce.IsActive = TRUE";
+
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
             cmd.AddParameter("@ChildId", childId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) 
-                return null;
-            return MapToEnrollmentResponse(reader);
+            while (await reader.ReadAsync())
+            {
+                var enrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId");
+
+                if (!lookup.TryGetValue(enrollmentId, out var enrollment))
+                {
+                    enrollment = MapToEnrollmentResponse(reader);
+                    lookup[enrollmentId] = enrollment;
+                }
+
+                if (!reader.IsDBNull("UserId"))
+                {
+                    enrollment.FamilyMembers.Add(MapToFamilyInfo(reader));
+                }
+            }
+
+            return lookup.Values.FirstOrDefault();
         }
         /*
                 // Get all enrollments for a specific course
@@ -167,20 +201,7 @@ namespace Courses.Repository.Implementation
 
         public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByGroup(Guid groupId)
         {
-            var results = new List<StudentCourseEnrollmentResponse>();
-            using var conn = await Database.CreateAndOpenConnectionAsync();
-            using var cmd = conn.CreateCommand();
-
-            cmd.CommandText = @"SELECT * FROM student_course_enrollment WHERE CourseEnrollmentGroupId=@GroupId AND IsActive=TRUE";
-            cmd.AddParameter("@GroupId", groupId.ToByteArray());
-
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                results.Add(MapToEnrollmentResponse(reader));
-            }
-
-            return results;
+            return await GetEnrollmentsByColumnAsync("CourseEnrollmentGroupId", groupId);
         }
 
         public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByCourse(Guid courseId)

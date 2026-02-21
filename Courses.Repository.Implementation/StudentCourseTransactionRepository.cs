@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using Cumulus.Data;
 using Data;
 using MaktabDataContracts.Requests.Course;
@@ -150,12 +150,12 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
-                    ui.UserId AS ParentUserId,
-                    ui.FirstName AS ParentFirstName,
-                    ui.LastName AS ParentLastName,
-                    ui.Email AS ParentEmail,
-                    ui.Phone AS ParentPhone,
-                    ui.Relationship AS ParentRelationship,
+                                        fi.ContactId AS ParentUserId,
+                    fi.FirstName AS ParentFirstName,
+                    fi.LastName AS ParentLastName,
+                    fi.Email AS ParentEmail,
+                    fi.Phone AS ParentPhone,
+                    fi.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -167,8 +167,32 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                LEFT JOIN user_info ui
-                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
+                                LEFT JOIN (
+                    SELECT
+                        ui.UserId AS ContactId,
+                        ui.FamilyId,
+                        ui.FirstName,
+                        ui.LastName,
+                        ui.Email,
+                        ui.Phone,
+                        ui.Relationship
+                    FROM user_info ui
+                    WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        oci.ContactId AS ContactId,
+                        oci.FamilyId,
+                        oci.FirstName,
+                        oci.LastName,
+                        NULL AS Email,
+                        oci.Phone,
+                        oci.Relationship
+                    FROM other_contacts_information oci
+                    WHERE oci.IsActive = 1
+                ) fi
+                    ON fi.FamilyId = sct.FamilyId
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -226,12 +250,12 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
-                    ui.UserId AS ParentUserId,
-                    ui.FirstName AS ParentFirstName,
-                    ui.LastName AS ParentLastName,
-                    ui.Email AS ParentEmail,
-                    ui.Phone AS ParentPhone,
-                    ui.Relationship AS ParentRelationship,
+                                        fi.ContactId AS ParentUserId,
+                    fi.FirstName AS ParentFirstName,
+                    fi.LastName AS ParentLastName,
+                    fi.Email AS ParentEmail,
+                    fi.Phone AS ParentPhone,
+                    fi.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -243,8 +267,32 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                LEFT JOIN user_info ui
-                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
+                                LEFT JOIN (
+                    SELECT
+                        ui.UserId AS ContactId,
+                        ui.FamilyId,
+                        ui.FirstName,
+                        ui.LastName,
+                        ui.Email,
+                        ui.Phone,
+                        ui.Relationship
+                    FROM user_info ui
+                    WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        oci.ContactId AS ContactId,
+                        oci.FamilyId,
+                        oci.FirstName,
+                        oci.LastName,
+                        NULL AS Email,
+                        oci.Phone,
+                        oci.Relationship
+                    FROM other_contacts_information oci
+                    WHERE oci.IsActive = 1
+                ) fi
+                    ON fi.FamilyId = sct.FamilyId
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -382,13 +430,13 @@ namespace Courses.Repository.Implementation
             return results;
         }
 
-        // ✅ FIXED: previously had broken SQL and wrong assumption about schema
+        // ? FIXED: previously had broken SQL and wrong assumption about schema
         public async Task<StudentCourseTransactionResponse> GetTransactionByFamilyForCurrentSession(Guid familyId, Guid instituteId)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            // “Current session” is ambiguous; safest interpretation:
+            // �Current session� is ambiguous; safest interpretation:
             // return most recent transaction for this family where enrollments belong to courses under this institute.
             cmd.CommandText = @"
                 SELECT
@@ -423,12 +471,12 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
-                    ui.UserId AS ParentUserId,
-                    ui.FirstName AS ParentFirstName,
-                    ui.LastName AS ParentLastName,
-                    ui.Email AS ParentEmail,
-                    ui.Phone AS ParentPhone,
-                    ui.Relationship AS ParentRelationship,
+                                        fi.ContactId AS ParentUserId,
+                    fi.FirstName AS ParentFirstName,
+                    fi.LastName AS ParentLastName,
+                    fi.Email AS ParentEmail,
+                    fi.Phone AS ParentPhone,
+                    fi.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -440,8 +488,32 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                LEFT JOIN user_info ui
-                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
+                                LEFT JOIN (
+                    SELECT
+                        ui.UserId AS ContactId,
+                        ui.FamilyId,
+                        ui.FirstName,
+                        ui.LastName,
+                        ui.Email,
+                        ui.Phone,
+                        ui.Relationship
+                    FROM user_info ui
+                    WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        oci.ContactId AS ContactId,
+                        oci.FamilyId,
+                        oci.FirstName,
+                        oci.LastName,
+                        NULL AS Email,
+                        oci.Phone,
+                        oci.Relationship
+                    FROM other_contacts_information oci
+                    WHERE oci.IsActive = 1
+                ) fi
+                    ON fi.FamilyId = sct.FamilyId
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
                 WHERE
@@ -500,12 +572,12 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
-                    ui.UserId AS ParentUserId,
-                    ui.FirstName AS ParentFirstName,
-                    ui.LastName AS ParentLastName,
-                    ui.Email AS ParentEmail,
-                    ui.Phone AS ParentPhone,
-                    ui.Relationship AS ParentRelationship,
+                                        fi.ContactId AS ParentUserId,
+                    fi.FirstName AS ParentFirstName,
+                    fi.LastName AS ParentLastName,
+                    fi.Email AS ParentEmail,
+                    fi.Phone AS ParentPhone,
+                    fi.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -517,8 +589,32 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                LEFT JOIN user_info ui
-                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
+                                LEFT JOIN (
+                    SELECT
+                        ui.UserId AS ContactId,
+                        ui.FamilyId,
+                        ui.FirstName,
+                        ui.LastName,
+                        ui.Email,
+                        ui.Phone,
+                        ui.Relationship
+                    FROM user_info ui
+                    WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        oci.ContactId AS ContactId,
+                        oci.FamilyId,
+                        oci.FirstName,
+                        oci.LastName,
+                        NULL AS Email,
+                        oci.Phone,
+                        oci.Relationship
+                    FROM other_contacts_information oci
+                    WHERE oci.IsActive = 1
+                ) fi
+                    ON fi.FamilyId = sct.FamilyId
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -570,12 +666,12 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
-                    ui.UserId AS ParentUserId,
-                    ui.FirstName AS ParentFirstName,
-                    ui.LastName AS ParentLastName,
-                    ui.Email AS ParentEmail,
-                    ui.Phone AS ParentPhone,
-                    ui.Relationship AS ParentRelationship,
+                                        fi.ContactId AS ParentUserId,
+                    fi.FirstName AS ParentFirstName,
+                    fi.LastName AS ParentLastName,
+                    fi.Email AS ParentEmail,
+                    fi.Phone AS ParentPhone,
+                    fi.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -587,8 +683,32 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                LEFT JOIN user_info ui
-                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
+                                LEFT JOIN (
+                    SELECT
+                        ui.UserId AS ContactId,
+                        ui.FamilyId,
+                        ui.FirstName,
+                        ui.LastName,
+                        ui.Email,
+                        ui.Phone,
+                        ui.Relationship
+                    FROM user_info ui
+                    WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        oci.ContactId AS ContactId,
+                        oci.FamilyId,
+                        oci.FirstName,
+                        oci.LastName,
+                        NULL AS Email,
+                        oci.Phone,
+                        oci.Relationship
+                    FROM other_contacts_information oci
+                    WHERE oci.IsActive = 1
+                ) fi
+                    ON fi.FamilyId = sct.FamilyId
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -642,12 +762,12 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
-                    ui.UserId AS ParentUserId,
-                    ui.FirstName AS ParentFirstName,
-                    ui.LastName AS ParentLastName,
-                    ui.Email AS ParentEmail,
-                    ui.Phone AS ParentPhone,
-                    ui.Relationship AS ParentRelationship,
+                                        fi.ContactId AS ParentUserId,
+                    fi.FirstName AS ParentFirstName,
+                    fi.LastName AS ParentLastName,
+                    fi.Email AS ParentEmail,
+                    fi.Phone AS ParentPhone,
+                    fi.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -659,8 +779,32 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                LEFT JOIN user_info ui
-                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
+                                LEFT JOIN (
+                    SELECT
+                        ui.UserId AS ContactId,
+                        ui.FamilyId,
+                        ui.FirstName,
+                        ui.LastName,
+                        ui.Email,
+                        ui.Phone,
+                        ui.Relationship
+                    FROM user_info ui
+                    WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        oci.ContactId AS ContactId,
+                        oci.FamilyId,
+                        oci.FirstName,
+                        oci.LastName,
+                        NULL AS Email,
+                        oci.Phone,
+                        oci.Relationship
+                    FROM other_contacts_information oci
+                    WHERE oci.IsActive = 1
+                ) fi
+                    ON fi.FamilyId = sct.FamilyId
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -714,12 +858,12 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
-                    ui.UserId AS ParentUserId,
-                    ui.FirstName AS ParentFirstName,
-                    ui.LastName AS ParentLastName,
-                    ui.Email AS ParentEmail,
-                    ui.Phone AS ParentPhone,
-                    ui.Relationship AS ParentRelationship,
+                                        fi.ContactId AS ParentUserId,
+                    fi.FirstName AS ParentFirstName,
+                    fi.LastName AS ParentLastName,
+                    fi.Email AS ParentEmail,
+                    fi.Phone AS ParentPhone,
+                    fi.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -731,8 +875,32 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                LEFT JOIN user_info ui
-                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
+                                LEFT JOIN (
+                    SELECT
+                        ui.UserId AS ContactId,
+                        ui.FamilyId,
+                        ui.FirstName,
+                        ui.LastName,
+                        ui.Email,
+                        ui.Phone,
+                        ui.Relationship
+                    FROM user_info ui
+                    WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        oci.ContactId AS ContactId,
+                        oci.FamilyId,
+                        oci.FirstName,
+                        oci.LastName,
+                        NULL AS Email,
+                        oci.Phone,
+                        oci.Relationship
+                    FROM other_contacts_information oci
+                    WHERE oci.IsActive = 1
+                ) fi
+                    ON fi.FamilyId = sct.FamilyId
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -784,12 +952,12 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
-                    ui.UserId AS ParentUserId,
-                    ui.FirstName AS ParentFirstName,
-                    ui.LastName AS ParentLastName,
-                    ui.Email AS ParentEmail,
-                    ui.Phone AS ParentPhone,
-                    ui.Relationship AS ParentRelationship,
+                                        fi.ContactId AS ParentUserId,
+                    fi.FirstName AS ParentFirstName,
+                    fi.LastName AS ParentLastName,
+                    fi.Email AS ParentEmail,
+                    fi.Phone AS ParentPhone,
+                    fi.Relationship AS ParentRelationship,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -801,8 +969,32 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                LEFT JOIN user_info ui
-                    ON ui.FamilyId = sct.FamilyId AND ui.IsActive = b'1'
+                                LEFT JOIN (
+                    SELECT
+                        ui.UserId AS ContactId,
+                        ui.FamilyId,
+                        ui.FirstName,
+                        ui.LastName,
+                        ui.Email,
+                        ui.Phone,
+                        ui.Relationship
+                    FROM user_info ui
+                    WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        oci.ContactId AS ContactId,
+                        oci.FamilyId,
+                        oci.FirstName,
+                        oci.LastName,
+                        NULL AS Email,
+                        oci.Phone,
+                        oci.Relationship
+                    FROM other_contacts_information oci
+                    WHERE oci.IsActive = 1
+                ) fi
+                    ON fi.FamilyId = sct.FamilyId
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -848,7 +1040,7 @@ namespace Courses.Repository.Implementation
 
         private async Task AddEnrollmentsToTransactionInternal(DbConnection conn, DbTransaction dbTx, Guid transactionId, IEnumerable<Guid> enrollmentIds)
         {
-            // 🔥 Extra Safety: verify all enrollment IDs exist to avoid FK error mid-insert
+            // ?? Extra Safety: verify all enrollment IDs exist to avoid FK error mid-insert
             // (If you prefer "fail fast", keep it; if you want silent skip, change behavior.)
             var ids = enrollmentIds.ToList();
             if (ids.Count == 0) return;
@@ -919,7 +1111,7 @@ namespace Courses.Repository.Implementation
             return count == enrollmentIds.Count;
         }
 
-        // ✅ FIXED: correct table relationship (must go through student_course_transaction_enrollment)
+        // ? FIXED: correct table relationship (must go through student_course_transaction_enrollment)
         public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentsForTransaction(Guid transactionId)
         {
             var results = new List<StudentCourseEnrollmentResponse>();
@@ -1015,7 +1207,7 @@ namespace Courses.Repository.Implementation
                 cmd.AddParameter("@FamilyId", familyId.Value.ToByteArray());
             }
 
-            // ✅ FIX: only add paymentCode filter when it is NOT null/empty
+            // ? FIX: only add paymentCode filter when it is NOT null/empty
             if (!string.IsNullOrWhiteSpace(paymentCode))
             {
                 filters.Add("LOWER(sct.PaymentCode) = LOWER(@PaymentCode)");
@@ -1181,7 +1373,7 @@ namespace Courses.Repository.Implementation
 
             var lookup = new Dictionary<Guid, StudentCourseTransactionResponse>();
             var enrollmentIdsByTx = new Dictionary<Guid, HashSet<Guid>>();
-            var familyInfoIdsByTx = new Dictionary<Guid, HashSet<Guid>>();
+            var familyInfoIdsByTx = new Dictionary<Guid, HashSet<string>>();
 
             while (await reader.ReadAsync())
             {
@@ -1216,7 +1408,7 @@ namespace Courses.Repository.Implementation
                     tx.StudentCourseEnrollmentId = enrollmentId;
                     lookup.Add(txId, tx);
                     enrollmentIdsByTx[txId] = new HashSet<Guid>();
-                    familyInfoIdsByTx[txId] = new HashSet<Guid>();
+                    familyInfoIdsByTx[txId] = new HashSet<string>();
                 }
 
                 if (!enrollmentIdsByTx.TryGetValue(txId, out var enrollmentIds))
@@ -1249,13 +1441,17 @@ namespace Courses.Repository.Implementation
                 if (!reader.IsDBNull(ordParentUserId))
                 {
                     var parentUserId = reader.GetGuid(ordParentUserId);
+                    // UNION includes user_info (Email NOT NULL) and other_contacts_information (Email NULL).
+                    // Key by source+id so both contacts are appended even if IDs collide.
+                    var contactSource = reader.IsDBNull(ordParentEmail) ? "other_contact" : "user_info";
+                    var familyInfoKey = $"{contactSource}:{parentUserId:N}";
                     if (!familyInfoIdsByTx.TryGetValue(txId, out var familyInfoIds))
                     {
-                        familyInfoIds = new HashSet<Guid>();
+                        familyInfoIds = new HashSet<string>();
                         familyInfoIdsByTx[txId] = familyInfoIds;
                     }
 
-                    if (familyInfoIds.Add(parentUserId))
+                    if (familyInfoIds.Add(familyInfoKey))
                     {
                         var relationship = (Relationship)reader.GetInt32(ordParentRelationship);
                         tx.FamilyInformation.Add(new FamilyInformationResponse
@@ -1369,3 +1565,4 @@ namespace Courses.Repository.Implementation
         }
     }
 }
+
