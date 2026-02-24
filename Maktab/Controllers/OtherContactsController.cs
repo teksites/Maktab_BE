@@ -63,6 +63,14 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
+        [HttpPost("otherContacts/update")]
+        [EnableCors("corspolicy")]
+        public async Task<OtherContactResponse> UpdateOtherContact(UpdateOtherContact otherContact)
+        {
+            return await _otherContactsService.UpdateOtherContact(otherContact).ConfigureAwait(false);
+        }
+
+        [Authorize]
         [HttpPost("families/{familyId:guid}/otherContacts/delete")]
         [EnableCors("corspolicy")]
         public async Task<bool> DeleteOtherContactByFamilyId(Guid familyId, bool ifHardDelete = false)

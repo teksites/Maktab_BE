@@ -105,19 +105,77 @@ namespace Application.Users.Implementation
                 .ToList();
         }
 
-        Task<OtherContactResponse> UpdateOtherContactResponse(UpdateOtherContact otherContactInformation)
-        {
-            throw new NotImplementedException();
-        }
-
         public async Task<OtherContactResponse> GetOtherContactByPhoneNumber(string phoneNumber)
         {
             return MaptToOtherContactResonse(await _repository.GetOtherContactByPhoneNumber(phoneNumber).ConfigureAwait(false));
         }
 
-        public Task<OtherContactResponse> UpdateOtherContact(UpdateOtherContact otherContactInformation)
+        public async Task<OtherContactResponse> UpdateOtherContact(UpdateOtherContact otherContactInformation)
         {
-            throw new NotImplementedException();
+            if (otherContactInformation == null)
+            {
+                throw new ArgumentNullException(nameof(otherContactInformation));
+            }
+
+            var contactIdProperty = otherContactInformation.GetType().GetProperty("ContactId");
+            if (contactIdProperty == null || contactIdProperty.PropertyType != typeof(Guid))
+            {
+                throw new ArgumentException("Update payload must include ContactId.", nameof(otherContactInformation));
+            }
+
+            var contactId = (Guid)(contactIdProperty.GetValue(otherContactInformation) ?? Guid.Empty);
+            if (contactId == Guid.Empty)
+            {
+                throw new ArgumentException("ContactId is required.", nameof(otherContactInformation));
+            }
+
+            var existing = await _repository.GetOtherContact(contactId).ConfigureAwait(false);
+            if (existing == null)
+            {
+                return null;
+            }
+
+            var merged = new OtherContactInformation
+            {
+                ContactId = existing.ContactId,
+                FamilyId = existing.FamilyId,
+                FirstName = existing.FirstName,
+                LastName = existing.LastName,
+                Phone = existing.Phone,
+                ContactType = existing.ContactType,
+                Relationship = existing.Relationship,
+                IsActive = existing.IsActive,
+                CreatedAt = existing.CreatedAt,
+                UpdatedOn = DateTime.Now
+            };
+
+            var destinationProperties = typeof(OtherContactInformation).GetProperties();
+            foreach (var destination in destinationProperties)
+            {
+                if (destination.Name == nameof(OtherContactInformation.ContactId)
+                    || destination.Name == nameof(OtherContactInformation.CreatedAt)
+                    || destination.Name == nameof(OtherContactInformation.UpdatedOn))
+                {
+                    continue;
+                }
+
+                var source = otherContactInformation.GetType().GetProperty(destination.Name);
+                if (source == null)
+                {
+                    continue;
+                }
+
+                var value = source.GetValue(otherContactInformation);
+                if (value == null)
+                {
+                    continue;
+                }
+
+                destination.SetValue(merged, value);
+            }
+
+            var updated = await _repository.UpdateOtherContact(merged).ConfigureAwait(false);
+            return MaptToOtherContactResonse(updated);
         }
     }
 }

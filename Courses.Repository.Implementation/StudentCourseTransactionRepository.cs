@@ -150,12 +150,14 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.RegistrationNumber AS ChildRegistrationNumber,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
                     fi.Phone AS ParentPhone,
                     fi.Relationship AS ParentRelationship,
+                    fi.ContactType AS ParentContactType,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -175,7 +177,8 @@ namespace Courses.Repository.Implementation
                         ui.LastName,
                         ui.Email,
                         ui.Phone,
-                        ui.Relationship
+                        ui.Relationship,
+                        0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
 
@@ -188,7 +191,8 @@ namespace Courses.Repository.Implementation
                         oci.LastName,
                         NULL AS Email,
                         oci.Phone,
-                        oci.Relationship
+                        oci.Relationship,
+                        oci.ContactType
                     FROM other_contacts_information oci
                     WHERE oci.IsActive = 1
                 ) fi
@@ -250,12 +254,14 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.RegistrationNumber AS ChildRegistrationNumber,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
                     fi.Phone AS ParentPhone,
                     fi.Relationship AS ParentRelationship,
+                    fi.ContactType AS ParentContactType,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -275,7 +281,8 @@ namespace Courses.Repository.Implementation
                         ui.LastName,
                         ui.Email,
                         ui.Phone,
-                        ui.Relationship
+                        ui.Relationship,
+                        0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
 
@@ -288,7 +295,8 @@ namespace Courses.Repository.Implementation
                         oci.LastName,
                         NULL AS Email,
                         oci.Phone,
-                        oci.Relationship
+                        oci.Relationship,
+                        oci.ContactType
                     FROM other_contacts_information oci
                     WHERE oci.IsActive = 1
                 ) fi
@@ -471,12 +479,14 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.RegistrationNumber AS ChildRegistrationNumber,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
                     fi.Phone AS ParentPhone,
                     fi.Relationship AS ParentRelationship,
+                    fi.ContactType AS ParentContactType,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -496,7 +506,8 @@ namespace Courses.Repository.Implementation
                         ui.LastName,
                         ui.Email,
                         ui.Phone,
-                        ui.Relationship
+                        ui.Relationship,
+                        0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
 
@@ -509,7 +520,8 @@ namespace Courses.Repository.Implementation
                         oci.LastName,
                         NULL AS Email,
                         oci.Phone,
-                        oci.Relationship
+                        oci.Relationship,
+                        oci.ContactType
                     FROM other_contacts_information oci
                     WHERE oci.IsActive = 1
                 ) fi
@@ -572,12 +584,14 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.RegistrationNumber AS ChildRegistrationNumber,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
                     fi.Phone AS ParentPhone,
                     fi.Relationship AS ParentRelationship,
+                    fi.ContactType AS ParentContactType,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -597,7 +611,8 @@ namespace Courses.Repository.Implementation
                         ui.LastName,
                         ui.Email,
                         ui.Phone,
-                        ui.Relationship
+                        ui.Relationship,
+                        0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
 
@@ -610,7 +625,8 @@ namespace Courses.Repository.Implementation
                         oci.LastName,
                         NULL AS Email,
                         oci.Phone,
-                        oci.Relationship
+                        oci.Relationship,
+                        oci.ContactType
                     FROM other_contacts_information oci
                     WHERE oci.IsActive = 1
                 ) fi
@@ -666,12 +682,14 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.RegistrationNumber AS ChildRegistrationNumber,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
                     fi.Phone AS ParentPhone,
                     fi.Relationship AS ParentRelationship,
+                    fi.ContactType AS ParentContactType,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -691,7 +709,8 @@ namespace Courses.Repository.Implementation
                         ui.LastName,
                         ui.Email,
                         ui.Phone,
-                        ui.Relationship
+                        ui.Relationship,
+                        0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
 
@@ -704,7 +723,8 @@ namespace Courses.Repository.Implementation
                         oci.LastName,
                         NULL AS Email,
                         oci.Phone,
-                        oci.Relationship
+                        oci.Relationship,
+                        oci.ContactType
                     FROM other_contacts_information oci
                     WHERE oci.IsActive = 1
                 ) fi
@@ -762,12 +782,14 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.RegistrationNumber AS ChildRegistrationNumber,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
                     fi.Phone AS ParentPhone,
                     fi.Relationship AS ParentRelationship,
+                    fi.ContactType AS ParentContactType,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -787,7 +809,8 @@ namespace Courses.Repository.Implementation
                         ui.LastName,
                         ui.Email,
                         ui.Phone,
-                        ui.Relationship
+                        ui.Relationship,
+                        0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
 
@@ -800,7 +823,8 @@ namespace Courses.Repository.Implementation
                         oci.LastName,
                         NULL AS Email,
                         oci.Phone,
-                        oci.Relationship
+                        oci.Relationship,
+                        oci.ContactType
                     FROM other_contacts_information oci
                     WHERE oci.IsActive = 1
                 ) fi
@@ -858,12 +882,14 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.RegistrationNumber AS ChildRegistrationNumber,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
                     fi.Phone AS ParentPhone,
                     fi.Relationship AS ParentRelationship,
+                    fi.ContactType AS ParentContactType,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -883,7 +909,8 @@ namespace Courses.Repository.Implementation
                         ui.LastName,
                         ui.Email,
                         ui.Phone,
-                        ui.Relationship
+                        ui.Relationship,
+                        0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
 
@@ -896,7 +923,8 @@ namespace Courses.Repository.Implementation
                         oci.LastName,
                         NULL AS Email,
                         oci.Phone,
-                        oci.Relationship
+                        oci.Relationship,
+                        oci.ContactType
                     FROM other_contacts_information oci
                     WHERE oci.IsActive = 1
                 ) fi
@@ -952,12 +980,14 @@ namespace Courses.Repository.Implementation
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.RegistrationNumber AS ChildRegistrationNumber,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
                     fi.Phone AS ParentPhone,
                     fi.Relationship AS ParentRelationship,
+                    fi.ContactType AS ParentContactType,
                     crcs.RegistrationFee AS CourseRegistrationFee
 
                 FROM student_course_transaction sct
@@ -977,7 +1007,8 @@ namespace Courses.Repository.Implementation
                         ui.LastName,
                         ui.Email,
                         ui.Phone,
-                        ui.Relationship
+                        ui.Relationship,
+                        0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
 
@@ -990,7 +1021,8 @@ namespace Courses.Repository.Implementation
                         oci.LastName,
                         NULL AS Email,
                         oci.Phone,
-                        oci.Relationship
+                        oci.Relationship,
+                        oci.ContactType
                     FROM other_contacts_information oci
                     WHERE oci.IsActive = 1
                 ) fi
@@ -1363,12 +1395,14 @@ namespace Courses.Repository.Implementation
             var ordGroupTitleFr = reader.GetOrdinal("GroupTitleFr");
             var ordChildFirstName = reader.GetOrdinal("ChildFirstName");
             var ordChildLastName = reader.GetOrdinal("ChildLastName");
+            var ordChildRegistrationNumber = reader.GetOrdinal("ChildRegistrationNumber");
             var ordParentUserId = reader.GetOrdinal("ParentUserId");
             var ordParentFirstName = reader.GetOrdinal("ParentFirstName");
             var ordParentLastName = reader.GetOrdinal("ParentLastName");
             var ordParentEmail = reader.GetOrdinal("ParentEmail");
             var ordParentPhone = reader.GetOrdinal("ParentPhone");
             var ordParentRelationship = reader.GetOrdinal("ParentRelationship");
+            var ordParentContactType = reader.GetOrdinal("ParentContactType");
             var ordCourseRegistrationFee = reader.GetOrdinal("CourseRegistrationFee");
 
             var lookup = new Dictionary<Guid, StudentCourseTransactionResponse>();
@@ -1419,7 +1453,7 @@ namespace Courses.Repository.Implementation
 
                 if (enrollmentIds.Add(enrollmentId))
                 {
-                    tx.Enrollments.Add(new StudentCourseEnrollmentResponse
+                    var enrollmentResponse = new StudentCourseEnrollmentResponse
                     {
                         StudentCourseEnrollmentId = enrollmentId,
                         CourseEnrollmentGroupId = reader.GetGuid(ordGroupId),
@@ -1435,7 +1469,18 @@ namespace Courses.Repository.Implementation
                         EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex),
                         GroupTitle = reader.IsDBNull(ordGroupTitle) ? string.Empty : reader.GetString(ordGroupTitle),
                         GroupTitleFr = reader.IsDBNull(ordGroupTitleFr) ? string.Empty : reader.GetString(ordGroupTitleFr)
-                    });
+                    };
+
+                    var childRegistrationNumberProperty = typeof(StudentCourseEnrollmentResponse).GetProperty("RegistrationNumber");
+                    if (childRegistrationNumberProperty?.CanWrite == true)
+                    {
+                        var childRegistrationNumber = reader.IsDBNull(ordChildRegistrationNumber)
+                            ? string.Empty
+                            : reader.GetString(ordChildRegistrationNumber);
+                        childRegistrationNumberProperty.SetValue(enrollmentResponse, childRegistrationNumber);
+                    }
+
+                    tx.Enrollments.Add(enrollmentResponse);
                 }
 
                 if (!reader.IsDBNull(ordParentUserId))
@@ -1454,13 +1499,14 @@ namespace Courses.Repository.Implementation
                     if (familyInfoIds.Add(familyInfoKey))
                     {
                         var relationship = (Relationship)reader.GetInt32(ordParentRelationship);
+                        var contactType = (ContactType)reader.GetInt32(ordParentContactType);
                         tx.FamilyInformation.Add(new FamilyInformationResponse
                         {
                             Name = $"{reader.GetString(ordParentFirstName)} {reader.GetString(ordParentLastName)}".Trim(),
                             Email = reader.IsDBNull(ordParentEmail) ? string.Empty : reader.GetString(ordParentEmail),
                             Phone = reader.IsDBNull(ordParentPhone) ? string.Empty : reader.GetString(ordParentPhone),
                             RelationshipType = relationship,
-                            RelationshipName = relationship.ToString()
+                            ContactType = contactType
                         });
                     }
                 }
@@ -1565,4 +1611,6 @@ namespace Courses.Repository.Implementation
         }
     }
 }
+
+
 

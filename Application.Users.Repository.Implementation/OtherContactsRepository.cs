@@ -243,9 +243,46 @@ namespace Application.Users.Repository.Implementation
             return results;
         }
 
-        public Task<OtherContactInformation> UpdateOtherContact(OtherContactInformation otherContactInformation)
+        public async Task<OtherContactInformation> UpdateOtherContact(OtherContactInformation otherContactInformation)
         {
-            throw new NotImplementedException("You cannot update the contact. Please delete and add again.");
+            if (otherContactInformation == null)
+            {
+                throw new ArgumentNullException(nameof(otherContactInformation));
+            }
+
+            using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                UPDATE other_contacts_information
+                SET
+                    FamilyId = @familyId,
+                    FirstName = @firstName,
+                    LastName = @lastName,
+                    Phone = @phone,
+                    ContactType = @contactType,
+                    Relationship = @relationship,
+                    IsActive = @isActive,
+                    UpdatedOn = @updatedOn
+                WHERE ContactId = @contactId";
+
+            cmd.AddParameter("@contactId", otherContactInformation.ContactId.ToByteArray());
+            cmd.AddParameter("@familyId", otherContactInformation.FamilyId.ToByteArray());
+            cmd.AddParameter("@firstName", otherContactInformation.FirstName);
+            cmd.AddParameter("@lastName", otherContactInformation.LastName);
+            cmd.AddParameter("@phone", otherContactInformation.Phone);
+            cmd.AddParameter("@contactType", (int)otherContactInformation.ContactType);
+            cmd.AddParameter("@relationship", (int)otherContactInformation.Relationship);
+            cmd.AddParameter("@isActive", otherContactInformation.IsActive);
+            cmd.AddParameter("@updatedOn", otherContactInformation.UpdatedOn);
+
+            var affectedRows = await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            if (affectedRows <= 0)
+            {
+                return null;
+            }
+
+            return await GetOtherContact(otherContactInformation.ContactId).ConfigureAwait(false);
         }
     }
 }

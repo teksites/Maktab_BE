@@ -15,12 +15,16 @@ namespace Application.Users.Repository.Implementation
         public async Task<Child> AddChild(Child child)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"INSERT INTO child_information 
-                (ChildId, FamilyId, FirstName, LastName, OtherHealthConditions, Allergies, AcedemicGroupType, DateOfBirth, Gender, RAMQExpiry, RAMQNumber, RAMQSequenceNumber, IsActive, CreatedAt, UpdatedOn)
+                (ChildId, FamilyId, FirstName, LastName, OtherHealthConditions, Allergies, AcedemicGroupType, DateOfBirth, Gender, RAMQExpiry, RAMQNumber, RAMQSequenceNumber, IsActive, CreatedAt, UpdatedOn, RegistrationNumber)
                 VALUES 
-                (@ChildId, @FamilyId, @FirstName, @LastName, @OtherHealthConditions, @Allergies, @AcedemicGroupType, @DateOfBirth, @Gender, @RAMQExpiry, @RAMQNumber, @RAMQSequenceNumber, @IsActive, @CreatedAt, @UpdatedOn)";
+                (@ChildId, @FamilyId, @FirstName, @LastName, @OtherHealthConditions, @Allergies, @AcedemicGroupType, @DateOfBirth, @Gender, @RAMQExpiry, @RAMQNumber, @RAMQSequenceNumber, @IsActive, @CreatedAt, @UpdatedOn, @RegistrationNumber)";
+            cmd.Transaction = tx;
+
+            child.RegistrationNumber = await GetNextRegistrationNumber(conn, tx).ConfigureAwait(false);
 
             cmd.AddParameter("@ChildId", child.ChildId.ToByteArray());
             cmd.AddParameter("@FamilyId", child.FamilyId.ToByteArray());
@@ -37,9 +41,17 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@IsActive", child.IsActive);
             cmd.AddParameter("@CreatedAt", child.CreatedAt);
             cmd.AddParameter("@UpdatedOn", child.UpdatedOn);
+            cmd.AddParameter("@RegistrationNumber", child.RegistrationNumber);
 
             var rows = await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-            return rows > 0 ? child : null;
+            if (rows > 0)
+            {
+                await tx.CommitAsync().ConfigureAwait(false);
+                return child;
+            }
+
+            await tx.RollbackAsync().ConfigureAwait(false);
+            return null;
         }
 
         public async Task<Child> UpdateChild(UpdateChildRequest child)
@@ -174,7 +186,41 @@ namespace Application.Users.Repository.Implementation
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn"),
+                RegistrationNumber = GetRegistrationNumber(reader),
             };
+        }
+
+        private static string GetRegistrationNumber(DbDataReader reader)
+        {
+            var ordinal = reader.GetOrdinal("RegistrationNumber");
+            return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
+        }
+
+        private async Task<string> GetNextRegistrationNumber(DbConnection conn, DbTransaction tx)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = @"
+                SELECT RegistrationNumber
+                FROM child_information
+                WHERE RegistrationNumber IS NOT NULL
+                  AND RegistrationNumber <> ''
+                  AND RegistrationNumber REGEXP '^[0-9]+(\\.[0-9]+)?$'
+                ORDER BY CAST(SUBSTRING_INDEX(RegistrationNumber, '.', 1) AS UNSIGNED) DESC
+                LIMIT 1
+                FOR UPDATE;";
+
+            var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
+            if (result == null || result == DBNull.Value)
+            {
+                return "1";
+            }
+
+            var current = Convert.ToString(result);
+            var integerPart = (current ?? string.Empty).Split('.')[0];
+            return long.TryParse(integerPart, out var currentValue)
+                ? (currentValue + 1L).ToString()
+                : "1";
         }
     }
 }

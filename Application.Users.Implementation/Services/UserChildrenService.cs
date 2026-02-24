@@ -140,6 +140,12 @@ namespace Application.Users.Implementation
                 AcedemicGroup = child.AcedemicGroup,
             };
 
+            var registrationNumberProperty = typeof(ChildResponse).GetProperty("RegistrationNumber");
+            if (registrationNumberProperty?.CanWrite == true)
+            {
+                registrationNumberProperty.SetValue(response, child.RegistrationNumber);
+            }
+
             return new MaktabApiResult<ChildResponse>
             {
                 Result = response,

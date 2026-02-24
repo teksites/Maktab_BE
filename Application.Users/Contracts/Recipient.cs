@@ -19,5 +19,6 @@ namespace Application.Users.Contracts
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedOn { get; set; }
         public AcedemicGroupType AcedemicGroup { get; set; } = AcedemicGroupType.None;
+        public string RegistrationNumber { get; set; } = string.Empty;
     }
 }
