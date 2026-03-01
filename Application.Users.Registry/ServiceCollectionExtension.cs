@@ -17,6 +17,7 @@ namespace Application.Users.Registry
             services.AddScoped<IUserLoginService, UserLoginService>();
             services.AddScoped<IUserLoginRepository, UserLoginRepository>();
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IDataAccessVerificationService, DataAccessVerificationService>();
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<ITempUserRepository, TempUserRepository>();
             services.AddScoped<IOtherContactsService, OtherContactsService>();

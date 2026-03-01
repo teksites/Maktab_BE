@@ -11,8 +11,9 @@ using Users.Services;
 
 namespace Maktab.Attributes
 {
-    public class ApiAuthorizeAttribute : Attribute, IAsyncAuthorizationFilter
+    public class ApiAuthorizeAttribute : Attribute, IAsyncAuthorizationFilter, IAsyncActionFilter
     {
+        private const string SessionAccessContextKey = "ApiAuthorize.SessionAccessContext";
         private readonly bool _allowTempUser;
         private readonly bool _ignoreHeaderCheck;
         private readonly UserRoleType _requiredRole;
@@ -80,8 +81,8 @@ namespace Maktab.Attributes
             }
 
             var userService = context.HttpContext.RequestServices.GetService<IUserService>();
-            var loginSvc = context.HttpContext.RequestServices.GetService<IUserLoginService>();
-            if (userService == null || loginSvc == null)
+            var dataAccessVerificationService = context.HttpContext.RequestServices.GetService<IDataAccessVerificationService>();
+            if (userService == null || dataAccessVerificationService == null)
             {
                 context.Result = new StatusCodeResult(500);
                 return;
@@ -94,24 +95,56 @@ namespace Maktab.Attributes
                 return;
             }
 
-            // Get userId and roles
-            var userId = await loginSvc.GetUserBySessionId(sessionId);
-            if (userId == Guid.Empty)
+            var sessionAccessContext = await dataAccessVerificationService.GetSessionAccessContext(sessionId).ConfigureAwait(false);
+            if (sessionAccessContext == null || sessionAccessContext.UserId == Guid.Empty)
             {
                 context.Result = CreateForbiddenResult("Access Denied: invalid session");
                 return;
             }
 
-            var userRoles = await userService.GetUserRoles(userId);
-
             // Check role hierarchy
-            if (!HasRequiredRole(userRoles, _requiredRole))
+            if (!HasRequiredRole(sessionAccessContext.UserRoles, _requiredRole))
             {
                 context.Result = CreateForbiddenResult("Access Denied: insufficient privileges");
                 return;
             }
 
-            // If all checks pass, allow access
+            context.HttpContext.Items[SessionAccessContextKey] = sessionAccessContext;
+        }
+
+        public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+        {
+            if (_ignoreHeaderCheck || _allowTempUser)
+            {
+                await next().ConfigureAwait(false);
+                return;
+            }
+
+            var dataAccessVerificationService = context.HttpContext.RequestServices.GetService<IDataAccessVerificationService>();
+            if (dataAccessVerificationService == null)
+            {
+                context.Result = new StatusCodeResult(500);
+                return;
+            }
+
+            if (!context.HttpContext.Items.TryGetValue(SessionAccessContextKey, out var sessionAccessContextObject)
+                || sessionAccessContextObject is not SessionAccessContext sessionAccessContext)
+            {
+                context.Result = CreateForbiddenResult("Access Denied: session context not found");
+                return;
+            }
+
+            var verificationResult = dataAccessVerificationService.VerifyOwnership(
+                sessionAccessContext,
+                context.ActionArguments.ToDictionary(entry => entry.Key, entry => entry.Value));
+
+            if (!verificationResult.IsAllowed)
+            {
+                context.Result = CreateForbiddenResult(verificationResult.FailureMessage);
+                return;
+            }
+
+            await next().ConfigureAwait(false);
         }
 
         private bool HasRequiredRole(UserRoleType userRoles, UserRoleType requiredRole)

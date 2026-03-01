@@ -1411,8 +1411,8 @@ namespace Courses.Repository.Implementation
 
             while (await reader.ReadAsync())
             {
-                var txId = reader.GetGuid(ordTxId);
-                var enrollmentId = reader.GetGuid(ordEnrollmentId);
+                var txId = reader.GetGuidFromByteArray(ordTxId);
+                var enrollmentId = reader.GetGuidFromByteArray(ordEnrollmentId);
                 var childName = $"{reader.GetString(ordChildFirstName)} {reader.GetString(ordChildLastName)}".Trim();
 
                 if (!lookup.TryGetValue(txId, out var tx))
@@ -1420,7 +1420,7 @@ namespace Courses.Repository.Implementation
                     tx = new StudentCourseTransactionResponse
                     {
                         StudentCourseTransactionId = txId,
-                        FamilyId = reader.GetGuid(ordTxFamilyId),
+                        FamilyId = reader.GetGuidFromByteArray(ordTxFamilyId),
                         PayableFee = reader.GetDecimal(ordPayableFee),
                         DayCareFee = reader.GetDecimal(ordDayCareFee),
                         DayCareDiscount = Convert.ToDecimal(reader.GetInt32(ordDayCareDiscount)),
@@ -1456,10 +1456,10 @@ namespace Courses.Repository.Implementation
                     var enrollmentResponse = new StudentCourseEnrollmentResponse
                     {
                         StudentCourseEnrollmentId = enrollmentId,
-                        CourseEnrollmentGroupId = reader.GetGuid(ordGroupId),
-                        CourseId = reader.GetGuid(ordCourseId),
-                        FamilyId = reader.GetGuid(ordEnrollmentFamilyId),
-                        ChildId = reader.GetGuid(ordChildId),
+                        CourseEnrollmentGroupId = reader.GetGuidFromByteArray(ordGroupId),
+                        CourseId = reader.GetGuidFromByteArray(ordCourseId),
+                        FamilyId = reader.GetGuidFromByteArray(ordEnrollmentFamilyId),
+                        ChildId = reader.GetGuidFromByteArray(ordChildId),
                         ChildName = childName,
                         IsActive = reader.GetBoolean(ordEnrollmentIsActive),
                         WillUseDayCare = reader.GetBoolean(ordWillUseDayCare),
@@ -1485,7 +1485,7 @@ namespace Courses.Repository.Implementation
 
                 if (!reader.IsDBNull(ordParentUserId))
                 {
-                    var parentUserId = reader.GetGuid(ordParentUserId);
+                    var parentUserId = reader.GetGuidFromByteArray(ordParentUserId);
                     // UNION includes user_info (Email NOT NULL) and other_contacts_information (Email NULL).
                     // Key by source+id so both contacts are appended even if IDs collide.
                     var contactSource = reader.IsDBNull(ordParentEmail) ? "other_contact" : "user_info";
