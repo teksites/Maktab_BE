@@ -14,7 +14,6 @@ using MaktabDataContracts.Responses.Addresses;
 
 [Route("api/student-course-enrollments")]
 [ApiController]
-[ApiAuthorize]
 [EnableCors("corspolicy")]
 public class StudentCourseEnrollmentController : ControllerBase
 {
@@ -25,22 +24,27 @@ public class StudentCourseEnrollmentController : ControllerBase
         _service = service;
     }
 
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
     [HttpGet("course/{courseId:guid}")]
     public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollments(Guid courseId)
         => await _service.GetAllEnrollments(courseId);
 
+    [ApiAuthorize]
     [HttpGet("recalculate-fee/family/{familyId:guid}/course/{courseId:guid}")]
     public async Task<bool> RecalculateCourseFee(Guid courseId, Guid familyId)
         => await _service.RecalculateCourseFee(courseId, familyId);
 
+    [ApiAuthorize]
     [HttpGet("{enrollmentId:guid}")]
     public async Task<StudentCourseEnrollmentResponse> GetEnrollment(Guid enrollmentId)
         => await _service.GetEnrollment(enrollmentId);
 
+    [ApiAuthorize]
     [HttpGet("family/{familyId:guid}")]
     public async Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentByFamily(Guid familyId)
         => await _service.GetEnrollmentByFamily(familyId);
 
+    [ApiAuthorize]
     [HttpPost]
     public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment)
     { 

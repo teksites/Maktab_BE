@@ -43,7 +43,7 @@ public class InstituteController : ControllerBase
     public async Task<bool> UpdateInstitute(Guid instituteId, AddInstitute institute)
         => await _instituteService.UpdateInstitute(instituteId, institute);
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
+    [ApiAuthorize(false, false, UserRoleType.Admin)]
     [HttpDelete("{instituteId:guid}")]
     public async Task<bool> DeleteInstitute(Guid instituteId, bool hardDelete = false)
         => await _instituteService.DeleteInstitute(instituteId, hardDelete);

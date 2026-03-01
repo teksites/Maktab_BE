@@ -7,10 +7,11 @@ using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System;
+using MaktabDataContracts.Enums;
 
 [Route("api/course-payments")]
 [ApiController]
-[ApiAuthorize]
+[ApiAuthorize(false, false, UserRoleType.Admin)]
 [EnableCors("corspolicy")]
 public class CoursePaymentController : ControllerBase
 {
