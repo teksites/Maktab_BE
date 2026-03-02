@@ -264,6 +264,67 @@ namespace Application.Users.Repository.Implementation
             }
             return results;
         }
+
+        public async Task<IEnumerable<UserInformation>> GetAllFamilyTempUsersInformation(Guid familyId, bool ifOnlyActive = true)
+        {
+            var results = new List<UserInformation>();
+
+            using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, isTempPassword, Relationship, UserRole, FamilyId from temp_user_info where FamilyId = @familyId";
+                    cmd.AddParameter("@familyId", familyId.ToByteArray());
+
+                    if (ifOnlyActive)
+                    {
+                        cmd.CommandText += " and IsActive = True";
+                    }
+
+                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+
+                    while (await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        var userId = reader.GetGuidFromByteArray(0);
+                        var fristName = reader.GetString(1);
+                        var lastName = reader.GetString(2);
+                        var email = reader.GetString(3);
+                        var phone = reader.GetString(4);
+                        var userName = reader.GetString(5);
+                        var password = reader.GetString(6);
+                        var isActive = reader.GetBoolean(7);
+                        var createdAt = reader.GetDateTime(8);
+                        var updatedOn = reader.GetDateTime(9);
+                        var isTempPassword = reader.GetBoolean(10);
+                        var relationship = (Relationship)reader.GetInt32(11);
+                        var userRole = (UserRoleType)reader.GetInt32(12);
+                        var tempFamilyId = reader.GetGuidFromByteArray(13);
+
+                        results.Add(new UserInformation
+                        {
+                            UserId = userId,
+                            FamilyId = tempFamilyId,
+                            FirstName = fristName,
+                            LastName = lastName,
+                            Email = email,
+                            Phone = phone,
+                            Password = password,
+                            UserName = userName,
+                            IsActive = isActive,
+                            CreatedAt = createdAt,
+                            UpdatedOn = updatedOn,
+                            IsAdmin = false,
+                            IsTempPassword = isTempPassword,
+                            Relationship = relationship,
+                            UserRole = userRole
+                        });
+                    }
+                }
+            }
+
+            return results;
+        }
+
         public async Task<UserInformation> GetTempUserInformation(string userName, string password)
         {
             using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))

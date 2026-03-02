@@ -371,10 +371,9 @@ namespace Application.Users.Implementation
 
         public async Task<IEnumerable<UserInformationResponse>> GetAllFamilyUsersInformation(Guid familyId, bool ifOnlyActive = true)
         {
-            var users = (await _repository.GetAllFamilyUsersInformation(familyId, ifOnlyActive).ConfigureAwait(false)).
-               Select(user => MapToUserInformationResponse(user, false)).ToList();
-
-            return users;
+            return (await _repository.GetAllFamilyUsersInformation(familyId, ifOnlyActive).ConfigureAwait(false))
+                .Select(user => MapToUserInformationResponse(user, user.IfTempUser))
+                .ToList();
         }
 
         public async Task<UserInformationResponse> LinkUserToAFamily(Guid userId, Guid familyId)

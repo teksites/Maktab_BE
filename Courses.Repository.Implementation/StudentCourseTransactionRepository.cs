@@ -185,6 +185,20 @@ namespace Courses.Repository.Implementation
                     UNION ALL
 
                     SELECT
+                        tui.UserId AS ContactId,
+                        tui.FamilyId,
+                        tui.FirstName,
+                        tui.LastName,
+                        tui.Email,
+                        tui.Phone,
+                        tui.Relationship,
+                        0 AS ContactType
+                    FROM temp_user_info tui
+                    WHERE tui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
                         oci.ContactId AS ContactId,
                         oci.FamilyId,
                         oci.FirstName,
@@ -285,6 +299,20 @@ namespace Courses.Repository.Implementation
                         0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        tui.UserId AS ContactId,
+                        tui.FamilyId,
+                        tui.FirstName,
+                        tui.LastName,
+                        tui.Email,
+                        tui.Phone,
+                        tui.Relationship,
+                        0 AS ContactType
+                    FROM temp_user_info tui
+                    WHERE tui.IsActive = b'1'
 
                     UNION ALL
 
@@ -514,6 +542,20 @@ namespace Courses.Repository.Implementation
                     UNION ALL
 
                     SELECT
+                        tui.UserId AS ContactId,
+                        tui.FamilyId,
+                        tui.FirstName,
+                        tui.LastName,
+                        tui.Email,
+                        tui.Phone,
+                        tui.Relationship,
+                        0 AS ContactType
+                    FROM temp_user_info tui
+                    WHERE tui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
                         oci.ContactId AS ContactId,
                         oci.FamilyId,
                         oci.FirstName,
@@ -619,6 +661,20 @@ namespace Courses.Repository.Implementation
                     UNION ALL
 
                     SELECT
+                        tui.UserId AS ContactId,
+                        tui.FamilyId,
+                        tui.FirstName,
+                        tui.LastName,
+                        tui.Email,
+                        tui.Phone,
+                        tui.Relationship,
+                        0 AS ContactType
+                    FROM temp_user_info tui
+                    WHERE tui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
                         oci.ContactId AS ContactId,
                         oci.FamilyId,
                         oci.FirstName,
@@ -713,6 +769,20 @@ namespace Courses.Repository.Implementation
                         0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        tui.UserId AS ContactId,
+                        tui.FamilyId,
+                        tui.FirstName,
+                        tui.LastName,
+                        tui.Email,
+                        tui.Phone,
+                        tui.Relationship,
+                        0 AS ContactType
+                    FROM temp_user_info tui
+                    WHERE tui.IsActive = b'1'
 
                     UNION ALL
 
@@ -817,6 +887,20 @@ namespace Courses.Repository.Implementation
                     UNION ALL
 
                     SELECT
+                        tui.UserId AS ContactId,
+                        tui.FamilyId,
+                        tui.FirstName,
+                        tui.LastName,
+                        tui.Email,
+                        tui.Phone,
+                        tui.Relationship,
+                        0 AS ContactType
+                    FROM temp_user_info tui
+                    WHERE tui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
                         oci.ContactId AS ContactId,
                         oci.FamilyId,
                         oci.FirstName,
@@ -917,6 +1001,20 @@ namespace Courses.Repository.Implementation
                     UNION ALL
 
                     SELECT
+                        tui.UserId AS ContactId,
+                        tui.FamilyId,
+                        tui.FirstName,
+                        tui.LastName,
+                        tui.Email,
+                        tui.Phone,
+                        tui.Relationship,
+                        0 AS ContactType
+                    FROM temp_user_info tui
+                    WHERE tui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
                         oci.ContactId AS ContactId,
                         oci.FamilyId,
                         oci.FirstName,
@@ -1011,6 +1109,20 @@ namespace Courses.Repository.Implementation
                         0 AS ContactType
                     FROM user_info ui
                     WHERE ui.IsActive = b'1'
+
+                    UNION ALL
+
+                    SELECT
+                        tui.UserId AS ContactId,
+                        tui.FamilyId,
+                        tui.FirstName,
+                        tui.LastName,
+                        tui.Email,
+                        tui.Phone,
+                        tui.Relationship,
+                        0 AS ContactType
+                    FROM temp_user_info tui
+                    WHERE tui.IsActive = b'1'
 
                     UNION ALL
 
@@ -1483,31 +1595,46 @@ namespace Courses.Repository.Implementation
                     tx.Enrollments.Add(enrollmentResponse);
                 }
 
-                if (!reader.IsDBNull(ordParentUserId))
+                var hasParentData =
+                    !reader.IsDBNull(ordParentUserId) ||
+                    !reader.IsDBNull(ordParentFirstName) ||
+                    !reader.IsDBNull(ordParentLastName) ||
+                    !reader.IsDBNull(ordParentEmail) ||
+                    !reader.IsDBNull(ordParentPhone);
+
+                if (hasParentData)
                 {
-                    var parentUserId = reader.GetGuidFromByteArray(ordParentUserId);
-                    // UNION includes user_info (Email NOT NULL) and other_contacts_information (Email NULL).
-                    // Key by source+id so both contacts are appended even if IDs collide.
-                    var contactSource = reader.IsDBNull(ordParentEmail) ? "other_contact" : "user_info";
-                    var familyInfoKey = $"{contactSource}:{parentUserId:N}";
+                    var firstName = reader.IsDBNull(ordParentFirstName) ? string.Empty : reader.GetString(ordParentFirstName);
+                    var lastName = reader.IsDBNull(ordParentLastName) ? string.Empty : reader.GetString(ordParentLastName);
+                    var email = reader.IsDBNull(ordParentEmail) ? string.Empty : reader.GetString(ordParentEmail);
+                    var phone = reader.IsDBNull(ordParentPhone) ? string.Empty : reader.GetString(ordParentPhone);
+                    var relationship = (Relationship)reader.GetInt32(ordParentRelationship);
+                    var contactType = (ContactType)reader.GetInt32(ordParentContactType);
+
+                    // Prefer the contact id when present, but fall back to the rest of the row so
+                    // valid parent rows are not dropped when the joined id is null or collides.
+                    var familyInfoKey = !reader.IsDBNull(ordParentUserId)
+                        ? $"{reader.GetGuidFromByteArray(ordParentUserId):N}:{(int)relationship}:{(int)contactType}"
+                        : $"{firstName}|{lastName}|{email}|{phone}|{(int)relationship}|{(int)contactType}";
+
                     if (!familyInfoIdsByTx.TryGetValue(txId, out var familyInfoIds))
                     {
-                        familyInfoIds = new HashSet<string>();
+                        familyInfoIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                         familyInfoIdsByTx[txId] = familyInfoIds;
                     }
 
                     if (familyInfoIds.Add(familyInfoKey))
                     {
-                        var relationship = (Relationship)reader.GetInt32(ordParentRelationship);
-                        var contactType = (ContactType)reader.GetInt32(ordParentContactType);
-                        tx.FamilyInformation.Add(new FamilyInformationResponse
+                        var familyInformation = new FamilyInformationResponse
                         {
-                            Name = $"{reader.GetString(ordParentFirstName)} {reader.GetString(ordParentLastName)}".Trim(),
-                            Email = reader.IsDBNull(ordParentEmail) ? string.Empty : reader.GetString(ordParentEmail),
-                            Phone = reader.IsDBNull(ordParentPhone) ? string.Empty : reader.GetString(ordParentPhone),
+                            Name = $"{firstName} {lastName}".Trim(),
+                            Email = email,
+                            Phone = phone,
                             RelationshipType = relationship,
                             ContactType = contactType
-                        });
+                        };
+
+                        tx.FamilyInformation.Add(familyInformation);
                     }
                 }
             }

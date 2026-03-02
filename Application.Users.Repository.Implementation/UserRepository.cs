@@ -252,10 +252,10 @@ SELECT
     IsTempPassword,
     FamilyId,
     Relationship,
-    UserRole
+    UserRole,
+    IfTempUser
 FROM
 (
-    -- Permanent user table
     SELECT
         ui.UserId,
         ui.FirstName,
@@ -271,13 +271,13 @@ FROM
         ui.IsTempPassword,
         ui.FamilyId,
         ui.Relationship,
-        ui.UserRole
+        ui.UserRole,
+        0 AS IfTempUser
     FROM user_info ui
     WHERE ui.FamilyId = @familyId
 
     UNION ALL
 
-    -- Temp user table
     SELECT
         tui.UserId,
         tui.FirstName,
@@ -289,19 +289,18 @@ FROM
         tui.IsActive,
         tui.CreatedAt,
         tui.UpdatedOn,
-        0 AS IsAdmin,   -- temp users do not have admin flag
+        0 AS IsAdmin,
         tui.IsTempPassword,
         tui.FamilyId,
         tui.Relationship,
-        tui.UserRole
+        tui.UserRole,
+        1 AS IfTempUser
     FROM temp_user_info tui
     WHERE tui.FamilyId = @familyId
-) u
-";
+) u";
 
                 cmd.AddParameter("@familyId", id.ToByteArray());
 
-                // Apply IsActive filter only if requested
                 if (ifOnlyActive)
                     cmd.CommandText += " WHERE u.IsActive = 1";
 
@@ -325,7 +324,8 @@ FROM
                         IsTempPassword = reader.GetBoolean(11),
                         FamilyId = reader.GetGuidFromByteArray(12),
                         Relationship = (Relationship)reader.GetInt32(13),
-                        UserRole = (UserRoleType)reader.GetInt32(14)
+                        UserRole = (UserRoleType)reader.GetInt32(14),
+                        IfTempUser = reader.GetBoolean(15)
                     });
                 }
             }

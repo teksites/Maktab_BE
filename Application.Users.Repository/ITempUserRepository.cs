@@ -13,6 +13,7 @@ namespace Users.Repository
         Task<bool> CheckIfTempUserAlreadyRegistered(string email, string phone);
         Task<UserInformation> UpdateRegistrationActivationCodes(UpdateUserRegistrationInformation updateData);
         Task<IEnumerable<UserInformation>> GetAllTempUsersInformation(bool ifOnlyActive = true);
+        Task<IEnumerable<UserInformation>> GetAllFamilyTempUsersInformation(Guid familyId, bool ifOnlyActive = true);
         Task<UserInformation> GetTempUserInformation(string userName, string password);
     }
 }
