@@ -18,7 +18,7 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [ApiAuthorize(false, false, UserRoleType.Admin|UserRoleType.SuperUser|UserRoleType.SchoolAdmin|UserRoleType.SchoolSupervoiser)]
+        [ApiAuthorize(false, false, UserRoleType.Admin|UserRoleType.SuperUser|UserRoleType.SchoolAdmin|UserRoleType.SchoolSupervisor)]
         [HttpPost("appstate/set")]
         public IActionResult Set(string key, string value)
         {
@@ -27,7 +27,7 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
+        [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
         [HttpGet("appstate/get")]
         public IActionResult Get(string key)
         {
@@ -36,7 +36,7 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
-        [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
+        [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
         [HttpGet("appstate/all")]
         public IActionResult GetAll()
         {

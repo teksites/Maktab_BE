@@ -154,7 +154,7 @@ namespace Maktab.Attributes
             int roleHierarchy(UserRoleType role) => role switch
             {
                 UserRoleType.Normal => 1,
-                UserRoleType.SchoolSupervoiser => 2,
+                UserRoleType.SchoolSupervisor => 2,
                 UserRoleType.SchoolAdmin => 3,
                 UserRoleType.SuperUser => 4,
                 UserRoleType.Admin => 5,
@@ -163,7 +163,7 @@ namespace Maktab.Attributes
 
             int maxUserRoleLevel = Enum.GetValues(typeof(UserRoleType))
                 .Cast<UserRoleType>()
-                .Where(r => r != UserRoleType.Unknown && userRoles.HasFlag(r))
+                .Where(r => r != UserRoleType.None && userRoles.HasFlag(r))
                 .Select(r => roleHierarchy(r))
                 .DefaultIfEmpty(0)
                 .Max();

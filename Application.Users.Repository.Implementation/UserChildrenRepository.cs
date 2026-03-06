@@ -32,7 +32,7 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@LastName", child.LastName);
             cmd.AddParameter("@OtherHealthConditions", child.OtherHealthConditions);
             cmd.AddParameter("@Allergies", child.Allergies);
-            cmd.AddParameter("@AcedemicGroupType", (byte)child.AcedemicGroup);
+            cmd.AddParameter("@AcedemicGroupType", (int)child.AcedemicGroup);
             cmd.AddParameter("@DateOfBirth", child.DateOfBirth);
             cmd.AddParameter("@Gender", (int)child.Gender);
             cmd.AddParameter("@RAMQExpiry", child.RAMQExpiry);
@@ -78,7 +78,7 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@LastName", child.LastName);
             cmd.AddParameter("@OtherHealthConditions", child.OtherHealthConditions);
             cmd.AddParameter("@Allergies", child.Allergies);
-            cmd.AddParameter("@AcedemicGroupType", (byte)child.AcedemicGroup);
+            cmd.AddParameter("@AcedemicGroupType", (int)child.AcedemicGroup);
             cmd.AddParameter("@DateOfBirth", child.DateOfBirth);
             cmd.AddParameter("@Gender", (int)child.Gender);
             cmd.AddParameter("@RAMQExpiry", child.RAMQExpiry);

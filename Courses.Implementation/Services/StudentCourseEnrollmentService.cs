@@ -183,8 +183,8 @@ namespace Courses.Implementation.Services
             var isActive = familyTransaction.IsActive;
             var totalAmountPaid = familyTransaction.TotalAmountPaid;
 
-            float dayCareFee = 0;
-            float courseFee = 0;
+            decimal dayCareFee = 0m;
+            decimal courseFee = 0m;
 
             var groupedByChild = familyTransaction.Enrollments
             .GroupBy(e => e.ChildId)
@@ -208,8 +208,9 @@ namespace Courses.Implementation.Services
                     policyFound = false;
                 }
                 else
-                { 
-                var discountPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == InstutePolicyType.SiblingDiscount).Details;
+                {
+                    var activeSiblingPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == InstutePolicyType.SiblingDiscount);
+                    var discountPolicy = activeSiblingPolicy?.Details;
                     if (!string.IsNullOrEmpty(discountPolicy))
                     {
                         try
@@ -225,25 +226,25 @@ namespace Courses.Implementation.Services
                 }
             }
 
-            float applicalbeDscountPercentage = 1;
+            decimal applicableDiscountPercentage = 1m;
 
             foreach (var childGroup in groupedByChild)
             {
                 var enrollments = childGroup.Enrollments;
-                float childFee = 0;
-                float childDayCareFee = 0;
+                decimal childFee = 0m;
+                decimal childDayCareFee = 0m;
 
                 if (i == 2 && policyFound)// we have multiple children
                 {
-                    applicalbeDscountPercentage = (float) policy.SecondChildFee / 100;
+                    applicableDiscountPercentage = policy.SecondChildFee / 100m;
                 }
-                else if (i > 2 && policyFound)// we have multiple children
+                else if (i == 3 && policyFound)// we have multiple children
                 {
-                    applicalbeDscountPercentage = (float) policy.ThirdChildFee / 100;
+                    applicableDiscountPercentage = policy.ThirdChildFee / 100m;
                 }
                 else if (i > 3 && policyFound)// we have multiple children
                 {
-                    applicalbeDscountPercentage = (float)policy.FourthAndOnwardChildFee / 100;
+                    applicableDiscountPercentage = policy.FourthAndOnwardChildFee / 100m;
                 }
 
                 foreach (var enrollment in enrollments)
@@ -252,8 +253,8 @@ namespace Courses.Implementation.Services
 
                     if (enrollmentGroup != null)
                     {
-                        childFee += (enrollmentGroup.Fee * applicalbeDscountPercentage);
-                        childDayCareFee += enrollment.WillUseDayCare ? enrollmentGroup.DayCareFee : 0;
+                        childFee += (Convert.ToDecimal(enrollmentGroup.Fee) * applicableDiscountPercentage);
+                        childDayCareFee += enrollment.WillUseDayCare ? Convert.ToDecimal(enrollmentGroup.DayCareFee) : 0m;
                     }
                 }
 
@@ -270,13 +271,14 @@ namespace Courses.Implementation.Services
             addStudentCourseTransaction.IsActive = familyTransaction.IsActive;
             addStudentCourseTransaction.FeeAmountDiscount = familyTransaction.FeeAmountDiscount;
             addStudentCourseTransaction.DayCareDiscount = familyTransaction.DayCareDiscount;
-            addStudentCourseTransaction.DayCareFee = (decimal)dayCareFee;
-            addStudentCourseTransaction.PayableFee = (decimal)courseFee;
+            addStudentCourseTransaction.DayCareFee = dayCareFee;
+            addStudentCourseTransaction.PayableFee = courseFee;
             addStudentCourseTransaction.TotalAmountPaid = familyTransaction.TotalAmountPaid;
-            addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
-                (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount + addStudentCourseTransaction.TotalAmountPaid);
+            var recalculatedTotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
+                (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
+            addStudentCourseTransaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable;
             addStudentCourseTransaction.Comments = familyTransaction.Comments +$"\n Updated the transaction on {DateTime.UtcNow.ToString()}";
-            addStudentCourseTransaction.IsCompletelyPaid = addStudentCourseTransaction.TotalAmountPaid < addStudentCourseTransaction.TotalPayable;
+            addStudentCourseTransaction.IsCompletelyPaid = addStudentCourseTransaction.TotalPayable <= addStudentCourseTransaction.TotalAmountPaid;
 
             return await _studentCourseTransactionService.UpdateTransaction(familyTransaction.StudentCourseTransactionId, addStudentCourseTransaction).ConfigureAwait(false);
         }

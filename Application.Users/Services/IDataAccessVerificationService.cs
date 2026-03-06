@@ -17,7 +17,7 @@ namespace Users.Services
         public Guid SessionId { get; set; }
         public Guid UserId { get; set; }
         public Guid FamilyId { get; set; }
-        public UserRoleType UserRoles { get; set; } = UserRoleType.Unknown;
+        public UserRoleType UserRoles { get; set; } = UserRoleType.None;
     }
 
     public class DataAccessVerificationResult

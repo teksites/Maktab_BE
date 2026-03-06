@@ -72,17 +72,33 @@ namespace Application.Users.Implementation
 
         public async Task<ExtendedUserInformationResponse> AddExtendedUserInformation(AddExtendedUserInformationInternal userInformation)
         {
-            var existingInfo = await _repository.GetFamilyExtendedUserInformation(userInformation.FamilyId).ConfigureAwait(false);
-            //User existingUserInfo = null; 
-            // reset existing rl24 info to false
+            var existingFamilyInfo = await _repository.GetFamilyExtendedUserInformation(userInformation.FamilyId).ConfigureAwait(false);
+            var existingUserInfo = await _repository.GetExtendedUserInformation(userInformation.UserId).ConfigureAwait(false);
 
-            if (existingInfo != null) 
+            // Allow only one active tax-credit recipient per family.
+            if (userInformation.IsActiveTaxCreditRecipient && existingFamilyInfo != null && existingFamilyInfo.UserId != userInformation.UserId)
             {
-                await _repository.UpdateExtendedUserInformation(new AddExtendedUserInformationInternal { UserId = userInformation.UserId, IsActiveTaxCreditRecipient = false}).ConfigureAwait(false);
+                await _repository.UpdateExtendedUserInformation(new AddExtendedUserInformationInternal
+                {
+                    UserId = existingFamilyInfo.UserId,
+                    IsActiveTaxCreditRecipient = false
+                }).ConfigureAwait(false);
             }
 
-            var information = MapToUserInformationResponse(await  _repository.AddExtendedUserInformation(MapToUserInformation(userInformation)).ConfigureAwait(false));
-            //await _repository.AddExtendedUserInformation(MapToUserInformation(userInformation)).ConfigureAwait(false);
+            ExtendedUserInformationResponse information;
+            if (existingUserInfo != null)
+            {
+                information = MapToUserInformationResponse(await _repository.UpdateExtendedUserInformation(new AddExtendedUserInformationInternal
+                {
+                    UserId = userInformation.UserId,
+                    AddressId = userInformation.AddressId,
+                    IsActiveTaxCreditRecipient = userInformation.IsActiveTaxCreditRecipient
+                }).ConfigureAwait(false));
+            }
+            else
+            {
+                information = MapToUserInformationResponse(await _repository.AddExtendedUserInformation(MapToUserInformation(userInformation)).ConfigureAwait(false));
+            }
 
             var familyUsers = await _userRepository.GetAllFamilyUsersInformation(userInformation.FamilyId).ConfigureAwait(false);
 

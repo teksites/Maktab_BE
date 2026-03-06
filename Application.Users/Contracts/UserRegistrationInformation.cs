@@ -17,6 +17,6 @@ namespace Application.Users.Contracts
         public Relationship Relationship { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
-        public UserRoleType UserRole { get; set; } = UserRoleType.Unknown;
+        public UserRoleType UserRole { get; set; } = UserRoleType.None;
     }
 }

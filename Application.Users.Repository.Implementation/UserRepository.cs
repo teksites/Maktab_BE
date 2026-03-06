@@ -570,7 +570,7 @@ FROM
 
                     if (!await reader.ReadAsync().ConfigureAwait(false))
                     {
-                        return UserRoleType.Unknown;
+                        return UserRoleType.None;
                     }
 
                     var userRole = (UserRoleType) reader.GetInt32(0);

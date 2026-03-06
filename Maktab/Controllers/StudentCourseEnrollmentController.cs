@@ -58,7 +58,7 @@ public class StudentCourseEnrollmentController : ControllerBase
         return response;
     }
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpPost("byadmin")]
     public async Task<StudentCourseEnrollmentResponse> AddEnrollmentByAdmin(AddStudentCourseEnrollment enrollment)
     {
@@ -73,7 +73,7 @@ public class StudentCourseEnrollmentController : ControllerBase
     }
 
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpPut("byadmin/{enrollmentId:guid}")]
     public async Task<bool> UpdateEnrollmentByAdmin(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
         => await _service.UpdateEnrollment(enrollmentId, enrollment, true);
@@ -87,7 +87,7 @@ public class StudentCourseEnrollmentController : ControllerBase
     public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false)
         => await _service.DeleteEnrollment(enrollmentId, hardDelete, false);
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervoiser)]
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpDelete("byadmin/{enrollmentId:guid}")]
     public async Task<bool> DeleteEnrollmentByAdmin(Guid enrollmentId, bool hardDelete = false)
         => await _service.DeleteEnrollment(enrollmentId, hardDelete, true);

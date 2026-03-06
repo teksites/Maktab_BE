@@ -271,7 +271,7 @@ namespace Application.Users.Implementation
         private UserRegistrationInformation MapToUserRegistrationInformation(AddUserInformation addUserInformation)
         {
             var userRole = UserRoleHelper.FromStrings(addUserInformation.UserRoles);
-            if (userRole == UserRoleType.Unknown)
+            if (userRole == UserRoleType.None)
             {
                 userRole = UserRoleType.Normal;
             }

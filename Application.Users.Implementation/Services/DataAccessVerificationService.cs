@@ -48,7 +48,7 @@ namespace Application.Users.Implementation
             return userRoles.HasFlag(UserRoleType.Admin)
                 || userRoles.HasFlag(UserRoleType.SuperUser)
                 || userRoles.HasFlag(UserRoleType.SchoolAdmin)
-                || userRoles.HasFlag(UserRoleType.SchoolSupervoiser);
+                || userRoles.HasFlag(UserRoleType.SchoolSupervisor);
         }
 
         public DataAccessVerificationResult VerifyOwnership(SessionAccessContext sessionContext, IDictionary<string, object> actionArguments)
