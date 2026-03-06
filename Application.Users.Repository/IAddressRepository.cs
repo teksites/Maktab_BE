@@ -12,6 +12,6 @@ namespace Users.Repository
 
         // default value ensures old calls without parameter still compile
         Task<AddAddressIntenal> GetAddress(Guid addressId, bool includeInactive = false);
-        Task<AddAddressIntenal> GetAddressWithConnectedId(Guid connectedId, bool includeInactive = false);
+        Task<IEnumerable<AddAddressIntenal>> GetAddressWithConnectedId(Guid connectedId, bool includeInactive = false);
     }
 }

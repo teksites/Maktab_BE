@@ -38,12 +38,13 @@ namespace Application.Users.Implementation
 
         public async Task<AddressResponse> GetAddress(Guid addressId, bool includeInactive)
         {
-            return MapToAddressResponse(await _repository.GetAddress(addressId).ConfigureAwait(false));
+            return MapToAddressResponse(await _repository.GetAddress(addressId, includeInactive).ConfigureAwait(false));
         }
 
-        public async Task<AddressResponse> GetAddressWithConnectedId(Guid connectedId, bool includeInactive)
+        public async Task<IEnumerable<AddressResponse>> GetAddressWithConnectedId(Guid connectedId, bool includeInactive)
         {
-            return MapToAddressResponse(await _repository.GetAddressWithConnectedId(connectedId).ConfigureAwait(false));
+            var addresses = await _repository.GetAddressWithConnectedId(connectedId, includeInactive).ConfigureAwait(false);
+            return addresses.Select(MapToAddressResponse).Where(a => a != null).ToList();
         }
 
         public async Task<AddressResponse> UpdateAddress(UpdateAddress address)

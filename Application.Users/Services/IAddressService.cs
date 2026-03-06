@@ -10,7 +10,7 @@ namespace Users.Services
         Task<AddressResponse> UpdateAddress(UpdateAddress address);
         Task<bool> DeleteAddress(Guid addressId, bool ifHardDelete);
         Task<AddressResponse> GetAddress(Guid addressId, bool includeInactive);
-        Task<AddressResponse> GetAddressWithConnectedId(Guid connectedId, bool includeInactive);
+        Task<IEnumerable<AddressResponse>> GetAddressWithConnectedId(Guid connectedId, bool includeInactive);
         Task<bool> DeleteAddressByConnectedId(Guid userId, bool ifHardDelete);
     }
 }

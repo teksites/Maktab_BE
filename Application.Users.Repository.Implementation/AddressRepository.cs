@@ -82,7 +82,7 @@ namespace Application.Users.Repository.Implementation
             return MapReaderToAddress(reader);
         }
 
-        public async Task<AddAddressIntenal> GetAddressWithConnectedId(Guid connectedId, bool includeInactive = false)
+        public async Task<IEnumerable<AddAddressIntenal>> GetAddressWithConnectedId(Guid connectedId, bool includeInactive = false)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
             using var cmd = conn.CreateCommand();
@@ -99,10 +99,13 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@connectedId", connectedId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            if (!await reader.ReadAsync().ConfigureAwait(false))
-                return null;
+            var addresses = new List<AddAddressIntenal>();
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                addresses.Add(MapReaderToAddress(reader));
+            }
 
-            return MapReaderToAddress(reader);
+            return addresses;
         }
 
         #endregion

@@ -7,6 +7,7 @@ using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Addresses;
 using MaktabDataContracts.Responses.Addresses;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Users.Services;
 
@@ -39,7 +40,7 @@ namespace Maktab.Controllers
         [Authorize]
         [HttpGet("connectedid/{id:guid}/address")]
         [EnableCors("corspolicy")]
-        public async Task<AddressResponse> GetUserAddress(Guid id, bool includeInactive = false)
+        public async Task<IEnumerable<AddressResponse>> GetUserAddress(Guid id, bool includeInactive = false)
         {
             return await _addressService.GetAddressWithConnectedId(id, includeInactive).ConfigureAwait(false);
         }
