@@ -47,7 +47,7 @@ public class CoursesController : ControllerBase
     public async Task<CourseResponseDetailed> UpdateCourse(Guid courseId, AddCourse course)
         => await _courseService.UpdateCourse(courseId, course);
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
+    [ApiAuthorize(false, false, UserRoleType.Admin)]
     [HttpDelete("{courseId:guid}")]
     public async Task<bool> DeleteCourse(Guid courseId, bool hardDelete = false)
         => await _courseService.DeleteCourse(courseId, hardDelete);
@@ -71,7 +71,7 @@ public class CoursesController : ControllerBase
     public async Task<bool> UpdateGroup(Guid groupId, AddCourseEnrollmentGroup group)
         => await _groupService.UpdateCourseEnrollmentGroup(groupId, group);
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
+    [ApiAuthorize(false, false, UserRoleType.Admin)]
     [HttpDelete("groups/{groupId:guid}")]
     public async Task<bool> DeleteGroup(Guid groupId, bool hardDelete = false)
         => await _groupService.UpdateCourseEnrollmentGroup(groupId);
