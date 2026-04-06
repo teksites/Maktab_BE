@@ -74,5 +74,5 @@ public class CoursesController : ControllerBase
     [ApiAuthorize(false, false, UserRoleType.Admin)]
     [HttpDelete("groups/{groupId:guid}")]
     public async Task<bool> DeleteGroup(Guid groupId, bool hardDelete = false)
-        => await _groupService.UpdateCourseEnrollmentGroup(groupId);
+        => await _groupService.DeleteCourseEnrollmentGroup(groupId);
 }

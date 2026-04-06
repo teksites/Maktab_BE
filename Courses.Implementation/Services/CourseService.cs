@@ -64,7 +64,7 @@ namespace Courses.Implementation.Services
         }
 
         public Task<bool> DeleteCourseGroup(Guid courseGroupId)
-            => _courseEnrollmentGroupService.UpdateCourseEnrollmentGroup(courseGroupId, false);
+            => _courseEnrollmentGroupService.DeleteCourseEnrollmentGroup(courseGroupId, false);
 
         public Task<CourseEnrollmentGroupResponse> GetCourseGroup(Guid groupId)
             => _courseEnrollmentGroupService.GetGroup(groupId);
@@ -84,12 +84,16 @@ namespace Courses.Implementation.Services
 
         public async Task<bool> SetCourseRegistrationOpenStatus(Guid courseId, bool ifRegistrationOpen)
         {
+            // WE NEED TO COMMENT IT AS WE NEED TO UPDATE THE STATUS OF ALL GROUPS IN THE COURSE, AND IT WILL BE A PROBLEM IF THE COURSE HAS MANY GROUPS,
+            // SO WE NEED TO UPDATE THE STATUS IN THE COURSE LEVEL AND CHECK IT IN THE GROUP LEVEL WHEN GETTING THE GROUPS,
+            // AND IF THE COURSE REGISTRATION IS CLOSED THEN WE WILL CONSIDER ALL GROUPS REGISTRATION AS CLOSED EVEN IF THEY ARE OPENED
             // Update all groups registration status
-            var groups = await _courseEnrollmentGroupService.GetAllGroups(courseId).ConfigureAwait(false);
-            foreach (var group in groups)
-            {
-                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(group.CourseEnrollmentGroupId, ifRegistrationOpen).ConfigureAwait(false);
-            }
+            //Enrollment group registration status is automatic based registered students
+            //var groups = await _courseEnrollmentGroupService.GetAllGroups(courseId).ConfigureAwait(false);
+            //foreach (var group in groups)
+            //{
+            //    await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(group.CourseEnrollmentGroupId, ifRegistrationOpen).ConfigureAwait(false);
+            //}
 
             // Update course-level registration flag
             var course = await _repository.GetCourse(courseId).ConfigureAwait(false);
@@ -109,7 +113,11 @@ namespace Courses.Implementation.Services
                     CanSelectMultipleEnrollmentGroups = course.CanSelectMultipleEnrollmentGroups,
                     PolicyHyperLink = course.PolicyHyperLink,
                     IsCourseCompleted = course.IsCourseCompleted,
-                    IsRegistrationOpened = ifRegistrationOpen
+                    IsRegistrationOpened = ifRegistrationOpen,
+                    OfferDaycare = course.OfferDaycare,
+                    RegistrationStartDate = course.RegistrationStartDate,
+                    RegistrationEndDate = course.RegistrationEndDate,
+                    
                 }).ConfigureAwait(false);
             }
 
@@ -130,6 +138,8 @@ namespace Courses.Implementation.Services
                 MaxStudents = update.MaxStudents,
                 Fee = update.Fee,
                 IfRegistrationOpen = update.IfRegistrationOpen,
+                DayCareFee = update.DayCareFee,
+                
                 // Map enum list to string list
                 AcedemicGroups = update.AcedemicGroups?.Select(g => g.ToString()).ToList() ?? new List<string>()
             };

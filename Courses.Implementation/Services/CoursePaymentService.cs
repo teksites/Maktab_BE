@@ -1,7 +1,6 @@
 ﻿using Courses.Repository;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
-using System.Net.Http.Headers;
 
 namespace Courses.Services.Implementation
 {
@@ -46,6 +45,7 @@ namespace Courses.Services.Implementation
                 PaymentCode = transaction.PaymentCode,
                 StudentCourseEnrollmentIds = new List<Guid>(),
                 TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.PartiallyPaid,
+                RegistrationStatus = transaction.RegistrationStatus,
                 IsActive = transaction.IsActive,
             };
             
@@ -98,6 +98,7 @@ namespace Courses.Services.Implementation
                 PaymentCode = transaction.PaymentCode,
                 StudentCourseEnrollmentIds = new List<Guid>(),
                 TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.PartiallyPaid,
+                RegistrationStatus = transaction.RegistrationStatus,
                 IsActive = transaction.IsActive,
             };
 
@@ -147,6 +148,7 @@ namespace Courses.Services.Implementation
                 PaymentCode = transaction.PaymentCode,
                 StudentCourseEnrollmentIds = new List<Guid>(),
                 TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.PartiallyPaid,
+                RegistrationStatus = transaction.RegistrationStatus, 
                 IsActive = transaction.IsActive,
             };
 

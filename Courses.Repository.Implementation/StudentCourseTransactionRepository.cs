@@ -8,6 +8,7 @@ using MaktabDataContracts.Enums;
 using System.Data.Common;
 using System.Security.Cryptography;
 using TransactionStatus = MaktabDataContracts.Enums.TransactionStatus;
+using RegistrationStatus = MaktabDataContracts.Enums.RegistrationStatus;
 
 namespace Courses.Repository.Implementation
 {
@@ -42,11 +43,11 @@ namespace Courses.Repository.Implementation
                     cmd.CommandText = @"
                         INSERT INTO student_course_transaction
                         (StudentCourseTransactionId, FamilyId, PayableFee, DayCareFee, DayCareDiscount,
-                         FeeAmountDiscount, TotalPayable, Comments, Status, PaymentCode, IsActive,
+                         FeeAmountDiscount, TotalPayable, Comments, Status, RegistrationStatus, PaymentCode, IsActive,
                          TotalAmountPaid, IsCompletelyPaid, CreatedAt, UpdatedOn)
                         VALUES
                         (@TransactionId, @FamilyId, @PayableFee, @DayCareFee, @DayCareDiscount,
-                         @FeeAmountDiscount, @TotalPayable, @Comments, @Status, @PaymentCode, @IsActive,
+                         @FeeAmountDiscount, @TotalPayable, @Comments, @Status, @RegistrationStatus, @PaymentCode, @IsActive,
                          @TotalAmountPaid, @IsCompletelyPaid, @CreatedAt, @UpdatedOn)
                     ";
 
@@ -60,6 +61,7 @@ namespace Courses.Repository.Implementation
                        .AddParameter("@TotalPayable", transaction.TotalPayable)
                        .AddParameter("@Comments", (object?)transaction.Comments ?? DBNull.Value)
                        .AddParameter("@Status", (int)transaction.TransactionStatus)
+                       .AddParameter("@RegistrationStatus", (int)transaction.RegistrationStatus)
                        .AddParameter("@PaymentCode", paymentCode)
                        .AddParameter("@IsActive", transaction.IsActive)
                        .AddParameter("@TotalAmountPaid", transaction.TotalAmountPaid)
@@ -128,6 +130,7 @@ namespace Courses.Repository.Implementation
                     sct.TotalPayable,
                     sct.Comments,
                     sct.Status AS TransactionStatus,
+                    sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
                     sct.IsActive,
                     sct.TotalAmountPaid,
@@ -146,6 +149,7 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    sce.EnrollmentStatus as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
@@ -246,6 +250,7 @@ namespace Courses.Repository.Implementation
                     sct.TotalPayable,
                     sct.Comments,
                     sct.Status AS TransactionStatus,
+                    sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
                     sct.IsActive,
                     sct.TotalAmountPaid,
@@ -264,6 +269,7 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    sce.EnrollmentStatus as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
@@ -376,6 +382,7 @@ namespace Courses.Repository.Implementation
                 Comments = reader.IsDBNull("Comments") ? string.Empty : reader.GetString("Comments"),
                 PaymentCode = reader.GetString("PaymentCode"),
                 TransactionStatus = (TransactionStatus)reader.GetInt32("Status"),
+                RegistrationStatus = (RegistrationStatus)reader.GetInt32("RegistrationStatus"),
                 IsActive = reader.GetBoolean("IsActive"),
                 IsCompletelyPaid = reader.GetBoolean("IsCompletelyPaid"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
@@ -401,6 +408,7 @@ namespace Courses.Repository.Implementation
                     TotalPayable = @TotalPayable,
                     Comments = @Comments,
                     Status = @Status,
+                    RegistrationStatus = @RegistrationStatus,
                     PaymentCode = @PaymentCode,
                     IsActive = @IsActive,
                     TotalAmountPaid = @TotalAmountPaid,
@@ -418,6 +426,7 @@ namespace Courses.Repository.Implementation
                .AddParameter("@TotalPayable", transaction.TotalPayable)
                .AddParameter("@Comments", (object?)transaction.Comments ?? DBNull.Value)
                .AddParameter("@Status", (int)transaction.TransactionStatus)
+               .AddParameter("@RegistrationStatus", (int)transaction.RegistrationStatus)
                .AddParameter("@PaymentCode", transaction.PaymentCode)
                .AddParameter("@IsActive", transaction.IsActive)
                .AddParameter("@TotalAmountPaid", transaction.TotalAmountPaid)
@@ -485,6 +494,7 @@ namespace Courses.Repository.Implementation
                     sct.TotalPayable,
                     sct.Comments,
                     sct.Status AS TransactionStatus,
+                    sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
                     sct.IsActive,
                     sct.TotalAmountPaid,
@@ -503,6 +513,7 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    sce.EnrollmentStatus as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
@@ -604,6 +615,7 @@ namespace Courses.Repository.Implementation
                     sct.TotalPayable,
                     sct.Comments,
                     sct.Status AS TransactionStatus,
+                    sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
                     sct.IsActive,
                     sct.TotalAmountPaid,
@@ -622,6 +634,7 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    sce.EnrollmentStatus as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
@@ -716,6 +729,7 @@ namespace Courses.Repository.Implementation
                     sct.TotalPayable,
                     sct.Comments,
                     sct.Status AS TransactionStatus,
+                    sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
                     sct.IsActive,
                     sct.TotalAmountPaid,
@@ -734,6 +748,7 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    sce.EnrollmentStatus as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
@@ -830,6 +845,7 @@ namespace Courses.Repository.Implementation
                     sct.TotalPayable,
                     sct.Comments,
                     sct.Status AS TransactionStatus,
+                    sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
                     sct.IsActive,
                     sct.TotalAmountPaid,
@@ -848,6 +864,7 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    sce.EnrollmentStatus as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
@@ -944,6 +961,7 @@ namespace Courses.Repository.Implementation
                     sct.TotalPayable,
                     sct.Comments,
                     sct.Status AS TransactionStatus,
+                    sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
                     sct.IsActive,
                     sct.TotalAmountPaid,
@@ -962,6 +980,7 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    sce.EnrollmentStatus as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
@@ -1056,6 +1075,7 @@ namespace Courses.Repository.Implementation
                     sct.TotalPayable,
                     sct.Comments,
                     sct.Status AS TransactionStatus,
+                    sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
                     sct.IsActive,
                     sct.TotalAmountPaid,
@@ -1074,6 +1094,7 @@ namespace Courses.Repository.Implementation
                     sce.CreatedAt AS EnrollmentCreatedAt,
                     sce.UpdatedOn AS EnrollmentUpdatedOn,
                     sce.EnrollmentIndex as EnrollmentIndex,
+                    sce.EnrollmentStatus as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
                     ci.FirstName AS ChildFirstName,
@@ -1288,7 +1309,8 @@ namespace Courses.Repository.Implementation
                     DayCareDays = reader.GetInt32("DayCareDays"),
                     CreatedAt = reader.GetDateTime("CreatedAt"),
                     UpdatedOn = reader.GetDateTime("UpdatedOn"),
-                    EnrollmentIndex = reader.GetInt32("EnrollmentIndex")
+                    EnrollmentIndex = reader.GetInt32("EnrollmentIndex"),
+                    EnrollmentStatus = (EnrollmentStatus)reader.GetInt32("EnrollmentStatus")
                 });
             }
 
@@ -1485,6 +1507,7 @@ namespace Courses.Repository.Implementation
             var ordTotalPayable = reader.GetOrdinal("TotalPayable");
             var ordComments = reader.GetOrdinal("Comments");
             var ordStatus = reader.GetOrdinal("TransactionStatus");
+            var ordRegistrationStatus = reader.GetOrdinal("RegistrationStatus");
             var ordPaymentCode = reader.GetOrdinal("PaymentCode");
             var ordTxIsActive = reader.GetOrdinal("IsActive");
             var ordTotalAmountPaid = reader.GetOrdinal("TotalAmountPaid");
@@ -1503,6 +1526,7 @@ namespace Courses.Repository.Implementation
             var ordEnrollmentCreatedAt = reader.GetOrdinal("EnrollmentCreatedAt");
             var ordEnrollmentUpdatedOn = reader.GetOrdinal("EnrollmentUpdatedOn");
             var ordEnrollmentIndex = reader.GetOrdinal("EnrollmentIndex");
+            var ordEnrollmentStatus = reader.GetOrdinal("EnrollmentStatus");
             var ordGroupTitle = reader.GetOrdinal("GroupTitle");
             var ordGroupTitleFr = reader.GetOrdinal("GroupTitleFr");
             var ordChildFirstName = reader.GetOrdinal("ChildFirstName");
@@ -1540,6 +1564,7 @@ namespace Courses.Repository.Implementation
                         TotalPayable = reader.GetDecimal(ordTotalPayable),
                         Comments = reader.IsDBNull(ordComments) ? string.Empty : reader.GetString(ordComments),
                         TransactionStatus = (TransactionStatus)reader.GetInt32(ordStatus),
+                        RegistrationStatus = (RegistrationStatus)reader.GetInt32(ordRegistrationStatus),
                         PaymentCode = reader.GetString(ordPaymentCode),
                         IsActive = reader.GetBoolean(ordTxIsActive),
                         TotalAmountPaid = reader.GetDecimal(ordTotalAmountPaid),
@@ -1579,6 +1604,7 @@ namespace Courses.Repository.Implementation
                         CreatedAt = reader.GetDateTime(ordEnrollmentCreatedAt),
                         UpdatedOn = reader.GetDateTime(ordEnrollmentUpdatedOn),
                         EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex),
+                        EnrollmentStatus = (EnrollmentStatus)reader.GetInt32(ordEnrollmentStatus),
                         GroupTitle = reader.IsDBNull(ordGroupTitle) ? string.Empty : reader.GetString(ordGroupTitle),
                         GroupTitleFr = reader.IsDBNull(ordGroupTitleFr) ? string.Empty : reader.GetString(ordGroupTitleFr)
                     };
@@ -1657,6 +1683,7 @@ namespace Courses.Repository.Implementation
                 Comments = reader.IsDBNull("Comments") ? string.Empty : reader.GetString("Comments"),
                 PaymentCode = reader.GetString("PaymentCode"),
                 TransactionStatus = (TransactionStatus)reader.GetInt32("Status"),
+                RegistrationStatus = (RegistrationStatus)reader.GetInt32("RegistrationStatus"),
                 IsActive = reader.GetBoolean("IsActive"),
                 IsCompletelyPaid = reader.GetBoolean("IsCompletelyPaid"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
@@ -1738,6 +1765,7 @@ namespace Courses.Repository.Implementation
         }
     }
 }
+
 
 
 

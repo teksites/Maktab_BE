@@ -27,7 +27,7 @@ namespace Courses.Implementation.Services
         public Task<bool> UpdateCourseEnrollmentGroup(Guid groupId, AddCourseEnrollmentGroup group)
             => _repository.UpdateGroup(groupId, group);
 
-        public Task<bool> UpdateCourseEnrollmentGroup(Guid groupId, bool hardDelete = false)
+        public Task<bool> DeleteCourseEnrollmentGroup(Guid groupId, bool hardDelete = false)
             => _repository.DeleteGroup(groupId, hardDelete);
 
         public async Task<CourseEnrollmentGroupResponse> GetCourseGroup(Guid groupId)

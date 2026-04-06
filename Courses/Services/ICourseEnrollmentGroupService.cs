@@ -6,7 +6,7 @@ namespace Courses.Services
     public interface ICourseEnrollmentGroupService
     {
         Task<CourseEnrollmentGroupResponse> AddCourseEnrollmentGroup(AddCourseEnrollmentGroup group);
-        Task<bool> UpdateCourseEnrollmentGroup(Guid groupId, bool hardDelete = false);
+        Task<bool> DeleteCourseEnrollmentGroup(Guid groupId, bool hardDelete = false);
         Task<IEnumerable<CourseEnrollmentGroupResponse>> GetAllCourseGroups(Guid courseId, bool isActive);
         Task<IEnumerable<CourseEnrollmentGroupResponse>> GetAllGroups(Guid courseId);
         Task<CourseEnrollmentGroupResponse> GetCourseGroup(Guid groupId);

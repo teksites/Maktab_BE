@@ -15,13 +15,15 @@ namespace Courses.Implementation.Services
         private readonly IStudentCourseTransactionService _studentCourseTransactionService;
         private readonly ICourseService _courseService;
         private readonly IInstitutePolicyService _policyService;
+        private readonly ICourseEnrollmentGroupService _courseEnrollmentGroupService;
 
-        public StudentCourseEnrollmentService(IStudentCourseEnrollmentRepository repository, IStudentCourseTransactionService studentCourseEnrollmentService, ICourseService courseService, IInstitutePolicyService policyService)
+        public StudentCourseEnrollmentService(IStudentCourseEnrollmentRepository repository, IStudentCourseTransactionService studentCourseEnrollmentService, ICourseService courseService, IInstitutePolicyService policyService, ICourseEnrollmentGroupService courseEnrollmentGroupService)
         {
             _repository = repository;
             _studentCourseTransactionService = studentCourseEnrollmentService;
             _courseService = courseService;
             _policyService = policyService;
+            _courseEnrollmentGroupService = courseEnrollmentGroupService;
         }
 
         public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment, bool ifAddedByAdmin = false)
@@ -36,6 +38,27 @@ namespace Courses.Implementation.Services
             {
                 throw new Exception("The registration is closed. Contact Admin please");
             }
+
+            //var enrollmentGroupsState = await GetCourseEnrollmentGroupsInformation(enrollment.CourseId).ConfigureAwait(false);
+            var enrollmentGroupState = await GetCourseEnrollmentGroupInformation(enrollment.CourseEnrollmentGroupId).ConfigureAwait(false);
+
+            enrollment.EnrollmentStatus = enrollmentGroupState?.MaxStudents > enrollmentGroupState?.EnrollmentStatusCount[EnrollmentStatus.Registered] && 
+                enrollmentGroupState.IfRegistrationOpen?
+                EnrollmentStatus.Registered : EnrollmentStatus.Awaiting ;
+
+            if (enrollmentGroupState?.MaxStudents <= enrollmentGroupState?.EnrollmentStatusCount[EnrollmentStatus.Registered] + 1  &&
+                enrollmentGroupState.IfRegistrationOpen)
+            {
+                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroupState.CourseEnrollmentGroupId, false).ConfigureAwait(false);
+
+            }
+
+            //if count of entrollment in registered is now equal to max students, we have to set the insregisteration opened to false for the group
+
+            // Here check count of the existing enrollments for the group. if they are exceeding the count enrollments for the group, we will keep status waiting
+            //otherwise we will keep it successful
+
+            //we will do further change in update enrollment api to update the status of the enrollment based on the count of the enrollments in the group and max allowed students in the group. if the count is exceeding the max allowed students, we will keep status waiting otherwise we will keep it successful
 
             var selectedCourseEnrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
 
@@ -141,12 +164,22 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.StudentCourseTransactionId = Guid.NewGuid();
                 addStudentCourseTransaction.FamilyId = enrollment.FamilyId;
                 addStudentCourseTransaction.PaymentCode = $"GENERATECODE";
-                addStudentCourseTransaction.TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.AwaitingPayment;
+                addStudentCourseTransaction.TransactionStatus = TransactionStatus.AwaitingPayment;
+                addStudentCourseTransaction.RegistrationStatus = RegistrationStatus.Pending;               
                 addStudentCourseTransaction.IsActive = true;
-                addStudentCourseTransaction.PayableFee = (decimal)selectedCourseEnrollmentGroup.Fee; // get from course
+                // Only calculate fees if enrollment status is Registered
+                if (enrollment.EnrollmentStatus == EnrollmentStatus.Registered)
+                {
+                    addStudentCourseTransaction.PayableFee = (decimal)selectedCourseEnrollmentGroup.Fee;
+                    addStudentCourseTransaction.DayCareFee = enrollment.WillUseDayCare ? selectedCourseEnrollmentGroup.DayCareFee : 0;
+                }
+                else
+                {
+                    addStudentCourseTransaction.PayableFee = 0;
+                    addStudentCourseTransaction.DayCareFee = 0;
+                }
                 addStudentCourseTransaction.FeeAmountDiscount = 0;
                 addStudentCourseTransaction.DayCareDiscount = 0;
-                addStudentCourseTransaction.DayCareFee = enrollment.WillUseDayCare ? selectedCourseEnrollmentGroup.DayCareFee : 0;//add day care fee in course group
                 addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
                     (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
                 addStudentCourseTransaction.Comments = $"New Enrollment on {DateTime.UtcNow.ToString()}";
@@ -180,6 +213,7 @@ namespace Courses.Implementation.Services
             var dayCareDiscount = familyTransaction.DayCareDiscount;
             var paymentCode = familyTransaction.PaymentCode;
             var transactionStatus = familyTransaction.TransactionStatus;
+            var registrationtionStatus = familyTransaction.RegistrationStatus;
             var isActive = familyTransaction.IsActive;
             var totalAmountPaid = familyTransaction.TotalAmountPaid;
 
@@ -251,7 +285,7 @@ namespace Courses.Implementation.Services
                 {
                     var enrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
 
-                    if (enrollmentGroup != null)
+                    if (enrollmentGroup != null && enrollment.EnrollmentStatus == EnrollmentStatus.Registered)// Only allowed registered ones
                     {
                         childFee += (Convert.ToDecimal(enrollmentGroup.Fee) * applicableDiscountPercentage);
                         childDayCareFee += enrollment.WillUseDayCare ? Convert.ToDecimal(enrollmentGroup.DayCareFee) : 0m;
@@ -268,6 +302,7 @@ namespace Courses.Implementation.Services
             addStudentCourseTransaction.FamilyId = familyTransaction.FamilyId;
             addStudentCourseTransaction.PaymentCode = familyTransaction.PaymentCode;
             addStudentCourseTransaction.TransactionStatus = familyTransaction.TransactionStatus;
+            addStudentCourseTransaction.RegistrationStatus = familyTransaction.RegistrationStatus;
             addStudentCourseTransaction.IsActive = familyTransaction.IsActive;
             addStudentCourseTransaction.FeeAmountDiscount = familyTransaction.FeeAmountDiscount;
             addStudentCourseTransaction.DayCareDiscount = familyTransaction.DayCareDiscount;
@@ -300,6 +335,7 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.FamilyId = enrollment.FamilyId;
                 addStudentCourseTransaction.PaymentCode = $"GENERATECODE";
                 addStudentCourseTransaction.TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.AwaitingPayment;
+                addStudentCourseTransaction.RegistrationStatus = RegistrationStatus.Pending;
                 addStudentCourseTransaction.IsActive = true;
                 addStudentCourseTransaction.PayableFee = enrollmentGroup.Fee; // get from course
                 addStudentCourseTransaction.FeeAmountDiscount = 0;
@@ -340,6 +376,7 @@ namespace Courses.Implementation.Services
             {
                 return false;
             }
+            var enrollmentStatus = enrollmentDetails.EnrollmentStatus;
 
             var courseDetails = await _courseService.GetCourse(enrollmentDetails.CourseId).ConfigureAwait(false);
             //var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
@@ -349,13 +386,31 @@ namespace Courses.Implementation.Services
                 return false;
             }
 
-            return await _repository.UpdateEnrollment(enrollmentId, enrollment).ConfigureAwait(false);
+            var response = await _repository.UpdateEnrollment(enrollmentId, enrollment).ConfigureAwait(false);
+
+            //if previous state was registered and its deleted, then we have to set the isregistered to true if the isregistered is false 
+            // it means we have a room now
+            if (enrollmentDetails != null && enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Registered)
+            {
+                var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
+                if (!enrollmentGroup.IfRegistrationOpen)
+                {
+                    await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
+                }
+            }
+
+            if (response && enrollment.EnrollmentStatus != enrollmentStatus)
+            {
+                await RecalculateCourseFee(enrollmentDetails.CourseId, enrollmentDetails.FamilyId).ConfigureAwait(false);
+            }
+
+            return response;
         }
-      
         public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false, bool ifDeletedByAdmin = false)
         {
             var enrollmentDetails = await _repository.GetEnrollment(enrollmentId).ConfigureAwait(false);
-            
+            enrollmentDetails.EnrollmentStatus = EnrollmentStatus.Cancelled;
+
             if (enrollmentDetails == null)
             {
                 return false;
@@ -377,13 +432,6 @@ namespace Courses.Implementation.Services
 
             var ifDeleted = await _studentCourseTransactionService.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(enrollmentId).ConfigureAwait(false);
             var ifEnrollmentDeleted = false;
-            
-            if (ifDeleted)
-            {
-                ifEnrollmentDeleted = await _repository.DeleteEnrollment(enrollmentId, hardDelete).ConfigureAwait(false);
-            }
-
-
 
             if (ifDeleted && ifEnrollmentDeleted)
             {
@@ -398,10 +446,28 @@ namespace Courses.Implementation.Services
                 }
             }
 
-           return false;
+            //if previous state was registered and its deleted, then we have to set the isregistered to true if the isregistered is false 
+            // it means we have a room now
+            if (enrollmentGroup != null && enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Registered && !enrollmentGroup.IfRegistrationOpen)
+            {
+                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
+            }
+
+            if (ifDeleted)
+            {
+                ifEnrollmentDeleted = await _repository.DeleteEnrollment(enrollmentId, hardDelete).ConfigureAwait(false);
+            }
+
+            return false;
 
         }
         public Task<StudentCourseEnrollmentResponse> GetStudentCourseEnrollment(Guid childId, Guid courseId)
             => _repository.GetStudentCourseEnrollment(childId, courseId);
+
+        public Task<IEnumerable<CourseEnrollmentGroupInformationResponse>> GetCourseEnrollmentGroupsInformation(Guid courseId)
+            => _repository.GetCourseEnrollmentGroupsInformation(courseId);
+
+        public Task<CourseEnrollmentGroupInformationResponse?> GetCourseEnrollmentGroupInformation(Guid courseGroupId)
+            => _repository.GetCourseEnrollmentGroupInformation(courseGroupId);
     }
 }

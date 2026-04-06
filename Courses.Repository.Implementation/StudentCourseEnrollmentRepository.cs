@@ -21,10 +21,10 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 INSERT INTO student_course_enrollment 
                 (StudentCourseEnrollmentId, CourseEnrollmentGroupId, CourseId, ChildId, FamilyId, 
-                 WillUseDayCare, DayCareDays, IsActive, CreatedAt, UpdatedOn, EnrollmentIndex)
+                 WillUseDayCare, DayCareDays, IsActive, CreatedAt, UpdatedOn, EnrollmentIndex,EnrollmentStatus)
                 VALUES 
                 (@StudentCourseEnrollmentId, @CourseEnrollmentGroupId, @CourseId, @ChildId, @FamilyId, 
-                 @WillUseDayCare, @DayCareDays, @IsActive, @CreatedAt, @UpdatedOn, @EnrollmentIndex)";
+                 @WillUseDayCare, @DayCareDays, @IsActive, @CreatedAt, @UpdatedOn, @EnrollmentIndex,@EnrollmentStatus)";
 
             enrollment.IsActive = true;
 
@@ -39,6 +39,8 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@CreatedAt", DateTime.UtcNow);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
             cmd.AddParameter("@EnrollmentIndex", enrollment.EnrollmentIndex);
+            cmd.AddParameter("@EnrollmentStatus", enrollment.EnrollmentStatus);  
+            
             await cmd.ExecuteNonQueryAsync();
             return await GetEnrollment(enrollmentId) ?? throw new Exception("Failed to retrieve created enrollment");
         }
@@ -70,6 +72,7 @@ namespace Courses.Repository.Implementation
             sce.CreatedAt,
             sce.UpdatedOn,
             sce.EnrollmentIndex,
+            sce.EnrollmentStatus,
             ci.FirstName AS ChildFirstName,
             ci.LastName AS ChildLastName,
             ui.UserId,
@@ -165,6 +168,7 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 UPDATE student_course_enrollment 
                 SET WillUseDayCare=@WillUseDayCare,
+                    EnrollmentStatus= @EnrollmentStatus,    
                     DayCareDays=@DayCareDays,
                     UpdatedOn=@UpdatedOn
                 WHERE StudentCourseEnrollmentId=@EnrollmentId";
@@ -178,6 +182,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@DayCareDays", enrollment.DayCareDays);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
             cmd.AddParameter("@EnrollmentIndex", enrollment.EnrollmentIndex);
+            cmd.AddParameter("@EnrollmentStatus", enrollment.EnrollmentStatus);
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
@@ -270,6 +275,7 @@ namespace Courses.Repository.Implementation
             sce.CreatedAt,
             sce.UpdatedOn,
             sce.EnrollmentIndex,
+            sce.EnrollmentStatus,
             ci.FirstName AS ChildFirstName,
             ci.LastName AS ChildLastName,
             ui.UserId,
@@ -324,8 +330,9 @@ namespace Courses.Repository.Implementation
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn"),
                 EnrollmentIndex = reader.GetInt32("EnrollmentIndex"),
+                EnrollmentStatus= (EnrollmentStatus)reader.GetInt32("EnrollmentStatus"),
 
-                FamilyMembers = new List<FamilyInfo>()
+               FamilyMembers = new List<FamilyInfo>()
             };
         }
 
@@ -341,7 +348,126 @@ namespace Courses.Repository.Implementation
             };
         }
 
+        public async Task<IEnumerable<CourseEnrollmentGroupInformationResponse>> GetCourseEnrollmentGroupsInformation(Guid courseId)
+        {
+            var results = new Dictionary<Guid, CourseEnrollmentGroupInformationResponse>();
 
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+        SELECT
+            ceg.CourseEnrollmentGroupId,
+            ceg.CourseId,
+            ceg.MaxStudents,
+            ceg.IfRegistrationOpen,
+            sce.EnrollmentStatus,
+            COUNT(sce.StudentCourseEnrollmentId) AS StatusCount
+        FROM course_enrollment_groups ceg
+        LEFT JOIN student_course_enrollment sce ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId 
+            AND sce.IsActive = TRUE
+        WHERE ceg.CourseId = @CourseId AND ceg.IsActive = TRUE
+        GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.MaxStudents, ceg.IfRegistrationOpen, sce.EnrollmentStatus";
+
+            cmd.AddParameter("@CourseId", courseId.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var groupId = reader.GetGuidFromByteArray("CourseEnrollmentGroupId");
+
+                if (!results.TryGetValue(groupId, out var groupInfo))
+                {
+                    groupInfo = new CourseEnrollmentGroupInformationResponse
+                    {
+                        CourseEnrollmentGroupId = groupId,
+                        CourseId = reader.GetGuidFromByteArray("CourseId"),
+                        MaxStudents = reader.IsDBNull("MaxStudents") ? 0 : reader.GetInt32("MaxStudents"),
+                        IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen"),
+                        EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>()
+                        {
+                            {EnrollmentStatus.Awaiting, 0},
+                            {EnrollmentStatus.Cancelled, 0},
+                            {EnrollmentStatus.Registered, 0},
+                            {EnrollmentStatus.Refunded, 0},
+                            {EnrollmentStatus.Unknown, 0}
+                        }
+                    };
+                    results[groupId] = groupInfo;
+                }
+
+                if (!reader.IsDBNull("EnrollmentStatus"))
+                {
+                    var status = (EnrollmentStatus)reader.GetInt32("EnrollmentStatus");
+                    int count = reader.GetInt32("StatusCount");
+                    if (groupInfo.EnrollmentStatusCount.ContainsKey(status))
+                    {
+                        groupInfo.EnrollmentStatusCount[status] = count;
+                    }
+                }
+            }
+
+            return results.Values;
+        }
+
+        public async Task<CourseEnrollmentGroupInformationResponse?> GetCourseEnrollmentGroupInformation(Guid courseGroupId)
+        {
+            var result = new CourseEnrollmentGroupInformationResponse();
+            bool found = false;
+
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+        SELECT
+            ceg.CourseEnrollmentGroupId,
+            ceg.CourseId,
+            ceg.MaxStudents,
+            ceg.IfRegistrationOpen,
+            sce.EnrollmentStatus,
+            COUNT(sce.StudentCourseEnrollmentId) AS StatusCount
+        FROM course_enrollment_groups ceg
+        LEFT JOIN student_course_enrollment sce ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId 
+            AND sce.IsActive = TRUE
+        WHERE ceg.CourseEnrollmentGroupId = @CourseGroupId AND ceg.IsActive = TRUE
+        GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.MaxStudents, ceg.IfRegistrationOpen, sce.EnrollmentStatus";
+
+            cmd.AddParameter("@CourseGroupId", courseGroupId.ToByteArray());
+
+            result.EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>()
+            {
+                {EnrollmentStatus.Awaiting, 0},
+                {EnrollmentStatus.Cancelled, 0},
+                {EnrollmentStatus.Registered, 0},
+                {EnrollmentStatus.Refunded, 0},
+                {EnrollmentStatus.Unknown, 0}
+            };
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (!found)
+                {
+                    result.CourseEnrollmentGroupId = reader.GetGuidFromByteArray("CourseEnrollmentGroupId");
+                    result.CourseId = reader.GetGuidFromByteArray("CourseId");
+                    result.MaxStudents = reader.IsDBNull("MaxStudents") ? 0 : reader.GetInt32("MaxStudents");
+                    result.IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen");
+                    found = true;
+                }
+
+                if (!reader.IsDBNull("EnrollmentStatus"))
+                {
+                    var status = (EnrollmentStatus)reader.GetInt32("EnrollmentStatus");
+                    int count = reader.GetInt32("StatusCount");
+                    if (result.EnrollmentStatusCount.ContainsKey(status))
+                    {
+                        result.EnrollmentStatusCount[status] = count;
+                    }
+                }
+            }
+
+            return found ? result : null;
+        }
 
     }
 }

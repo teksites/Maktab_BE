@@ -32,13 +32,13 @@ namespace Courses.Repository.Implementation
                  Details, DetailsFr, StartDate, EndDate, IsActive,
                  CreatedAt, UpdatedOn, CanSelectMultipleEnrollmentGroups,
                  PolicyHyperLink, IsCourseCompleted, IsRegistrationOpened,
-                 RegistrationStartDate, RegistrationEndDate, CourseSession, RegistrationFee)
+                 RegistrationStartDate, RegistrationEndDate, CourseSession, RegistrationFee, OfferDaycare)
                 VALUES
                 (@CourseId, @InstituteId, @Name, @NameFr, @Description, @DescriptionFr,
                  @Details, @DetailsFr, @StartDate, @EndDate, @IsActive,
                  @CreatedAt, @UpdatedOn, @CanSelectMultipleEnrollmentGroups,
                  @PolicyHyperLink, @IsCourseCompleted, @IsRegistrationOpened,
-                 @RegistrationStartDate, @RegistrationEndDate, @CourseSession, @RegistrationFee)";
+                 @RegistrationStartDate, @RegistrationEndDate, @CourseSession, @RegistrationFee,@OfferDaycare)";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
             cmd.AddParameter("@InstituteId", course.InstituteId.ToByteArray());
@@ -57,6 +57,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@PolicyHyperLink", (object?)course.PolicyHyperLink ?? DBNull.Value);
             cmd.AddParameter("@IsCourseCompleted", course.IsCourseCompleted);
             cmd.AddParameter("@IsRegistrationOpened", course.IsRegistrationOpened);
+            cmd.AddParameter("@OfferDaycare", course.OfferDaycare);
 
             // ✅ FIX: DBNull-safe nullable DateTime parameters
             cmd.AddParameter("@RegistrationStartDate", (object?)course.RegistrationStartDate ?? DBNull.Value);
@@ -164,7 +165,7 @@ namespace Courses.Repository.Implementation
                     IsActive=@IsActive, UpdatedOn=@UpdatedOn, CanSelectMultipleEnrollmentGroups=@CanSelectMultipleEnrollmentGroups,
                     PolicyHyperLink=@PolicyHyperLink, IsCourseCompleted=@IsCourseCompleted, IsRegistrationOpened=@IsRegistrationOpened,
                     RegistrationStartDate=@RegistrationStartDate, RegistrationEndDate=@RegistrationEndDate, CourseSession=@CourseSession, 
-                    RegistrationFee=@RegistrationFee
+                    RegistrationFee=@RegistrationFee, OfferDaycare =@OfferDaycare
                 WHERE CourseId=@CourseId";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
@@ -189,6 +190,7 @@ namespace Courses.Repository.Implementation
 
             cmd.AddParameter("@CourseSession", (int)course.CourseSession);
             cmd.AddParameter("@RegistrationFee", (int)course.RegistrationFee);
+            cmd.AddParameter("@OfferDaycare", course.OfferDaycare); 
 
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
@@ -263,7 +265,8 @@ namespace Courses.Repository.Implementation
                 RegistrationStartDate = registrationStart,
                 RegistrationEndDate = registrationEnd,
                 CourseSession = (CourseSessionType)reader.GetByte("CourseSession"),
-                RegistrationFee = (int)reader.GetInt32("RegistrationFee")
+                RegistrationFee = (int)reader.GetInt32("RegistrationFee"),
+                OfferDaycare = reader.GetBoolean("OfferDaycare")
             };
 
             // Load enrollment groups using DI (kept as-is)
