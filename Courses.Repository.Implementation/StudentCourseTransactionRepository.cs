@@ -5,6 +5,8 @@ using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
 using MaktabDataContracts.Enums;
+using MaktabDataContracts.Models;
+using Newtonsoft.Json;
 using System.Data.Common;
 using System.Security.Cryptography;
 using TransactionStatus = MaktabDataContracts.Enums.TransactionStatus;
@@ -43,11 +45,11 @@ namespace Courses.Repository.Implementation
                     cmd.CommandText = @"
                         INSERT INTO student_course_transaction
                         (StudentCourseTransactionId, FamilyId, PayableFee, DayCareFee, DayCareDiscount,
-                         FeeAmountDiscount, TotalPayable, Comments, Status, RegistrationStatus, PaymentCode, IsActive,
+                         FeeAmountDiscount, TotalPayable, Comments, FeeInstallmentsJson, Status, RegistrationStatus, PaymentCode, IsActive,
                          TotalAmountPaid, IsCompletelyPaid, CreatedAt, UpdatedOn)
                         VALUES
                         (@TransactionId, @FamilyId, @PayableFee, @DayCareFee, @DayCareDiscount,
-                         @FeeAmountDiscount, @TotalPayable, @Comments, @Status, @RegistrationStatus, @PaymentCode, @IsActive,
+                         @FeeAmountDiscount, @TotalPayable, @Comments, @FeeInstallmentsJson, @Status, @RegistrationStatus, @PaymentCode, @IsActive,
                          @TotalAmountPaid, @IsCompletelyPaid, @CreatedAt, @UpdatedOn)
                     ";
 
@@ -60,6 +62,7 @@ namespace Courses.Repository.Implementation
                        .AddParameter("@FeeAmountDiscount", (int)transaction.FeeAmountDiscount)
                        .AddParameter("@TotalPayable", transaction.TotalPayable)
                        .AddParameter("@Comments", (object?)transaction.Comments ?? DBNull.Value)
+                       .AddParameter("@FeeInstallmentsJson", SerializeFeeInstallments(transaction.FeeInstallments))
                        .AddParameter("@Status", (int)transaction.TransactionStatus)
                        .AddParameter("@RegistrationStatus", (int)transaction.RegistrationStatus)
                        .AddParameter("@PaymentCode", paymentCode)
@@ -129,6 +132,7 @@ namespace Courses.Repository.Implementation
                     sct.FeeAmountDiscount,
                     sct.TotalPayable,
                     sct.Comments,
+                    sct.FeeInstallmentsJson,
                     sct.Status AS TransactionStatus,
                     sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
@@ -249,6 +253,7 @@ namespace Courses.Repository.Implementation
                     sct.FeeAmountDiscount,
                     sct.TotalPayable,
                     sct.Comments,
+                    sct.FeeInstallmentsJson,
                     sct.Status AS TransactionStatus,
                     sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
@@ -369,6 +374,9 @@ namespace Courses.Repository.Implementation
 
         private async Task<StudentCourseTransactionResponse> MapToTransactionSimpleResponse(DbDataReader reader)
         {
+            var feeInstallments = DeserializeFeeInstallments(reader.GetNullableString("FeeInstallmentsJson"));
+            var totalAmountPaid = reader.GetDecimal("TotalAmountPaid");
+
             return new StudentCourseTransactionResponse
             {
                 StudentCourseTransactionId = reader.GetGuidFromByteArray("StudentCourseTransactionId"),
@@ -378,8 +386,10 @@ namespace Courses.Repository.Implementation
                 DayCareDiscount = Convert.ToDecimal(reader.GetInt32("DayCareDiscount")),
                 FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32("FeeAmountDiscount")),
                 TotalPayable = reader.GetDecimal("TotalPayable"),
-                TotalAmountPaid = reader.GetDecimal("TotalAmountPaid"),
+                TotalAmountPaid = totalAmountPaid,
                 Comments = reader.IsDBNull("Comments") ? string.Empty : reader.GetString("Comments"),
+                FeeInstallments = feeInstallments,
+                MinimumPayable = CalculateMinimumPayable(feeInstallments, totalAmountPaid),
                 PaymentCode = reader.GetString("PaymentCode"),
                 TransactionStatus = (TransactionStatus)reader.GetInt32("Status"),
                 RegistrationStatus = (RegistrationStatus)reader.GetInt32("RegistrationStatus"),
@@ -407,6 +417,7 @@ namespace Courses.Repository.Implementation
                     FeeAmountDiscount = @FeeAmountDiscount,
                     TotalPayable = @TotalPayable,
                     Comments = @Comments,
+                    FeeInstallmentsJson = @FeeInstallmentsJson,
                     Status = @Status,
                     RegistrationStatus = @RegistrationStatus,
                     PaymentCode = @PaymentCode,
@@ -425,6 +436,7 @@ namespace Courses.Repository.Implementation
                .AddParameter("@FeeAmountDiscount", (int)transaction.FeeAmountDiscount)
                .AddParameter("@TotalPayable", transaction.TotalPayable)
                .AddParameter("@Comments", (object?)transaction.Comments ?? DBNull.Value)
+               .AddParameter("@FeeInstallmentsJson", SerializeFeeInstallments(transaction.FeeInstallments))
                .AddParameter("@Status", (int)transaction.TransactionStatus)
                .AddParameter("@RegistrationStatus", (int)transaction.RegistrationStatus)
                .AddParameter("@PaymentCode", transaction.PaymentCode)
@@ -493,6 +505,7 @@ namespace Courses.Repository.Implementation
                     sct.FeeAmountDiscount,
                     sct.TotalPayable,
                     sct.Comments,
+                    sct.FeeInstallmentsJson,
                     sct.Status AS TransactionStatus,
                     sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
@@ -614,6 +627,7 @@ namespace Courses.Repository.Implementation
                     sct.FeeAmountDiscount,
                     sct.TotalPayable,
                     sct.Comments,
+                    sct.FeeInstallmentsJson,
                     sct.Status AS TransactionStatus,
                     sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
@@ -728,6 +742,7 @@ namespace Courses.Repository.Implementation
                     sct.FeeAmountDiscount,
                     sct.TotalPayable,
                     sct.Comments,
+                    sct.FeeInstallmentsJson,
                     sct.Status AS TransactionStatus,
                     sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
@@ -844,6 +859,7 @@ namespace Courses.Repository.Implementation
                     sct.FeeAmountDiscount,
                     sct.TotalPayable,
                     sct.Comments,
+                    sct.FeeInstallmentsJson,
                     sct.Status AS TransactionStatus,
                     sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
@@ -935,7 +951,7 @@ namespace Courses.Repository.Implementation
 
                 WHERE sct.FamilyId = @FamilyId
                   AND sce.CourseId = @CourseId
-                ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
+                ORDER BY sct.CreatedAt DESC, sce.IsActive DESC, sce.UpdatedOn DESC, sce.CreatedAt DESC;
             ";
 
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
@@ -960,6 +976,7 @@ namespace Courses.Repository.Implementation
                     sct.FeeAmountDiscount,
                     sct.TotalPayable,
                     sct.Comments,
+                    sct.FeeInstallmentsJson,
                     sct.Status AS TransactionStatus,
                     sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
@@ -1074,6 +1091,7 @@ namespace Courses.Repository.Implementation
                     sct.FeeAmountDiscount,
                     sct.TotalPayable,
                     sct.Comments,
+                    sct.FeeInstallmentsJson,
                     sct.Status AS TransactionStatus,
                     sct.RegistrationStatus AS RegistrationStatus,
                     sct.PaymentCode,
@@ -1506,6 +1524,7 @@ namespace Courses.Repository.Implementation
             var ordFeeAmountDiscount = reader.GetOrdinal("FeeAmountDiscount");
             var ordTotalPayable = reader.GetOrdinal("TotalPayable");
             var ordComments = reader.GetOrdinal("Comments");
+            var ordFeeInstallmentsJson = reader.GetOrdinal("FeeInstallmentsJson");
             var ordStatus = reader.GetOrdinal("TransactionStatus");
             var ordRegistrationStatus = reader.GetOrdinal("RegistrationStatus");
             var ordPaymentCode = reader.GetOrdinal("PaymentCode");
@@ -1553,6 +1572,9 @@ namespace Courses.Repository.Implementation
 
                 if (!lookup.TryGetValue(txId, out var tx))
                 {
+                    var feeInstallments = DeserializeFeeInstallments(reader.IsDBNull(ordFeeInstallmentsJson) ? null : reader.GetString(ordFeeInstallmentsJson));
+                    var totalAmountPaid = reader.GetDecimal(ordTotalAmountPaid);
+
                     tx = new StudentCourseTransactionResponse
                     {
                         StudentCourseTransactionId = txId,
@@ -1563,11 +1585,13 @@ namespace Courses.Repository.Implementation
                         FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32(ordFeeAmountDiscount)),
                         TotalPayable = reader.GetDecimal(ordTotalPayable),
                         Comments = reader.IsDBNull(ordComments) ? string.Empty : reader.GetString(ordComments),
+                        FeeInstallments = feeInstallments,
                         TransactionStatus = (TransactionStatus)reader.GetInt32(ordStatus),
                         RegistrationStatus = (RegistrationStatus)reader.GetInt32(ordRegistrationStatus),
                         PaymentCode = reader.GetString(ordPaymentCode),
                         IsActive = reader.GetBoolean(ordTxIsActive),
-                        TotalAmountPaid = reader.GetDecimal(ordTotalAmountPaid),
+                        TotalAmountPaid = totalAmountPaid,
+                        MinimumPayable = CalculateMinimumPayable(feeInstallments, totalAmountPaid),
                         IsCompletelyPaid = reader.GetBoolean(ordIsCompletelyPaid),
                         CreatedAt = reader.GetDateTime(ordTxCreatedAt),
                         UpdatedOn = reader.GetDateTime(ordTxUpdatedOn),
@@ -1670,6 +1694,9 @@ namespace Courses.Repository.Implementation
 
         private async Task<StudentCourseTransactionResponse> MapToTransactionSingleResponse(DbDataReader reader)
         {
+            var feeInstallments = DeserializeFeeInstallments(reader.GetNullableString("FeeInstallmentsJson"));
+            var totalAmountPaid = reader.GetDecimal("TotalAmountPaid");
+
             return new StudentCourseTransactionResponse
             {
                 StudentCourseTransactionId = reader.GetGuidFromByteArray("StudentCourseTransactionId"),
@@ -1679,8 +1706,10 @@ namespace Courses.Repository.Implementation
                 DayCareDiscount = Convert.ToDecimal(reader.GetInt32("DayCareDiscount")),
                 FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32("FeeAmountDiscount")),
                 TotalPayable = reader.GetDecimal("TotalPayable"),
-                TotalAmountPaid = reader.GetDecimal("TotalAmountPaid"),
+                TotalAmountPaid = totalAmountPaid,
                 Comments = reader.IsDBNull("Comments") ? string.Empty : reader.GetString("Comments"),
+                FeeInstallments = feeInstallments,
+                MinimumPayable = CalculateMinimumPayable(feeInstallments, totalAmountPaid),
                 PaymentCode = reader.GetString("PaymentCode"),
                 TransactionStatus = (TransactionStatus)reader.GetInt32("Status"),
                 RegistrationStatus = (RegistrationStatus)reader.GetInt32("RegistrationStatus"),
@@ -1732,6 +1761,53 @@ namespace Courses.Repository.Implementation
                 buffer[i] = PaymentCodeChars[bytes[i] % PaymentCodeChars.Length];
 
             return new string(buffer);
+        }
+
+        private static string SerializeFeeInstallments(IEnumerable<FeeInstallment>? feeInstallments)
+        {
+            return JsonConvert.SerializeObject(feeInstallments ?? Enumerable.Empty<FeeInstallment>());
+        }
+
+        private static List<FeeInstallment> DeserializeFeeInstallments(string? feeInstallmentsJson)
+        {
+            if (string.IsNullOrWhiteSpace(feeInstallmentsJson))
+            {
+                return new List<FeeInstallment>();
+            }
+
+            return JsonConvert.DeserializeObject<List<FeeInstallment>>(feeInstallmentsJson) ?? new List<FeeInstallment>();
+        }
+
+        private static decimal CalculateMinimumPayable(IReadOnlyCollection<FeeInstallment> feeInstallments, decimal totalAmountPaid)
+        {
+            var applicableInstallmentTotal = GetApplicableInstallmentTotal(feeInstallments, DateTime.UtcNow.Date);
+            return applicableInstallmentTotal - totalAmountPaid;
+        }
+
+        private static decimal GetApplicableInstallmentTotal(IReadOnlyCollection<FeeInstallment> feeInstallments, DateTime asOfDate)
+        {
+            if (feeInstallments.Count == 0)
+            {
+                return 0m;
+            }
+
+            var orderedInstallments = feeInstallments
+                .OrderBy(installment => installment.DueDate.Date)
+                .ToList();
+
+            var dueInstallmentTotal = orderedInstallments
+                .Where(installment => installment.DueDate.Date <= asOfDate)
+                .Sum(installment => installment.Amount);
+
+            var nextUpcomingInstallment = orderedInstallments
+                .FirstOrDefault(installment => installment.DueDate.Date > asOfDate);
+
+            if (nextUpcomingInstallment != null)
+            {
+                dueInstallmentTotal += nextUpcomingInstallment.Amount;
+            }
+
+            return dueInstallmentTotal;
         }
 
         public async Task<bool> DeleteStudentCourseTransactionEnrollmentByEnrollmentId(Guid studentCourseEnrollmentId)

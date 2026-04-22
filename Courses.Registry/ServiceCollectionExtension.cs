@@ -4,7 +4,6 @@ using Courses.Repository;
 using Courses.Services;
 using Courses.Implementation.Services;
 using Courses.Services.Implementation;
-using Courses.Implementation;
 
 namespace Courses.Registry
 {

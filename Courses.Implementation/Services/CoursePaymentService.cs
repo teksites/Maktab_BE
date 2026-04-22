@@ -44,6 +44,7 @@ namespace Courses.Services.Implementation
                 TotalPayable = transaction.TotalPayable,
                 PaymentCode = transaction.PaymentCode,
                 StudentCourseEnrollmentIds = new List<Guid>(),
+                FeeInstallments = transaction.FeeInstallments,
                 TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.PartiallyPaid,
                 RegistrationStatus = transaction.RegistrationStatus,
                 IsActive = transaction.IsActive,
@@ -97,6 +98,7 @@ namespace Courses.Services.Implementation
                 TotalPayable = transaction.TotalPayable,
                 PaymentCode = transaction.PaymentCode,
                 StudentCourseEnrollmentIds = new List<Guid>(),
+                FeeInstallments = transaction.FeeInstallments,
                 TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.PartiallyPaid,
                 RegistrationStatus = transaction.RegistrationStatus,
                 IsActive = transaction.IsActive,
@@ -117,7 +119,7 @@ namespace Courses.Services.Implementation
         {
             var paymentDetails = await _repository.GetPayment(paymentId).ConfigureAwait(false);
 
-            if(paymentDetails == null)
+            if (paymentDetails == null)
             {
                 return false;
             }
@@ -147,6 +149,7 @@ namespace Courses.Services.Implementation
                 TotalPayable = transaction.TotalPayable,
                 PaymentCode = transaction.PaymentCode,
                 StudentCourseEnrollmentIds = new List<Guid>(),
+                FeeInstallments = transaction.FeeInstallments,
                 TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.PartiallyPaid,
                 RegistrationStatus = transaction.RegistrationStatus, 
                 IsActive = transaction.IsActive,

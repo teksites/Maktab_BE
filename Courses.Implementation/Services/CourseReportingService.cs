@@ -2,7 +2,7 @@
 using Courses.Repository;
 using MaktabDataContracts.Responses.Transactions;
 
-namespace Courses.Implementation
+namespace Courses.Implementation.Services
 {
 
     public class CourseReportingService : ICourseReportingService

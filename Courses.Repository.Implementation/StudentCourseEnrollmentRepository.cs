@@ -469,5 +469,23 @@ namespace Courses.Repository.Implementation
             return found ? result : null;
         }
 
+        public async Task<bool> UpdateEnrollmentStatus(Guid enrollmentId, EnrollmentStatus status)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                UPDATE student_course_enrollment
+                SET EnrollmentStatus = @EnrollmentStatus,
+                    UpdatedOn = @UpdatedOn
+                WHERE StudentCourseEnrollmentId = @EnrollmentId";
+
+            cmd.AddParameter("@EnrollmentId", enrollmentId.ToByteArray());
+            cmd.AddParameter("@EnrollmentStatus", status);
+            cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
+
+            return await cmd.ExecuteNonQueryAsync() > 0;
+        }
+
     }
 }

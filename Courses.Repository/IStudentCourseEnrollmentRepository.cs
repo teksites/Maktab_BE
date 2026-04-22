@@ -1,4 +1,5 @@
 ﻿
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
 
@@ -12,6 +13,7 @@ namespace Courses.Repository
         Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByCourse(Guid courseId);
         Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByFamily(Guid familyId);
         Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment);
+        Task<bool> UpdateEnrollmentStatus(Guid enrollmentId, EnrollmentStatus status);
         Task<StudentCourseEnrollmentResponse> GetStudentCourseEnrollment(Guid childId, Guid courseId);
         Task<IEnumerable<CourseEnrollmentGroupInformationResponse>> GetCourseEnrollmentGroupsInformation(Guid courseId);
         Task<CourseEnrollmentGroupInformationResponse?> GetCourseEnrollmentGroupInformation(Guid courseGroupId);

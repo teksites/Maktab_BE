@@ -162,3 +162,7 @@
 /Zeffy.Repository.Implementation/bin/Debug/net8.0/MaktabDataContracts.dll
 /Zeffy/bin/Debug/net8.0/MaktabDataContracts.dll
 /Microsoft/Windows/PowerShell/ModuleAnalysisCache
+/.codex-enumprobe
+/.codex-dbprobe
+/Courses.Test/bin/Debug/net8.0
+/Courses.Test/obj

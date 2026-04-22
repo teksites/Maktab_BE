@@ -39,26 +39,23 @@ namespace Courses.Implementation.Services
                 throw new Exception("The registration is closed. Contact Admin please");
             }
 
-            //var enrollmentGroupsState = await GetCourseEnrollmentGroupsInformation(enrollment.CourseId).ConfigureAwait(false);
             var enrollmentGroupState = await GetCourseEnrollmentGroupInformation(enrollment.CourseEnrollmentGroupId).ConfigureAwait(false);
-
-            enrollment.EnrollmentStatus = enrollmentGroupState?.MaxStudents > enrollmentGroupState?.EnrollmentStatusCount[EnrollmentStatus.Registered] && 
-                enrollmentGroupState.IfRegistrationOpen?
-                EnrollmentStatus.Registered : EnrollmentStatus.Awaiting ;
-
-            if (enrollmentGroupState?.MaxStudents <= enrollmentGroupState?.EnrollmentStatusCount[EnrollmentStatus.Registered] + 1  &&
-                enrollmentGroupState.IfRegistrationOpen)
+            if (enrollmentGroupState == null)
             {
-                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroupState.CourseEnrollmentGroupId, false).ConfigureAwait(false);
-
+                throw new Exception("Course enrollment group not found");
             }
 
-            //if count of entrollment in registered is now equal to max students, we have to set the insregisteration opened to false for the group
+            var registeredCount = enrollmentGroupState.EnrollmentStatusCount.TryGetValue(EnrollmentStatus.Registered, out var count)
+                ? count
+                : 0;
 
-            // Here check count of the existing enrollments for the group. if they are exceeding the count enrollments for the group, we will keep status waiting
-            //otherwise we will keep it successful
+            var canRegister = enrollmentGroupState.IfRegistrationOpen && registeredCount < enrollmentGroupState.MaxStudents;
+            enrollment.EnrollmentStatus = canRegister ? EnrollmentStatus.Enrolled : EnrollmentStatus.Awaiting;
 
-            //we will do further change in update enrollment api to update the status of the enrollment based on the count of the enrollments in the group and max allowed students in the group. if the count is exceeding the max allowed students, we will keep status waiting otherwise we will keep it successful
+            if (enrollmentGroupState.IfRegistrationOpen && registeredCount + 1 >= enrollmentGroupState.MaxStudents)
+            {
+                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroupState.CourseEnrollmentGroupId, false).ConfigureAwait(false);
+            }
 
             var selectedCourseEnrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
 
@@ -102,46 +99,11 @@ namespace Courses.Implementation.Services
                     
                     enrollment.EnrollmentIndex = distinctChildIds.Count + 1;
 
-                    //decimal discountPercentage = policy.FirstChildFee / 100;
-
-                    //if (distinctChildIds.Count == 1)
-                    //{
-                    //    discountPercentage = policy.SecondChildFee / 100;
-                    //}
-                    //else if (distinctChildIds.Count >= 2)
-                    //{
-                    //    discountPercentage = policy.ThirdAndOnwardChildFee / 100;
-                    //}
-
-                    //newCourseFee = selectedCourseEnrollmentGroup.Fee * discountPercentage;
                 }
 
                 // Add enrollment first
                 var addedEnrollment = await _repository.AddEnrollment(enrollment).ConfigureAwait(false);
 
-                //var transaction = await _studentCourseTransactionService.GetTransaction(familyCourseTransaction.First().StudentCourseTransactionId).ConfigureAwait(false);
-
-                // Update the transcation
-                // First create the transaction based on course data
-                /*var transactionToUpdate = new AddStudentCourseTransaction
-                {
-                    StudentCourseTransactionId = transaction.StudentCourseTransactionId,
-                    FamilyId = transaction.FamilyId,
-                    PaymentCode = transaction.PaymentCode,
-                    FeeAmountDiscount = transaction.FeeAmountDiscount,
-                    DayCareDiscount = transaction.DayCareDiscount,
-                    Comments = transaction.Comments,
-                    DayCareFee = transaction.DayCareFee + newDayCareFee,
-                    IsActive = transaction.IsActive,
-                    IsCompletelyPaid = transaction.IsCompletelyPaid,
-                    PayableFee = transaction.PayableFee + newCourseFee,
-                    StudentCourseEnrollmentIds = new List<Guid> { transaction.StudentCourseEnrollmentId },
-                    TotalAmountPaid = transaction.TotalAmountPaid,
-                    TotalPayable = transaction.TotalPayable + newDayCareFee + newCourseFee,
-                    TransactionStatus = transaction.TransactionStatus
-                };
-                var ifTransactionUpdated = await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, transactionToUpdate).ConfigureAwait(false);
-                */
                 var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(transaction.StudentCourseTransactionId,
                     addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
 
@@ -182,6 +144,14 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.DayCareDiscount = 0;
                 addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
                     (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
+                var activePolicies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
+                var activeFeePaymentPolicy = activePolicies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.CourseFeePayment);
+                var (feePolicy, feePaymentPolicyFound) = ParseValidatedFeePaymentPolicy(activeFeePaymentPolicy?.Details);
+                addStudentCourseTransaction.FeeInstallments = BuildFeeInstallments(
+                    addStudentCourseTransaction.TotalPayable,
+                    feePaymentPolicyFound,
+                    feePolicy,
+                    new[] { 1 });
                 addStudentCourseTransaction.Comments = $"New Enrollment on {DateTime.UtcNow.ToString()}";
                 addStudentCourseTransaction.IsCompletelyPaid = false;
 
@@ -220,7 +190,15 @@ namespace Courses.Implementation.Services
             decimal dayCareFee = 0m;
             decimal courseFee = 0m;
 
-            var groupedByChild = familyTransaction.Enrollments
+            var effectiveEnrollments = familyTransaction.Enrollments
+            .GroupBy(e => new { e.ChildId, e.CourseEnrollmentGroupId })
+            .Select(g => g
+                .OrderByDescending(e => e.UpdatedOn)
+                .ThenByDescending(e => e.CreatedAt)
+                .First())
+            .ToList();
+
+            var groupedByChild = effectiveEnrollments
             .GroupBy(e => e.ChildId)
             .Select(g => new
             {
@@ -228,22 +206,27 @@ namespace Courses.Implementation.Services
                 Enrollments = g.ToList()
             })
             .ToList();
+            var enrollmentGroupCountsByChild = groupedByChild.Select(g => g.Enrollments.Count).ToList();
 
             int i = 1;
 
             SiblingDiscountPolicy policy = new SiblingDiscountPolicy();
+            List<FeePaymentPolicy> feePolicy = new List<FeePaymentPolicy>();
             var policyFound = false;
+            var feePaymentPolicyFound = false;
 
-            if (groupedByChild.Count > 1)
+            //if (groupedByChild.Count > 1) //We need to get two policies now. therefore we will check if we have more than
+            ////1 child and then get the policies. if we have only one child then we dont need to get the policies as there will be no discount
             {
                 var policies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
                 if (!policies.Any())
                 {
                     policyFound = false;
+                    feePaymentPolicyFound = false;
                 }
                 else
                 {
-                    var activeSiblingPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == InstutePolicyType.SiblingDiscount);
+                    var activeSiblingPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.SiblingDiscount);
                     var discountPolicy = activeSiblingPolicy?.Details;
                     if (!string.IsNullOrEmpty(discountPolicy))
                     {
@@ -252,40 +235,42 @@ namespace Courses.Implementation.Services
                             policy = JsonConvert.DeserializeObject<SiblingDiscountPolicy>(discountPolicy);
                             policyFound = true;
                         }
-                        catch (Exception e)
+                        catch
                         {
                             policyFound = false;
                         }
                     }
+
+                    var activeFeePaymentPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.CourseFeePayment);
+                    (feePolicy, feePaymentPolicyFound) = ParseValidatedFeePaymentPolicy(activeFeePaymentPolicy?.Details);
                 }
             }
 
-            decimal applicableDiscountPercentage = 1m;
-
-            foreach (var childGroup in groupedByChild)
+           foreach (var childGroup in groupedByChild)
             {
-                var enrollments = childGroup.Enrollments;
+                var childEnrollments = childGroup.Enrollments;
                 decimal childFee = 0m;
                 decimal childDayCareFee = 0m;
+                decimal applicableDiscountPercentage = 1m;
 
-                if (i == 2 && policyFound)// we have multiple children
+                if (i == 2 && policyFound)
                 {
                     applicableDiscountPercentage = policy.SecondChildFee / 100m;
                 }
-                else if (i == 3 && policyFound)// we have multiple children
+                else if (i == 3 && policyFound)
                 {
                     applicableDiscountPercentage = policy.ThirdChildFee / 100m;
                 }
-                else if (i > 3 && policyFound)// we have multiple children
+                else if (i > 3 && policyFound)
                 {
                     applicableDiscountPercentage = policy.FourthAndOnwardChildFee / 100m;
                 }
 
-                foreach (var enrollment in enrollments)
+                foreach (var enrollment in childEnrollments)
                 {
                     var enrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
 
-                    if (enrollmentGroup != null && enrollment.EnrollmentStatus == EnrollmentStatus.Registered)// Only allowed registered ones
+                    if (enrollmentGroup != null && (enrollment.EnrollmentStatus == EnrollmentStatus.Registered || enrollment.EnrollmentStatus == EnrollmentStatus.Awaiting))// Only allowed registered and awaited  ones
                     {
                         childFee += (Convert.ToDecimal(enrollmentGroup.Fee) * applicableDiscountPercentage);
                         childDayCareFee += enrollment.WillUseDayCare ? Convert.ToDecimal(enrollmentGroup.DayCareFee) : 0m;
@@ -302,7 +287,9 @@ namespace Courses.Implementation.Services
             addStudentCourseTransaction.FamilyId = familyTransaction.FamilyId;
             addStudentCourseTransaction.PaymentCode = familyTransaction.PaymentCode;
             addStudentCourseTransaction.TransactionStatus = familyTransaction.TransactionStatus;
-            addStudentCourseTransaction.RegistrationStatus = familyTransaction.RegistrationStatus;
+            // Check if any enrollment is Awaiting, set RegistrationStatus accordingly
+            var hasAwaiting = effectiveEnrollments.Any(e => e.EnrollmentStatus == EnrollmentStatus.Awaiting);
+            addStudentCourseTransaction.RegistrationStatus = hasAwaiting ? RegistrationStatus.Pending : RegistrationStatus.Completed;
             addStudentCourseTransaction.IsActive = familyTransaction.IsActive;
             addStudentCourseTransaction.FeeAmountDiscount = familyTransaction.FeeAmountDiscount;
             addStudentCourseTransaction.DayCareDiscount = familyTransaction.DayCareDiscount;
@@ -312,11 +299,153 @@ namespace Courses.Implementation.Services
             var recalculatedTotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
                 (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
             addStudentCourseTransaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable;
+            addStudentCourseTransaction.FeeInstallments = BuildFeeInstallments(
+                addStudentCourseTransaction.TotalPayable,
+                feePaymentPolicyFound,
+                feePolicy,
+                enrollmentGroupCountsByChild);
             addStudentCourseTransaction.Comments = familyTransaction.Comments +$"\n Updated the transaction on {DateTime.UtcNow.ToString()}";
             addStudentCourseTransaction.IsCompletelyPaid = addStudentCourseTransaction.TotalPayable <= addStudentCourseTransaction.TotalAmountPaid;
 
             return await _studentCourseTransactionService.UpdateTransaction(familyTransaction.StudentCourseTransactionId, addStudentCourseTransaction).ConfigureAwait(false);
         }
+
+        private static (List<FeePaymentPolicy> FeePolicy, bool FeePaymentPolicyFound) ParseValidatedFeePaymentPolicy(string? feePaymentPolicyDetails)
+        {
+            if (string.IsNullOrWhiteSpace(feePaymentPolicyDetails))
+            {
+                return (new List<FeePaymentPolicy>(), false);
+            }
+
+            try
+            {
+                var feePolicy = JsonConvert.DeserializeObject<List<FeePaymentPolicy>>(feePaymentPolicyDetails) ?? new List<FeePaymentPolicy>();
+                var totalMinimumAmountDue = feePolicy.Sum(x => x.MinimumAmountDue ?? 0m);
+
+                return (feePolicy, feePolicy.Count > 0 && totalMinimumAmountDue == 100m);
+            }
+            catch
+            {
+                return (new List<FeePaymentPolicy>(), false);
+            }
+        }
+
+        private static List<FeeInstallment> BuildFeeInstallments(
+            decimal totalPayable,
+            bool feePaymentPolicyFound,
+            IReadOnlyList<FeePaymentPolicy> feePolicy,
+            IReadOnlyList<int> enrollmentGroupCountsByChild)
+        {
+            if (totalPayable <= 0m)
+            {
+                return new List<FeeInstallment>();
+            }
+
+            if (!feePaymentPolicyFound || feePolicy.Count == 0)
+            {
+                return new List<FeeInstallment>
+                {
+                    new FeeInstallment
+                    {
+                        Description = "Paiement complet de l'inscription/Complete Registration Payment",
+                        DueDate = DateTime.UtcNow.Date.AddDays(1),
+                        Amount = totalPayable
+                    }
+                };
+            }
+
+            var installmentCount = DetermineInstallmentCount(feePolicy.Count, enrollmentGroupCountsByChild);
+            if (installmentCount <= 1)
+            {
+                return new List<FeeInstallment>
+                {
+                    new FeeInstallment
+                    {
+                        Description = feePolicy[0].Name,
+                        DueDate = feePolicy[0].PaymentDate,
+                        Amount = totalPayable
+                    }
+                };
+            }
+
+            var installmentAmounts = SplitInstallmentAmounts(totalPayable, installmentCount);
+            var installments = new List<FeeInstallment>(installmentCount);
+
+            for (var index = 0; index < installmentCount; index++)
+            {
+                installments.Add(new FeeInstallment
+                {
+                    Description = feePolicy[index].Name,
+                    DueDate = feePolicy[index].PaymentDate,
+                    Amount = installmentAmounts[index]
+                });
+            }
+
+            return installments;
+        }
+
+        private static int DetermineInstallmentCount(int policyItemCount, IReadOnlyList<int> enrollmentGroupCountsByChild)
+        {
+            if (policyItemCount <= 0 || enrollmentGroupCountsByChild.Count == 0)
+            {
+                return 0;
+            }
+
+            if (enrollmentGroupCountsByChild.Count == 1)
+            {
+                var singleChildEnrollmentGroupCount = enrollmentGroupCountsByChild[0];
+                if (singleChildEnrollmentGroupCount <= 2)
+                {
+                    return 1;
+                }
+
+                return singleChildEnrollmentGroupCount <= policyItemCount
+                    ? singleChildEnrollmentGroupCount - 1
+                    : policyItemCount;
+            }
+
+            if (enrollmentGroupCountsByChild.All(count => count <= 1))
+            {
+                return 1;
+            }
+
+            var maxEnrollmentGroupCount = enrollmentGroupCountsByChild.Max();
+            return maxEnrollmentGroupCount <= policyItemCount
+                ? maxEnrollmentGroupCount
+                : policyItemCount;
+        }
+
+        private static List<decimal> SplitInstallmentAmounts(decimal totalPayable, int installmentCount)
+        {
+            if (installmentCount <= 1)
+            {
+                return new List<decimal> { totalPayable };
+            }
+
+            var installmentAmounts = new List<decimal>(installmentCount);
+            var remainingAmount = totalPayable;
+
+            for (var index = 0; index < installmentCount - 1; index++)
+            {
+                var remainingInstallmentCount = installmentCount - index;
+                var roundedInstallmentAmount = RoundToNearestFive(remainingAmount / remainingInstallmentCount);
+
+                if (roundedInstallmentAmount > remainingAmount)
+                {
+                    roundedInstallmentAmount = remainingAmount;
+                }
+
+                installmentAmounts.Add(roundedInstallmentAmount);
+                remainingAmount -= roundedInstallmentAmount;
+            }
+
+            installmentAmounts.Add(remainingAmount);
+            return installmentAmounts;
+        }
+
+        private static decimal RoundToNearestFive(decimal amount)
+            => Math.Round(amount / 5m, 0, MidpointRounding.AwayFromZero) * 5m;
+
         private async Task<AddStudentCourseTransaction> CreateTransactionData(AddStudentCourseEnrollment enrollment, AddStudentCourseTransaction addStudentCourseTransaction)
         {
             //var course = await _courseService.GetCourseGroup(enrollment.CourseEnrollmentGroupId).ConfigureAwait(false);
@@ -335,7 +464,7 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.FamilyId = enrollment.FamilyId;
                 addStudentCourseTransaction.PaymentCode = $"GENERATECODE";
                 addStudentCourseTransaction.TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.AwaitingPayment;
-                addStudentCourseTransaction.RegistrationStatus = RegistrationStatus.Pending;
+                addStudentCourseTransaction.RegistrationStatus = RegistrationStatus.Completed;
                 addStudentCourseTransaction.IsActive = true;
                 addStudentCourseTransaction.PayableFee = enrollmentGroup.Fee; // get from course
                 addStudentCourseTransaction.FeeAmountDiscount = 0;
@@ -390,7 +519,9 @@ namespace Courses.Implementation.Services
 
             //if previous state was registered and its deleted, then we have to set the isregistered to true if the isregistered is false 
             // it means we have a room now
-            if (enrollmentDetails != null && enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Registered)
+            if (enrollmentDetails != null && 
+                (enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Registered || enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Enrolled)
+                && enrollment.EnrollmentStatus != enrollmentDetails.EnrollmentStatus)
             {
                 var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
                 if (!enrollmentGroup.IfRegistrationOpen)
@@ -448,7 +579,9 @@ namespace Courses.Implementation.Services
 
             //if previous state was registered and its deleted, then we have to set the isregistered to true if the isregistered is false 
             // it means we have a room now
-            if (enrollmentGroup != null && enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Registered && !enrollmentGroup.IfRegistrationOpen)
+            if (enrollmentGroup != null &&
+                 (enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Registered || enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Enrolled)
+                && !enrollmentGroup.IfRegistrationOpen)
             {
                 await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
             }

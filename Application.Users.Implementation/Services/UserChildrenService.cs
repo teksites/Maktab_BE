@@ -104,13 +104,13 @@ namespace Application.Users.Implementation
                 LastName = child.LastName,
                 RAMQNumber = child.RAMQNumber,
                 RAMQSequenceNumber = child.RAMQSequenceNumber,
+                HasAllergy = child.HasAllergy,
                 Allergies = child.Allergies,
                 OtherHealthConditions = child.OtherHealthConditions,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedOn = DateTime.UtcNow,
                 IsActive = true,
                 AcedemicGroup = child.AcedemicGroup,
-               
             };
         }
 
@@ -125,6 +125,7 @@ namespace Application.Users.Implementation
             {
                 ChildId = child.ChildId,
                 FamilyId = child.FamilyId,
+                HasAllergy = child.HasAllergy,
                 Allergies = child.Allergies,
                 DateOfBirth = child.DateOfBirth,
                 RAMQNumber = child.RAMQNumber,

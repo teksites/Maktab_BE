@@ -116,7 +116,7 @@ namespace Courses.Repository.Implementation
                 InstituteId = reader.GetGuidFromByteArray("InstituteId"),
                 PolicyId = reader.GetGuidFromByteArray("InstitutePolicyId"), // Assuming PolicyId maps to InstitutePolicyId
                 Details = reader.GetString("Details"),
-                InstutePolicy = (InstutePolicyType)(reader.GetNullableInt("InstutePolicyType") ?? 0),
+                InstutePolicy = (PolicyType)(reader.GetNullableInt("InstutePolicyType") ?? 0),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn")
