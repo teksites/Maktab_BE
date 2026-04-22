@@ -9,6 +9,8 @@ using MaktabDataContracts.Responses.Institute;
 using MaktabDataContracts.Responses.Transactions;
 using Moq;
 using Newtonsoft.Json;
+using Email;
+using Users.Services;
 
 namespace Courses.Test;
 
@@ -174,7 +176,9 @@ public class StudentCourseEnrollmentServiceTests
             transactionService.Object,
             courseService.Object,
             policyService.Object,
-            Mock.Of<ICourseEnrollmentGroupService>());
+            Mock.Of<ICourseEnrollmentGroupService>(),
+            Mock.Of<ISendEmailService>(),
+            Mock.Of<IUserService>());
     }
 
     private static StudentCourseTransactionResponse CreateFamilyTransaction(

@@ -1,11 +1,13 @@
 ﻿using Courses.Repository;
 using Courses.Services;
+using Email;
 using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Requests.Policies;
 using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
 using Newtonsoft.Json;
+using Users.Services;
 
 namespace Courses.Implementation.Services
 {
@@ -16,17 +18,24 @@ namespace Courses.Implementation.Services
         private readonly ICourseService _courseService;
         private readonly IInstitutePolicyService _policyService;
         private readonly ICourseEnrollmentGroupService _courseEnrollmentGroupService;
+        private readonly ISendEmailService _sendEmailService;
+        private readonly IUserService _userService;
 
-        public StudentCourseEnrollmentService(IStudentCourseEnrollmentRepository repository, IStudentCourseTransactionService studentCourseEnrollmentService, ICourseService courseService, IInstitutePolicyService policyService, ICourseEnrollmentGroupService courseEnrollmentGroupService)
+
+        public StudentCourseEnrollmentService(IStudentCourseEnrollmentRepository repository, IStudentCourseTransactionService studentCourseEnrollmentService, ICourseService courseService, IInstitutePolicyService policyService, 
+            ICourseEnrollmentGroupService courseEnrollmentGroupService, ISendEmailService sendEmailService, IUserService userService)
         {
             _repository = repository;
             _studentCourseTransactionService = studentCourseEnrollmentService;
             _courseService = courseService;
             _policyService = policyService;
             _courseEnrollmentGroupService = courseEnrollmentGroupService;
-        }
+            _sendEmailService = sendEmailService;
+            _userService = userService;
 
-        public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment, bool ifAddedByAdmin = false)
+    }
+
+    public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment, bool ifAddedByAdmin = false)
         {
 
             var familyTransactions = await _studentCourseTransactionService.GetCourseTransactionsByFamily(enrollment.CourseId, enrollment.FamilyId).ConfigureAwait(false);
@@ -505,6 +514,7 @@ namespace Courses.Implementation.Services
             {
                 return false;
             }
+
             var enrollmentStatus = enrollmentDetails.EnrollmentStatus;
 
             var courseDetails = await _courseService.GetCourse(enrollmentDetails.CourseId).ConfigureAwait(false);
@@ -517,23 +527,80 @@ namespace Courses.Implementation.Services
 
             var response = await _repository.UpdateEnrollment(enrollmentId, enrollment).ConfigureAwait(false);
 
+
+            var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
+
             //if previous state was registered and its deleted, then we have to set the isregistered to true if the isregistered is false 
             // it means we have a room now
             if (enrollmentDetails != null && 
-                (enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Registered || enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Enrolled)
-                && enrollment.EnrollmentStatus != enrollmentDetails.EnrollmentStatus)
+                (enrollmentStatus == EnrollmentStatus.Registered || enrollmentStatus == EnrollmentStatus.Enrolled)//current state is enrolled
+                && (enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Cancelled)//New status is cancelled
+                && enrollment.EnrollmentStatus != enrollmentStatus)// it means it can be either refund or cancelled
             {
-                var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
                 if (!enrollmentGroup.IfRegistrationOpen)
                 {
                     await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
                 }
             }
 
-            if (response && enrollment.EnrollmentStatus != enrollmentStatus)
+            if (response && enrollment.EnrollmentStatus != enrollmentStatus && enrollment.EnrollmentStatus != EnrollmentStatus.Refunded)//No need calc fee on refund
             {
                 await RecalculateCourseFee(enrollmentDetails.CourseId, enrollmentDetails.FamilyId).ConfigureAwait(false);
             }
+
+
+            var familyUsers = await _userService.GetAllFamilyUsersInformation(enrollment.FamilyId).ConfigureAwait(false);
+
+            var targetEmails = familyUsers
+            .Where(x => x.Relationship == Relationship.Mother ||
+                        x.Relationship == Relationship.Father ||
+                        x.Relationship == Relationship.Guardian)
+            .Select(x => x.Email)
+            .ToList();
+
+            var emailBody = string.Empty;
+            var emailSubject = string.Empty;
+            //now emails
+            if (response && enrollment.EnrollmentStatus != enrollmentStatus && (enrollment.EnrollmentStatus == EnrollmentStatus.Registered || enrollment.EnrollmentStatus == EnrollmentStatus.Enrolled))//No need calc fee on refund
+            {
+                emailSubject = "Confirmation de l'inscription / Confirmation of enrollment";
+                emailBody = $"<p><strong>Chèr parent,</strong></p>" +
+                       $"<p>Merci d'avoir inscrit votre enfant au <strong>{courseDetails.NameFr}-</strong><strong>{enrollmentGroup.DetailsFr}</strong>. L'inscription sera complétée seulement après réception du paiement, conformément à la politique du {{school / camp}}. Veuillez vous connecter au portail et payer les frais d'inscription.</p>" +
+                       $"<div>&nbsp;</div>" +
+                       $"<p><strong>Dear parent,</strong></p>" +
+                       $"<p>Thank you for enrolling your child in the <strong>{courseDetails.Name}-</strong><strong>{enrollmentGroup.Details}</strong>. Registration is only complete when payment is made based on the policy of the {{school / camp}}. Please login to the portal and pay the fee to register your child.</p>" +
+                       $"<div>&nbsp;</div>" +
+                       $"<div>Cheers</div>" +
+                       $"<div>&nbsp;</div>" +
+                       $"<div><strong>ICC Brossard School Registration Portal</strong></div>";
+
+            }
+            else if (response && enrollment.EnrollmentStatus != enrollmentStatus && enrollment.EnrollmentStatus == EnrollmentStatus.Cancelled)//No need calc fee on refund
+
+            {
+                emailSubject = $"Annulation de l'inscription / Cancellation of Registration";
+                emailBody = $"<p><strong>Chèr parent,</strong></p>" +
+               $"<p>L'inscription de votre enfant a été annulée à cause que les frais requis n'ayant pas été réglés dans les délais précédemment communiqués.</p>" +
+               $"<div>&nbsp;</div>" +
+               $"<p><strong>Dear parent,</strong></p>" +
+               $"<p>Due to the required fees being unpaid by the deadline previously given, your child's registration has been cancelled.</p>" +
+               $"<div>&nbsp;</div>" +
+               $"<div>Cheers</div>" +
+               $"<div>&nbsp;</div>" +
+               $"<div><strong>ICC Brossard School Registration Portal</strong></div>";
+
+            }
+
+            if (!string.IsNullOrEmpty(emailBody) && targetEmails.Any())
+            {
+               // _sendEmailService.
+                 var success = _sendEmailService.SendBulkEmail(new MultiUserEmailData
+                {
+                    To = targetEmails.ToList(),
+                    Subject = emailSubject,
+                    Body = emailBody
+                });
+        }
 
             return response;
         }

@@ -11,8 +11,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Application.Users\Users.csproj" />
     <ProjectReference Include="..\Courses.Repository\Courses.Repository.csproj" />
     <ProjectReference Include="..\Courses\Courses.csproj" />
+    <ProjectReference Include="..\Email\Email.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="MaktabDataContracts">
