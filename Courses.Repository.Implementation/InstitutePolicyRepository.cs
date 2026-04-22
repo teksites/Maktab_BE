@@ -18,12 +18,13 @@ namespace Courses.Repository.Implementation
             var policyId = Guid.NewGuid();
 
             cmd.CommandText = @"INSERT INTO institute_policy 
-                                (InstitutePolicyId, InstituteId, Details, InstutePolicyType, IsActive, CreatedAt, UpdatedOn) 
+                                (InstitutePolicyId, InstituteId, Details, InstutePolicyType, IsActive, CreatedAt, UpdatedOn, CourseId) 
                                 VALUES 
-                                (@InstitutePolicyId, @InstituteId, @Details, @InstutePolicyType, @IsActive, @CreatedAt, @UpdatedOn)";
+                                (@InstitutePolicyId, @InstituteId, @Details, @InstutePolicyType, @IsActive, @CreatedAt, @UpdatedOn, @CourseId)";
 
             cmd.AddParameter("@InstitutePolicyId", policyId.ToByteArray());
             cmd.AddParameter("@InstituteId", policy.InstituteId.ToByteArray());
+            cmd.AddParameter("@CourseId", policy.CourseId.HasValue ? policy.CourseId.Value.ToByteArray() : DBNull.Value);
             cmd.AddParameter("@Details", policy.Details);
             cmd.AddParameter("@InstutePolicyType", (byte)policy.InstutePolicy);
             cmd.AddParameter("@IsActive", policy.IsActive);
@@ -114,6 +115,7 @@ namespace Courses.Repository.Implementation
             {
                 InstitutePolicyId = reader.GetGuidFromByteArray("InstitutePolicyId"),
                 InstituteId = reader.GetGuidFromByteArray("InstituteId"),
+                CourseId = reader.GetNullableGuidFromByteArray("CourseId") ?? Guid.Empty,
                 PolicyId = reader.GetGuidFromByteArray("InstitutePolicyId"), // Assuming PolicyId maps to InstitutePolicyId
                 Details = reader.GetString("Details"),
                 InstutePolicy = (PolicyType)(reader.GetNullableInt("InstutePolicyType") ?? 0),
