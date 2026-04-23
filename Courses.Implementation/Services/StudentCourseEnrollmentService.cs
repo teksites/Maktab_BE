@@ -323,8 +323,9 @@ namespace Courses.Implementation.Services
                 feePaymentPolicyFound,
                 feePolicy,
                 enrollmentGroupCountsByChild);
+
             addStudentCourseTransaction.Comments = familyTransaction.Comments +$"\n Updated the transaction on {DateTime.UtcNow.ToString()}";
-            addStudentCourseTransaction.IsCompletelyPaid = addStudentCourseTransaction.recalculatedTotalPayable <= addStudentCourseTransaction.TotalAmountPaid;
+            addStudentCourseTransaction.IsCompletelyPaid = recalculatedTotalPayable <= addStudentCourseTransaction.TotalAmountPaid;
 
             return await _studentCourseTransactionService.UpdateTransaction(familyTransaction.StudentCourseTransactionId, addStudentCourseTransaction).ConfigureAwait(false);
         }
