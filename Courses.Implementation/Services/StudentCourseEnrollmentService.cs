@@ -198,20 +198,32 @@ namespace Courses.Implementation.Services
             decimal courseFee = 0m;
 
             var effectiveEnrollments = familyTransaction.Enrollments
-            .GroupBy(e => new { e.ChildId, e.CourseEnrollmentGroupId })
+            .GroupBy(e => new { e.EnrollmentIndex, e.CourseEnrollmentGroupId })
             .Select(g => g
                 .OrderByDescending(e => e.UpdatedOn)
                 .ThenByDescending(e => e.CreatedAt)
                 .First())
+            .OrderBy(e => e.EnrollmentIndex)
+            .ThenBy(e => e.CreatedAt)
             .ToList();
 
             var groupedByChild = effectiveEnrollments
-            .GroupBy(e => e.ChildId)
-            .Select(g => new
+            .GroupBy(e => e.EnrollmentIndex)
+            .Select(g =>
             {
-                ChildId = g.Key,
-                Enrollments = g.ToList()
+                var orderedEnrollments = g
+                    .OrderBy(e => e.CreatedAt)
+                    .ThenBy(e => e.UpdatedOn)
+                    .ToList();
+
+                return new
+                {
+                    EnrollmentIndex = g.Key,
+                    ChildId = orderedEnrollments[0].ChildId,
+                    Enrollments = orderedEnrollments
+                };
             })
+            .OrderBy(g => g.EnrollmentIndex)
             .ToList();
             var enrollmentGroupCountsByChild = groupedByChild.Select(g => g.Enrollments.Count).ToList();
 
