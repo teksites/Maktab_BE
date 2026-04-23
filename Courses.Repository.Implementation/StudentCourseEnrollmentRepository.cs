@@ -72,7 +72,7 @@ namespace Courses.Repository.Implementation
             sce.CreatedAt,
             sce.UpdatedOn,
             sce.EnrollmentIndex,
-            sce.EnrollmentStatus,
+            CAST(sce.EnrollmentStatus AS SIGNED) AS EnrollmentStatus,
             ci.FirstName AS ChildFirstName,
             ci.LastName AS ChildLastName,
             ui.UserId,
@@ -275,7 +275,7 @@ namespace Courses.Repository.Implementation
             sce.CreatedAt,
             sce.UpdatedOn,
             sce.EnrollmentIndex,
-            sce.EnrollmentStatus,
+            CAST(sce.EnrollmentStatus AS SIGNED) AS EnrollmentStatus,
             ci.FirstName AS ChildFirstName,
             ci.LastName AS ChildLastName,
             ui.UserId,
@@ -361,13 +361,17 @@ namespace Courses.Repository.Implementation
             ceg.CourseId,
             ceg.MaxStudents,
             ceg.IfRegistrationOpen,
-            sce.EnrollmentStatus,
-            COUNT(sce.StudentCourseEnrollmentId) AS StatusCount
+            SUM(CASE WHEN sce.EnrollmentStatus = 0 THEN 1 ELSE 0 END) AS UnknownCount,
+            SUM(CASE WHEN sce.EnrollmentStatus = 1 THEN 1 ELSE 0 END) AS EnrolledCount,
+            SUM(CASE WHEN sce.EnrollmentStatus = 2 THEN 1 ELSE 0 END) AS AwaitingCount,
+            SUM(CASE WHEN sce.EnrollmentStatus = 3 THEN 1 ELSE 0 END) AS RegisteredCount,
+            SUM(CASE WHEN sce.EnrollmentStatus = 4 THEN 1 ELSE 0 END) AS CancelledCount,
+            SUM(CASE WHEN sce.EnrollmentStatus = 5 THEN 1 ELSE 0 END) AS RefundedCount
         FROM course_enrollment_groups ceg
         LEFT JOIN student_course_enrollment sce ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId 
             AND sce.IsActive = TRUE
         WHERE ceg.CourseId = @CourseId AND ceg.IsActive = TRUE
-        GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.MaxStudents, ceg.IfRegistrationOpen, sce.EnrollmentStatus";
+        GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.MaxStudents, ceg.IfRegistrationOpen";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
@@ -376,35 +380,19 @@ namespace Courses.Repository.Implementation
             {
                 var groupId = reader.GetGuidFromByteArray("CourseEnrollmentGroupId");
 
-                if (!results.TryGetValue(groupId, out var groupInfo))
+                if (results.ContainsKey(groupId))
                 {
-                    groupInfo = new CourseEnrollmentGroupInformationResponse
-                    {
-                        CourseEnrollmentGroupId = groupId,
-                        CourseId = reader.GetGuidFromByteArray("CourseId"),
-                        MaxStudents = reader.IsDBNull("MaxStudents") ? 0 : reader.GetInt32("MaxStudents"),
-                        IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen"),
-                        EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>()
-                        {
-                            {EnrollmentStatus.Awaiting, 0},
-                            {EnrollmentStatus.Cancelled, 0},
-                            {EnrollmentStatus.Registered, 0},
-                            {EnrollmentStatus.Refunded, 0},
-                            {EnrollmentStatus.Unknown, 0}
-                        }
-                    };
-                    results[groupId] = groupInfo;
+                    continue;
                 }
 
-                if (!reader.IsDBNull("EnrollmentStatus"))
+                results[groupId] = new CourseEnrollmentGroupInformationResponse
                 {
-                    var status = (EnrollmentStatus)reader.GetInt32("EnrollmentStatus");
-                    int count = reader.GetInt32("StatusCount");
-                    if (groupInfo.EnrollmentStatusCount.ContainsKey(status))
-                    {
-                        groupInfo.EnrollmentStatusCount[status] = count;
-                    }
-                }
+                    CourseEnrollmentGroupId = groupId,
+                    CourseId = reader.GetGuidFromByteArray("CourseId"),
+                    MaxStudents = reader.IsDBNull("MaxStudents") ? 0 : reader.GetInt32("MaxStudents"),
+                    IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen"),
+                    EnrollmentStatusCount = CreateEnrollmentStatusCountMap(reader)
+                };
             }
 
             return results.Values;
@@ -424,24 +412,19 @@ namespace Courses.Repository.Implementation
             ceg.CourseId,
             ceg.MaxStudents,
             ceg.IfRegistrationOpen,
-            sce.EnrollmentStatus,
-            COUNT(sce.StudentCourseEnrollmentId) AS StatusCount
+            SUM(CASE WHEN sce.EnrollmentStatus = 0 THEN 1 ELSE 0 END) AS UnknownCount,
+            SUM(CASE WHEN sce.EnrollmentStatus = 1 THEN 1 ELSE 0 END) AS EnrolledCount,
+            SUM(CASE WHEN sce.EnrollmentStatus = 2 THEN 1 ELSE 0 END) AS AwaitingCount,
+            SUM(CASE WHEN sce.EnrollmentStatus = 3 THEN 1 ELSE 0 END) AS RegisteredCount,
+            SUM(CASE WHEN sce.EnrollmentStatus = 4 THEN 1 ELSE 0 END) AS CancelledCount,
+            SUM(CASE WHEN sce.EnrollmentStatus = 5 THEN 1 ELSE 0 END) AS RefundedCount
         FROM course_enrollment_groups ceg
         LEFT JOIN student_course_enrollment sce ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId 
             AND sce.IsActive = TRUE
         WHERE ceg.CourseEnrollmentGroupId = @CourseGroupId AND ceg.IsActive = TRUE
-        GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.MaxStudents, ceg.IfRegistrationOpen, sce.EnrollmentStatus";
+        GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.MaxStudents, ceg.IfRegistrationOpen";
 
             cmd.AddParameter("@CourseGroupId", courseGroupId.ToByteArray());
-
-            result.EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>()
-            {
-                {EnrollmentStatus.Awaiting, 0},
-                {EnrollmentStatus.Cancelled, 0},
-                {EnrollmentStatus.Registered, 0},
-                {EnrollmentStatus.Refunded, 0},
-                {EnrollmentStatus.Unknown, 0}
-            };
 
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
@@ -452,21 +435,25 @@ namespace Courses.Repository.Implementation
                     result.CourseId = reader.GetGuidFromByteArray("CourseId");
                     result.MaxStudents = reader.IsDBNull("MaxStudents") ? 0 : reader.GetInt32("MaxStudents");
                     result.IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen");
+                    result.EnrollmentStatusCount = CreateEnrollmentStatusCountMap(reader);
                     found = true;
-                }
-
-                if (!reader.IsDBNull("EnrollmentStatus"))
-                {
-                    var status = (EnrollmentStatus)reader.GetInt32("EnrollmentStatus");
-                    int count = reader.GetInt32("StatusCount");
-                    if (result.EnrollmentStatusCount.ContainsKey(status))
-                    {
-                        result.EnrollmentStatusCount[status] = count;
-                    }
                 }
             }
 
             return found ? result : null;
+        }
+
+        private static Dictionary<EnrollmentStatus, int> CreateEnrollmentStatusCountMap(DbDataReader reader)
+        {
+            return new Dictionary<EnrollmentStatus, int>
+            {
+                [EnrollmentStatus.Unknown] = Convert.ToInt32(reader["UnknownCount"]),
+                [EnrollmentStatus.Enrolled] = Convert.ToInt32(reader["EnrolledCount"]),
+                [EnrollmentStatus.Awaiting] = Convert.ToInt32(reader["AwaitingCount"]),
+                [EnrollmentStatus.Registered] = Convert.ToInt32(reader["RegisteredCount"]),
+                [EnrollmentStatus.Cancelled] = Convert.ToInt32(reader["CancelledCount"]),
+                [EnrollmentStatus.Refunded] = Convert.ToInt32(reader["RefundedCount"])
+            };
         }
 
         public async Task<bool> UpdateEnrollmentStatus(Guid enrollmentId, EnrollmentStatus status)

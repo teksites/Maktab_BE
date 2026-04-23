@@ -7,6 +7,7 @@ using MaktabDataContracts.Requests.Policies;
 using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Institute;
 using MaktabDataContracts.Responses.Transactions;
+using MaktabDataContracts.Responses.Users;
 using Moq;
 using Newtonsoft.Json;
 using Email;
@@ -16,6 +17,101 @@ namespace Courses.Test;
 
 public class StudentCourseEnrollmentServiceTests
 {
+    [Fact]
+    public async Task AddEnrollment_SetsEnrollmentToAwaitingWhenGroupIsAlreadyFull()
+    {
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var capturedEnrollment = default(AddStudentCourseEnrollment);
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetCourseEnrollmentGroupInformation(groupId))
+            .ReturnsAsync(new CourseEnrollmentGroupInformationResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                MaxStudents = 2,
+                IfRegistrationOpen = true,
+                EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>
+                {
+                    [EnrollmentStatus.Enrolled] = 1,
+                    [EnrollmentStatus.Registered] = 1
+                }
+            });
+        repository
+            .Setup(repo => repo.AddEnrollment(It.IsAny<AddStudentCourseEnrollment>()))
+            .Callback<AddStudentCourseEnrollment>(enrollment => capturedEnrollment = enrollment)
+            .ReturnsAsync(() => new StudentCourseEnrollmentResponse
+            {
+                StudentCourseEnrollmentId = Guid.NewGuid(),
+                ChildId = childId,
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                FamilyId = familyId,
+                EnrollmentStatus = capturedEnrollment!.EnrollmentStatus,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedOn = DateTime.UtcNow
+            });
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(Array.Empty<StudentCourseTransactionResponse>());
+        transactionService
+            .Setup(service => service.AddTransaction(It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = Guid.NewGuid(),
+                FamilyId = familyId
+            });
+        transactionService
+            .Setup(service => service.AddEnrollmentsToTransaction(It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 120));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
+
+        var groupService = new Mock<ICourseEnrollmentGroupService>();
+        groupService
+            .Setup(service => service.SetCourseGroupRegistrationStatus(groupId, false))
+            .ReturnsAsync(new CourseEnrollmentGroupResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                IfRegistrationOpen = false
+            });
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService,
+            groupService: groupService);
+
+        var response = await service.AddEnrollment(new AddStudentCourseEnrollment
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            CourseId = courseId,
+            CourseEnrollmentGroupId = groupId,
+            WillUseDayCare = false,
+            DayCareDays = 0
+        });
+
+        Assert.NotNull(capturedEnrollment);
+        Assert.Equal(EnrollmentStatus.Awaiting, capturedEnrollment!.EnrollmentStatus);
+        Assert.Equal(EnrollmentStatus.Awaiting, response.EnrollmentStatus);
+    }
+
     [Fact]
     public async Task RecalculateCourseFee_UsesFallbackSingleInstallmentWhenFeePolicyIsInvalid()
     {
@@ -74,7 +170,10 @@ public class StudentCourseEnrollmentServiceTests
                 }
             });
 
-        var service = CreateEnrollmentService(transactionService, courseService, policyService);
+        var service = CreateEnrollmentService(
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService);
 
         var result = await service.RecalculateCourseFee(courseId, familyId);
 
@@ -151,7 +250,10 @@ public class StudentCourseEnrollmentServiceTests
                 }
             });
 
-        var service = CreateEnrollmentService(transactionService, courseService, policyService);
+        var service = CreateEnrollmentService(
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService);
 
         var result = await service.RecalculateCourseFee(courseId, familyId);
 
@@ -166,19 +268,323 @@ public class StudentCourseEnrollmentServiceTests
         Assert.Equal(150m, capturedUpdate.FeeInstallments[1].Amount);
     }
 
+    [Fact]
+    public async Task UpdateEnrollment_ReopensClosedGroupWhenConfirmedEnrollmentIsCancelled()
+    {
+        var enrollmentId = Guid.NewGuid();
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetEnrollment(enrollmentId))
+            .ReturnsAsync(CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Registered));
+        repository
+            .Setup(repo => repo.UpdateEnrollment(enrollmentId, It.IsAny<AddStudentCourseEnrollment>()))
+            .ReturnsAsync(true);
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[]
+            {
+                CreateFamilyTransaction(courseId, familyId, new[]
+                {
+                    CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Registered)
+                })
+            });
+        transactionService
+            .Setup(service => service.UpdateTransaction(It.IsAny<Guid>(), It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 100, ifRegistrationOpen: false));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
+
+        var groupService = new Mock<ICourseEnrollmentGroupService>();
+        groupService
+            .Setup(service => service.SetCourseGroupRegistrationStatus(groupId, true))
+            .ReturnsAsync(new CourseEnrollmentGroupResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                IfRegistrationOpen = true
+            });
+
+        var userService = new Mock<IUserService>();
+        userService
+            .Setup(service => service.GetAllFamilyUsersInformation(familyId, true))
+            .ReturnsAsync(Array.Empty<UserInformationResponse>());
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService,
+            groupService: groupService,
+            userService: userService);
+
+        var result = await service.UpdateEnrollment(enrollmentId, new AddStudentCourseEnrollment
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            CourseId = courseId,
+            CourseEnrollmentGroupId = groupId,
+            EnrollmentStatus = EnrollmentStatus.Cancelled,
+            WillUseDayCare = false,
+            DayCareDays = 0
+        }, ifUpdatedByAdmin: true);
+
+        Assert.True(result);
+        groupService.Verify(service => service.SetCourseGroupRegistrationStatus(groupId, true), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateEnrollment_DoesNotAllowMoveIntoSeatHoldingStatusWhenGroupIsFull()
+    {
+        var enrollmentId = Guid.NewGuid();
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetEnrollment(enrollmentId))
+            .ReturnsAsync(CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Awaiting));
+        repository
+            .Setup(repo => repo.GetCourseEnrollmentGroupInformation(groupId))
+            .ReturnsAsync(new CourseEnrollmentGroupInformationResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                MaxStudents = 3,
+                IfRegistrationOpen = true,
+                EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>
+                {
+                    [EnrollmentStatus.Enrolled] = 2,
+                    [EnrollmentStatus.Registered] = 1
+                }
+            });
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 100));
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            courseService: courseService);
+
+        var result = await service.UpdateEnrollment(enrollmentId, new AddStudentCourseEnrollment
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            CourseId = courseId,
+            CourseEnrollmentGroupId = groupId,
+            EnrollmentStatus = EnrollmentStatus.Enrolled,
+            WillUseDayCare = false,
+            DayCareDays = 0
+        }, ifUpdatedByAdmin: true);
+
+        Assert.False(result);
+        repository.Verify(repo => repo.UpdateEnrollment(enrollmentId, It.IsAny<AddStudentCourseEnrollment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateEnrollment_ClosesGroupWhenMoveIntoSeatHoldingStatusFillsLastSeat()
+    {
+        var enrollmentId = Guid.NewGuid();
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetEnrollment(enrollmentId))
+            .ReturnsAsync(CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Awaiting));
+        repository
+            .SetupSequence(repo => repo.GetCourseEnrollmentGroupInformation(groupId))
+            .ReturnsAsync(new CourseEnrollmentGroupInformationResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                MaxStudents = 3,
+                IfRegistrationOpen = true,
+                EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>
+                {
+                    [EnrollmentStatus.Enrolled] = 2,
+                    [EnrollmentStatus.Registered] = 0
+                }
+            })
+            .ReturnsAsync(new CourseEnrollmentGroupInformationResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                MaxStudents = 3,
+                IfRegistrationOpen = true,
+                EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>
+                {
+                    [EnrollmentStatus.Enrolled] = 3,
+                    [EnrollmentStatus.Registered] = 0
+                }
+            });
+        repository
+            .Setup(repo => repo.UpdateEnrollment(enrollmentId, It.IsAny<AddStudentCourseEnrollment>()))
+            .ReturnsAsync(true);
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[]
+            {
+                CreateFamilyTransaction(courseId, familyId, new[]
+                {
+                    CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Enrolled)
+                })
+            });
+        transactionService
+            .Setup(service => service.UpdateTransaction(It.IsAny<Guid>(), It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 100, ifRegistrationOpen: true));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
+
+        var groupService = new Mock<ICourseEnrollmentGroupService>();
+        groupService
+            .Setup(service => service.SetCourseGroupRegistrationStatus(groupId, false))
+            .ReturnsAsync(new CourseEnrollmentGroupResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                IfRegistrationOpen = false
+            });
+
+        var userService = new Mock<IUserService>();
+        userService
+            .Setup(service => service.GetAllFamilyUsersInformation(familyId, true))
+            .ReturnsAsync(Array.Empty<UserInformationResponse>());
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService,
+            groupService: groupService,
+            userService: userService);
+
+        var result = await service.UpdateEnrollment(enrollmentId, new AddStudentCourseEnrollment
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            CourseId = courseId,
+            CourseEnrollmentGroupId = groupId,
+            EnrollmentStatus = EnrollmentStatus.Enrolled,
+            WillUseDayCare = false,
+            DayCareDays = 0
+        }, ifUpdatedByAdmin: true);
+
+        Assert.True(result);
+        groupService.Verify(service => service.SetCourseGroupRegistrationStatus(groupId, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteEnrollment_ReopensClosedGroupWhenConfirmedEnrollmentIsRemoved()
+    {
+        var enrollmentId = Guid.NewGuid();
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetEnrollment(enrollmentId))
+            .ReturnsAsync(CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Enrolled));
+        repository
+            .Setup(repo => repo.DeleteEnrollment(enrollmentId, false))
+            .ReturnsAsync(true);
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        var transactionId = Guid.NewGuid();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[]
+            {
+                new StudentCourseTransactionResponse
+                {
+                    StudentCourseTransactionId = transactionId,
+                    FamilyId = familyId,
+                    TotalAmountPaid = 0m,
+                    Enrollments = new List<StudentCourseEnrollmentResponse>
+                    {
+                        CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Enrolled)
+                    }
+                }
+            });
+        transactionService
+            .Setup(service => service.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(enrollmentId))
+            .ReturnsAsync(true);
+        transactionService
+            .Setup(service => service.DeleteTransaction(transactionId, true))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 100, ifRegistrationOpen: false, courseIsRegistrationOpen: true));
+
+        var groupService = new Mock<ICourseEnrollmentGroupService>();
+        groupService
+            .Setup(service => service.SetCourseGroupRegistrationStatus(groupId, true))
+            .ReturnsAsync(new CourseEnrollmentGroupResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                IfRegistrationOpen = true
+            });
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            groupService: groupService);
+
+        var result = await service.DeleteEnrollment(enrollmentId, hardDelete: false, ifDeletedByAdmin: false);
+
+        Assert.True(result);
+        groupService.Verify(service => service.SetCourseGroupRegistrationStatus(groupId, true), Times.Once);
+        transactionService.Verify(service => service.DeleteTransaction(transactionId, true), Times.Once);
+    }
+
     private static StudentCourseEnrollmentService CreateEnrollmentService(
-        Mock<IStudentCourseTransactionService> transactionService,
-        Mock<ICourseService> courseService,
-        Mock<IInstitutePolicyService> policyService)
+        Mock<IStudentCourseEnrollmentRepository>? repository = null,
+        Mock<IStudentCourseTransactionService>? transactionService = null,
+        Mock<ICourseService>? courseService = null,
+        Mock<IInstitutePolicyService>? policyService = null,
+        Mock<ICourseEnrollmentGroupService>? groupService = null,
+        Mock<IUserService>? userService = null)
     {
         return new StudentCourseEnrollmentService(
-            Mock.Of<IStudentCourseEnrollmentRepository>(),
-            transactionService.Object,
-            courseService.Object,
-            policyService.Object,
-            Mock.Of<ICourseEnrollmentGroupService>(),
+            (repository ?? new Mock<IStudentCourseEnrollmentRepository>()).Object,
+            (transactionService ?? new Mock<IStudentCourseTransactionService>()).Object,
+            (courseService ?? new Mock<ICourseService>()).Object,
+            (policyService ?? new Mock<IInstitutePolicyService>()).Object,
+            (groupService ?? new Mock<ICourseEnrollmentGroupService>()).Object,
             Mock.Of<ISendEmailService>(),
-            Mock.Of<IUserService>());
+            (userService ?? new Mock<IUserService>()).Object);
     }
 
     private static StudentCourseTransactionResponse CreateFamilyTransaction(
@@ -201,7 +607,12 @@ public class StudentCourseEnrollmentServiceTests
         };
     }
 
-    private static StudentCourseEnrollmentResponse CreateEnrollment(Guid childId, Guid groupId, Guid courseId)
+    private static StudentCourseEnrollmentResponse CreateEnrollment(
+        Guid childId,
+        Guid groupId,
+        Guid courseId,
+        Guid? familyId = null,
+        EnrollmentStatus status = EnrollmentStatus.Registered)
     {
         return new StudentCourseEnrollmentResponse
         {
@@ -209,8 +620,8 @@ public class StudentCourseEnrollmentServiceTests
             ChildId = childId,
             CourseEnrollmentGroupId = groupId,
             CourseId = courseId,
-            FamilyId = Guid.NewGuid(),
-            EnrollmentStatus = EnrollmentStatus.Registered,
+            FamilyId = familyId ?? Guid.NewGuid(),
+            EnrollmentStatus = status,
             WillUseDayCare = false,
             CreatedAt = DateTime.UtcNow.AddMinutes(-5),
             UpdatedOn = DateTime.UtcNow
@@ -218,6 +629,15 @@ public class StudentCourseEnrollmentServiceTests
     }
 
     private static CourseResponseDetailed CreateCourse(Guid courseId, Guid firstGroupId, int fee, params Guid[] otherGroupIds)
+        => CreateCourse(courseId, firstGroupId, fee, true, true, otherGroupIds);
+
+    private static CourseResponseDetailed CreateCourse(
+        Guid courseId,
+        Guid firstGroupId,
+        int fee,
+        bool ifRegistrationOpen,
+        bool courseIsRegistrationOpen = true,
+        params Guid[] otherGroupIds)
     {
         var groupIds = new[] { firstGroupId }.Concat(otherGroupIds).ToList();
 
@@ -226,7 +646,7 @@ public class StudentCourseEnrollmentServiceTests
             CourseId = courseId,
             InstituteId = Guid.NewGuid(),
             RegistrationFee = 0,
-            IsRegistrationOpened = true,
+            IsRegistrationOpened = courseIsRegistrationOpen,
             CourseEnrollmentGroups = groupIds.Select(groupId => new CourseEnrollmentGroupResponse
             {
                 CourseEnrollmentGroupId = groupId,
@@ -234,7 +654,7 @@ public class StudentCourseEnrollmentServiceTests
                 InstituteId = Guid.NewGuid(),
                 Fee = fee,
                 DayCareFee = 0,
-                IfRegistrationOpen = true,
+                IfRegistrationOpen = ifRegistrationOpen,
                 GroupTitle = "Group",
                 GroupTitleFr = "Groupe",
                 AcedemicGroups = new List<string>()

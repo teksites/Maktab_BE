@@ -54,14 +54,12 @@ namespace Courses.Implementation.Services
                 throw new Exception("Course enrollment group not found");
             }
 
-            var registeredCount = enrollmentGroupState.EnrollmentStatusCount.TryGetValue(EnrollmentStatus.Registered, out var count)
-                ? count
-                : 0;
+            var occupiedSeatCount = GetOccupiedSeatCount(enrollmentGroupState.EnrollmentStatusCount);
 
-            var canRegister = enrollmentGroupState.IfRegistrationOpen && registeredCount < enrollmentGroupState.MaxStudents;
+            var canRegister = enrollmentGroupState.IfRegistrationOpen && occupiedSeatCount < enrollmentGroupState.MaxStudents;
             enrollment.EnrollmentStatus = canRegister ? EnrollmentStatus.Enrolled : EnrollmentStatus.Awaiting;
 
-            if (enrollmentGroupState.IfRegistrationOpen && registeredCount + 1 >= enrollmentGroupState.MaxStudents)
+            if (enrollmentGroupState.IfRegistrationOpen && occupiedSeatCount + 1 >= enrollmentGroupState.MaxStudents)
             {
                 await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroupState.CourseEnrollmentGroupId, false).ConfigureAwait(false);
             }
@@ -138,8 +136,8 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.TransactionStatus = TransactionStatus.AwaitingPayment;
                 addStudentCourseTransaction.RegistrationStatus = RegistrationStatus.Pending;               
                 addStudentCourseTransaction.IsActive = true;
-                // Only calculate fees if enrollment status is Registered
-                if (enrollment.EnrollmentStatus == EnrollmentStatus.Registered)
+                // Bill immediately when the child has a confirmed seat.
+                if (IsFeeBearingEnrollmentStatus(enrollment.EnrollmentStatus))
                 {
                     addStudentCourseTransaction.PayableFee = (decimal)selectedCourseEnrollmentGroup.Fee;
                     addStudentCourseTransaction.DayCareFee = enrollment.WillUseDayCare ? selectedCourseEnrollmentGroup.DayCareFee : 0;
@@ -279,7 +277,7 @@ namespace Courses.Implementation.Services
                 {
                     var enrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
 
-                    if (enrollmentGroup != null && (enrollment.EnrollmentStatus == EnrollmentStatus.Registered || enrollment.EnrollmentStatus == EnrollmentStatus.Awaiting))// Only allowed registered and awaited  ones
+                    if (enrollmentGroup != null && IsFeeBearingEnrollmentStatus(enrollment.EnrollmentStatus))// Only allowed billable ones
                     {
                         childFee += (Convert.ToDecimal(enrollmentGroup.Fee) * applicableDiscountPercentage);
                         childDayCareFee += enrollment.WillUseDayCare ? Convert.ToDecimal(enrollmentGroup.DayCareFee) : 0m;
@@ -455,6 +453,26 @@ namespace Courses.Implementation.Services
         private static decimal RoundToNearestFive(decimal amount)
             => Math.Round(amount / 5m, 0, MidpointRounding.AwayFromZero) * 5m;
 
+        private static int GetOccupiedSeatCount(IReadOnlyDictionary<EnrollmentStatus, int> enrollmentStatusCount)
+        {
+            var enrolledCount = enrollmentStatusCount.TryGetValue(EnrollmentStatus.Enrolled, out var enrolled)
+                ? enrolled
+                : 0;
+            var registeredCount = enrollmentStatusCount.TryGetValue(EnrollmentStatus.Registered, out var registered)
+                ? registered
+                : 0;
+
+            return enrolledCount + registeredCount;
+        }
+
+        private static bool IsFeeBearingEnrollmentStatus(EnrollmentStatus status)
+            => status == EnrollmentStatus.Enrolled
+            || status == EnrollmentStatus.Registered
+            || status == EnrollmentStatus.Awaiting;
+
+        private static bool HoldsSeat(EnrollmentStatus status)
+            => status == EnrollmentStatus.Enrolled || status == EnrollmentStatus.Registered;
+
         private async Task<AddStudentCourseTransaction> CreateTransactionData(AddStudentCourseEnrollment enrollment, AddStudentCourseTransaction addStudentCourseTransaction)
         {
             //var course = await _courseService.GetCourseGroup(enrollment.CourseEnrollmentGroupId).ConfigureAwait(false);
@@ -525,17 +543,56 @@ namespace Courses.Implementation.Services
                 return false;
             }
 
-            var response = await _repository.UpdateEnrollment(enrollmentId, enrollment).ConfigureAwait(false);
-
+            // Preserve the existing status when the caller does not explicitly send one.
+            if (enrollment.EnrollmentStatus == EnrollmentStatus.Unknown)
+            {
+                enrollment.EnrollmentStatus = enrollmentStatus;
+            }
 
             var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
+            var isMovingIntoSeatHoldingStatus =
+                !HoldsSeat(enrollmentStatus) &&
+                HoldsSeat(enrollment.EnrollmentStatus) &&
+                enrollment.EnrollmentStatus != enrollmentStatus;
+
+            if (isMovingIntoSeatHoldingStatus)
+            {
+                var enrollmentGroupState = await GetCourseEnrollmentGroupInformation(enrollmentDetails.CourseEnrollmentGroupId).ConfigureAwait(false);
+                if (enrollmentGroupState == null)
+                {
+                    return false;
+                }
+
+                var occupiedSeatCount = GetOccupiedSeatCount(enrollmentGroupState.EnrollmentStatusCount);
+                if (!enrollmentGroupState.IfRegistrationOpen || occupiedSeatCount >= enrollmentGroupState.MaxStudents)
+                {
+                    return false;
+                }
+            }
+
+            var response = await _repository.UpdateEnrollment(enrollmentId, enrollment).ConfigureAwait(false);
+
+            if (response &&
+                isMovingIntoSeatHoldingStatus &&
+                enrollmentGroup != null)
+            {
+                var enrollmentGroupState = await GetCourseEnrollmentGroupInformation(enrollmentDetails.CourseEnrollmentGroupId).ConfigureAwait(false);
+                if (enrollmentGroupState != null)
+                {
+                    var occupiedSeatCount = GetOccupiedSeatCount(enrollmentGroupState.EnrollmentStatusCount);
+                    if (enrollmentGroupState.IfRegistrationOpen && occupiedSeatCount >= enrollmentGroupState.MaxStudents)
+                    {
+                        await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, false).ConfigureAwait(false);
+                    }
+                }
+            }
 
             //if previous state was registered and its deleted, then we have to set the isregistered to true if the isregistered is false 
             // it means we have a room now
-            if (enrollmentDetails != null && 
-                (enrollmentStatus == EnrollmentStatus.Registered || enrollmentStatus == EnrollmentStatus.Enrolled)//current state is enrolled
-                && (enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Cancelled)//New status is cancelled
-                && enrollment.EnrollmentStatus != enrollmentStatus)// it means it can be either refund or cancelled
+            if (enrollmentDetails != null &&
+                HoldsSeat(enrollmentStatus) &&
+                !HoldsSeat(enrollment.EnrollmentStatus) &&
+                enrollment.EnrollmentStatus != enrollmentStatus)
             {
                 if (!enrollmentGroup.IfRegistrationOpen)
                 {
@@ -607,12 +664,13 @@ namespace Courses.Implementation.Services
         public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false, bool ifDeletedByAdmin = false)
         {
             var enrollmentDetails = await _repository.GetEnrollment(enrollmentId).ConfigureAwait(false);
-            enrollmentDetails.EnrollmentStatus = EnrollmentStatus.Cancelled;
 
             if (enrollmentDetails == null)
             {
                 return false;
             }
+
+            var previousEnrollmentStatus = enrollmentDetails.EnrollmentStatus;
           
             var courseDetails = await _courseService.GetCourse(enrollmentDetails.CourseId).ConfigureAwait(false);
             
@@ -631,34 +689,31 @@ namespace Courses.Implementation.Services
             var ifDeleted = await _studentCourseTransactionService.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(enrollmentId).ConfigureAwait(false);
             var ifEnrollmentDeleted = false;
 
-            if (ifDeleted && ifEnrollmentDeleted)
-            {
-                if (familyTransaction.Enrollments.Count <= 1)
-                {
-                    var ifFeePaid = familyTransaction.TotalAmountPaid > 0;
-                    return await _studentCourseTransactionService.DeleteTransaction(familyTransaction.StudentCourseTransactionId, !ifFeePaid).ConfigureAwait(false);
-                }
-                else
-                {
-                    return await RecalculateCourseFee(courseId, familyId).ConfigureAwait(false);
-                }
-            }
-
-            //if previous state was registered and its deleted, then we have to set the isregistered to true if the isregistered is false 
-            // it means we have a room now
-            if (enrollmentGroup != null &&
-                 (enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Registered || enrollmentDetails.EnrollmentStatus == EnrollmentStatus.Enrolled)
-                && !enrollmentGroup.IfRegistrationOpen)
-            {
-                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
-            }
-
             if (ifDeleted)
             {
                 ifEnrollmentDeleted = await _repository.DeleteEnrollment(enrollmentId, hardDelete).ConfigureAwait(false);
             }
 
-            return false;
+            if (!ifDeleted || !ifEnrollmentDeleted)
+            {
+                return false;
+            }
+
+            // If a confirmed-seat enrollment is removed, reopen the group when it had been closed for capacity.
+            if (enrollmentGroup != null &&
+                HoldsSeat(previousEnrollmentStatus) &&
+                !enrollmentGroup.IfRegistrationOpen)
+            {
+                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
+            }
+
+            if (familyTransaction.Enrollments.Count <= 1)
+            {
+                var ifFeePaid = familyTransaction.TotalAmountPaid > 0;
+                return await _studentCourseTransactionService.DeleteTransaction(familyTransaction.StudentCourseTransactionId, !ifFeePaid).ConfigureAwait(false);
+            }
+
+            return await RecalculateCourseFee(courseId, familyId).ConfigureAwait(false);
 
         }
         public Task<StudentCourseEnrollmentResponse> GetStudentCourseEnrollment(Guid childId, Guid courseId)

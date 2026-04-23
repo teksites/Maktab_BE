@@ -8,17 +8,19 @@ namespace Courses.Test.Infrastructure;
 internal sealed class FakeDatabase : IDatabase
 {
     private readonly Func<DbDataReader> _readerFactory;
+    private readonly Action<DbCommand>? _onExecute;
 
-    public FakeDatabase(Func<DbDataReader> readerFactory)
+    public FakeDatabase(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute = null)
     {
         _readerFactory = readerFactory;
+        _onExecute = onExecute;
     }
 
     public string ConnectionString => "Fake";
 
     public DbConnection CreateAndOpenConnection()
     {
-        var connection = new FakeDbConnection(_readerFactory);
+        var connection = new FakeDbConnection(_readerFactory, _onExecute);
         connection.Open();
         return connection;
     }
@@ -27,7 +29,7 @@ internal sealed class FakeDatabase : IDatabase
         => Task.FromResult<DbConnection>(CreateAndOpenConnection());
 
     public DbCommand CreateCommand()
-        => new FakeDbCommand(_readerFactory);
+        => new FakeDbCommand(_readerFactory, _onExecute);
 
     public DbCommand CreateCommand(string cmdText)
     {
@@ -64,11 +66,13 @@ internal sealed class FakeDatabase : IDatabase
 internal sealed class FakeDbConnection : DbConnection
 {
     private readonly Func<DbDataReader> _readerFactory;
+    private readonly Action<DbCommand>? _onExecute;
     private ConnectionState _state;
 
-    public FakeDbConnection(Func<DbDataReader> readerFactory)
+    public FakeDbConnection(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute)
     {
         _readerFactory = readerFactory;
+        _onExecute = onExecute;
     }
 
     public override string? ConnectionString { get; set; } = "Fake";
@@ -106,7 +110,7 @@ internal sealed class FakeDbConnection : DbConnection
 
     protected override DbCommand CreateDbCommand()
     {
-        var command = new FakeDbCommand(_readerFactory)
+        var command = new FakeDbCommand(_readerFactory, _onExecute)
         {
             Connection = this
         };
@@ -118,11 +122,13 @@ internal sealed class FakeDbConnection : DbConnection
 internal sealed class FakeDbCommand : DbCommand
 {
     private readonly Func<DbDataReader> _readerFactory;
+    private readonly Action<DbCommand>? _onExecute;
     private readonly FakeDbParameterCollection _parameters = new();
 
-    public FakeDbCommand(Func<DbDataReader> readerFactory)
+    public FakeDbCommand(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute)
     {
         _readerFactory = readerFactory;
+        _onExecute = onExecute;
     }
 
     public override string? CommandText { get; set; } = string.Empty;
@@ -157,7 +163,10 @@ internal sealed class FakeDbCommand : DbCommand
         => new FakeDbParameter();
 
     protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
-        => _readerFactory();
+    {
+        _onExecute?.Invoke(this);
+        return _readerFactory();
+    }
 }
 
 internal sealed class FakeDbParameter : DbParameter
