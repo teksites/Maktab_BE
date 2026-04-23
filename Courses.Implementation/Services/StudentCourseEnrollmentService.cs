@@ -319,7 +319,7 @@ namespace Courses.Implementation.Services
                 (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
             addStudentCourseTransaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable + (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
             addStudentCourseTransaction.FeeInstallments = BuildFeeInstallments(
-                addStudentCourseTransaction.TotalPayable,
+                recalculatedTotalPayable,
                 feePaymentPolicyFound,
                 feePolicy,
                 enrollmentGroupCountsByChild);
