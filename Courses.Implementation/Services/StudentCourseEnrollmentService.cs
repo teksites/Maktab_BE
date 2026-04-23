@@ -317,7 +317,7 @@ namespace Courses.Implementation.Services
             addStudentCourseTransaction.TotalAmountPaid = familyTransaction.TotalAmountPaid;
             var recalculatedTotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
                 (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
-            addStudentCourseTransaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable;
+            addStudentCourseTransaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable + (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
             addStudentCourseTransaction.FeeInstallments = BuildFeeInstallments(
                 addStudentCourseTransaction.TotalPayable,
                 feePaymentPolicyFound,
