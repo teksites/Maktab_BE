@@ -329,7 +329,7 @@ namespace Courses.Implementation.Services
                 var feePolicy = JsonConvert.DeserializeObject<List<FeePaymentPolicy>>(feePaymentPolicyDetails) ?? new List<FeePaymentPolicy>();
                 var totalMinimumAmountDue = feePolicy.Sum(x => x.MinimumAmountDue ?? 0m);
 
-                return (feePolicy, feePolicy.Count > 0 && totalMinimumAmountDue == 100m);
+                return (feePolicy, feePolicy.Count > 0);
             }
             catch
             {
