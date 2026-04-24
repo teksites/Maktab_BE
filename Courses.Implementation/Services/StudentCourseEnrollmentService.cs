@@ -158,7 +158,8 @@ namespace Courses.Implementation.Services
                     addStudentCourseTransaction.TotalPayable,
                     feePaymentPolicyFound,
                     feePolicy,
-                    new[] { 1 });
+                    new[] { 1 },
+                    course.CanSelectMultipleEnrollmentGroups);
                 addStudentCourseTransaction.Comments = $"New Enrollment on {DateTime.UtcNow.ToString()}";
                 addStudentCourseTransaction.IsCompletelyPaid = false;
 
@@ -223,7 +224,7 @@ namespace Courses.Implementation.Services
                     Enrollments = orderedEnrollments
                 };
             })
-            .OrderByDescending(g => g.Enrollments.Count)
+            .OrderByDescending(g => g.Enrollments.Count(e => IsFeeBearingEnrollmentStatus(e.EnrollmentStatus)))
             .ThenBy(g => g.EnrollmentIndex)
             .ToList();
             var enrollmentGroupCountsByChild = groupedByChild.Select(g => g.Enrollments.Count).ToList();
@@ -323,7 +324,8 @@ namespace Courses.Implementation.Services
                 recalculatedTotalPayable,
                 feePaymentPolicyFound,
                 feePolicy,
-                enrollmentGroupCountsByChild);
+                enrollmentGroupCountsByChild,
+                course.CanSelectMultipleEnrollmentGroups);
 
             addStudentCourseTransaction.Comments = familyTransaction.Comments +$"\n Updated the transaction on {DateTime.UtcNow.ToString()}";
             addStudentCourseTransaction.IsCompletelyPaid = recalculatedTotalPayable <= addStudentCourseTransaction.TotalAmountPaid;
@@ -355,14 +357,15 @@ namespace Courses.Implementation.Services
             decimal totalPayable,
             bool feePaymentPolicyFound,
             IReadOnlyList<FeePaymentPolicy> feePolicy,
-            IReadOnlyList<int> enrollmentGroupCountsByChild)
+            IReadOnlyList<int> enrollmentGroupCountsByChild,
+            bool canHaveMultipleEnrollmentGroups)
         {
             if (totalPayable <= 0m)
             {
                 return new List<FeeInstallment>();
             }
 
-            if (!feePaymentPolicyFound || feePolicy.Count == 0)
+            if (!feePaymentPolicyFound || feePolicy.Count == 0 || canHaveMultipleEnrollmentGroups)
             {
                 return new List<FeeInstallment>
                 {
