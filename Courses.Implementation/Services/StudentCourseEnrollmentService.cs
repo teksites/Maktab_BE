@@ -208,7 +208,11 @@ namespace Courses.Implementation.Services
             .ThenBy(e => e.CreatedAt)
             .ToList();
 
-            var groupedByChild = effectiveEnrollments
+            var feeApplicableEnrollments = effectiveEnrollments
+            .Where(e => IsFeeBearingEnrollmentStatus(e.EnrollmentStatus))
+            .ToList();
+
+            var groupedByChild = feeApplicableEnrollments
             .GroupBy(e => e.EnrollmentIndex)
             .Select(g =>
             {
@@ -227,6 +231,7 @@ namespace Courses.Implementation.Services
             .OrderByDescending(g => g.Enrollments.Count(e => IsFeeBearingEnrollmentStatus(e.EnrollmentStatus)))
             .ThenBy(g => g.EnrollmentIndex)
             .ToList();
+            
             var enrollmentGroupCountsByChild = groupedByChild.Select(g => g.Enrollments.Count).ToList();
 
             int i = 1;
