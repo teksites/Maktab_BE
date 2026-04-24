@@ -223,7 +223,8 @@ namespace Courses.Implementation.Services
                     Enrollments = orderedEnrollments
                 };
             })
-            .OrderBy(g => g.EnrollmentIndex)
+            .OrderByDescending(g => g.Enrollments.Count)
+            .ThenBy(g => g.EnrollmentIndex)
             .ToList();
             var enrollmentGroupCountsByChild = groupedByChild.Select(g => g.Enrollments.Count).ToList();
 
