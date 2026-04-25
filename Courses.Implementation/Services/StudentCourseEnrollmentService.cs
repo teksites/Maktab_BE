@@ -370,7 +370,7 @@ namespace Courses.Implementation.Services
                 return new List<FeeInstallment>();
             }
 
-            if (!feePaymentPolicyFound || feePolicy.Count == 0 || canHaveMultipleEnrollmentGroups)
+            if (!feePaymentPolicyFound || feePolicy.Count == 0 || !canHaveMultipleEnrollmentGroups)
             {
                 return new List<FeeInstallment>
                 {
