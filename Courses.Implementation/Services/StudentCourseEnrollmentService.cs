@@ -267,7 +267,7 @@ namespace Courses.Implementation.Services
                         }
                     }
 
-                    var activeFeePaymentPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.CourseFeePayment);
+                    var activeFeePaymentPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.CourseFeePayment && p.CourseId == course.CourseId);
                     (feePolicy, feePaymentPolicyFound) = ParseValidatedFeePaymentPolicy(activeFeePaymentPolicy?.Details);
                 }
             }
