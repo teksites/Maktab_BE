@@ -56,8 +56,8 @@ public class InstituteController : ControllerBase
 
     [ApiAuthorize]
     [HttpGet("/policies")]
-    public async Task<IEnumerable<InstitutePolicyResponse>> GetPolicyByType(PolicyType policyType)
-    => await _policyService.GetAllPolicies(instituteId);
+    public async Task<InstitutePolicyResponse> GetPolicyByType(PolicyType policyType)
+    => await _policyService.GetPolicyByType(policyType);
 
     [ApiAuthorize]
     [HttpGet("policies/{policyId:guid}")]
