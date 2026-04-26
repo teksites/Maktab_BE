@@ -1,4 +1,5 @@
-﻿using MaktabDataContracts.Requests.Institute;
+﻿using MaktabDataContracts.Enums;
+using MaktabDataContracts.Requests.Institute;
 using MaktabDataContracts.Responses.Institute;
 
 namespace Courses.Repository
@@ -31,5 +32,6 @@ namespace Courses.Repository
         /// If hardDelete is true, deletes the row; otherwise marks it inactive.
         /// </summary>
         Task<bool> DeletePolicy(Guid policyId, bool hardDelete = false);
+        Task<InstitutePolicyResponse> GetPolicyByType(PolicyType policyType);
     }
 }

@@ -124,5 +124,26 @@ namespace Courses.Repository.Implementation
                 UpdatedOn = reader.GetDateTime("UpdatedOn")
             };
         }
+
+        public async Task<InstitutePolicyResponse> GetPolicyByType(PolicyType policyType)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                SELECT *
+                FROM institute_policy
+                WHERE InstutePolicyType = @InstutePolicyType
+                  AND IsActive = TRUE
+                ORDER BY CreatedAt DESC
+                LIMIT 1";
+
+            cmd.AddParameter("@InstutePolicyType", (byte)policyType);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
+
+            return MapToPolicyResponse(reader);
+        }
     }
 }

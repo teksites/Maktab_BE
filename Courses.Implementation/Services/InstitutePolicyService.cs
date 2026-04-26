@@ -1,5 +1,6 @@
 ﻿using Courses.Repository;
 using Courses.Services;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Requests.Institute;
 using MaktabDataContracts.Responses.Institute;
@@ -41,5 +42,8 @@ namespace Courses.Implementation.Services
             };
         }
 
+        public Task<InstitutePolicyResponse> GetPolicyByType(PolicyType policyType)
+            => _repository.GetPolicyByType(policyType);
+        }
     }
 }
