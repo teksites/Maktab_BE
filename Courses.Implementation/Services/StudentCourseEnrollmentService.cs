@@ -155,11 +155,12 @@ namespace Courses.Implementation.Services
                 var activeFeePaymentPolicy = activePolicies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.CourseFeePayment);
                 var (feePolicy, feePaymentPolicyFound) = ParseValidatedFeePaymentPolicy(activeFeePaymentPolicy?.Details);
                 addStudentCourseTransaction.FeeInstallments = BuildFeeInstallments(
-                    addStudentCourseTransaction.TotalPayable,
+                    addStudentCourseTransaction.TotalPayable - course.RegistrationFee,// exclude registration fee from installments
+                    course.RegistrationFee,
                     feePaymentPolicyFound,
                     feePolicy,
                     new[] { 1 },
-                    course.CanSelectMultipleEnrollmentGroups);
+                    course.CourseEnrollmentGroups.Count);
                 addStudentCourseTransaction.Comments = $"New Enrollment on {DateTime.UtcNow.ToString()}";
                 addStudentCourseTransaction.IsCompletelyPaid = false;
 
@@ -326,11 +327,12 @@ namespace Courses.Implementation.Services
                 (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
             addStudentCourseTransaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable + (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
             addStudentCourseTransaction.FeeInstallments = BuildFeeInstallments(
-                recalculatedTotalPayable,
+                recalculatedTotalPayable - course.RegistrationFee,
+                course.RegistrationFee,
                 feePaymentPolicyFound,
                 feePolicy,
                 enrollmentGroupCountsByChild,
-                course.CanSelectMultipleEnrollmentGroups);
+                course.CourseEnrollmentGroups.Count);
 
             addStudentCourseTransaction.Comments = familyTransaction.Comments +$"\n Updated the transaction on {DateTime.UtcNow.ToString()}";
             addStudentCourseTransaction.IsCompletelyPaid = recalculatedTotalPayable <= addStudentCourseTransaction.TotalAmountPaid;
@@ -348,8 +350,6 @@ namespace Courses.Implementation.Services
             try
             {
                 var feePolicy = JsonConvert.DeserializeObject<List<FeePaymentPolicy>>(feePaymentPolicyDetails) ?? new List<FeePaymentPolicy>();
-                var totalMinimumAmountDue = feePolicy.Sum(x => x.MinimumAmountDue ?? 0m);
-
                 return (feePolicy, feePolicy.Count > 0);
             }
             catch
@@ -360,117 +360,218 @@ namespace Courses.Implementation.Services
 
         private static List<FeeInstallment> BuildFeeInstallments(
             decimal totalPayable,
+            decimal registrationFee,
             bool feePaymentPolicyFound,
             IReadOnlyList<FeePaymentPolicy> feePolicy,
             IReadOnlyList<int> enrollmentGroupCountsByChild,
-            bool canHaveMultipleEnrollmentGroups)
+            int totalEnrollmentGroups)
         {
-            if (totalPayable <= 0m)
+            var sortedPolicy = feePolicy
+                .OrderBy(policy => policy.PaymentDate)
+                .ToList();
+
+            if (totalPayable <= 0m && registrationFee <= 0m)
             {
                 return new List<FeeInstallment>();
             }
 
-            if (!feePaymentPolicyFound || feePolicy.Count == 0 || !canHaveMultipleEnrollmentGroups)
+            if (!feePaymentPolicyFound || sortedPolicy.Count == 0 || totalEnrollmentGroups <= 1)
+            {
+                return new List<FeeInstallment> { CreateDefaultInstallment(totalPayable + registrationFee) };
+            }
+
+            if (totalPayable <= 0m) // only registration fee
+            {
+                return new List<FeeInstallment> { CreatePolicyInstallment(sortedPolicy[0], registrationFee) };
+            }
+
+            if (!sortedPolicy[0].ShouldApplyEnrollmentToCover)
+            {
+                return BuildPercentageDrivenInstallments(
+                    totalPayable,
+                    registrationFee,
+                    sortedPolicy,
+                    enrollmentGroupCountsByChild.Count);
+            }
+
+            return BuildEnrollmentCountDrivenInstallments(
+                totalPayable,
+                registrationFee,
+                sortedPolicy,
+                enrollmentGroupCountsByChild,
+                totalEnrollmentGroups);
+        }
+
+        private static List<FeeInstallment> BuildPercentageDrivenInstallments(
+            decimal totalPayable,
+            decimal registrationFee,
+            IReadOnlyList<FeePaymentPolicy> sortedPolicy,
+            int enrolledChildrenCount)
+        {
+            var firstPolicy = sortedPolicy[0];
+            var totalPercentageToCover = sortedPolicy.Sum(policy => policy.PercentageToCover);
+
+            if (totalPercentageToCover != 100
+                || firstPolicy.MinimalChildrenToApply == 0
+                || enrolledChildrenCount < firstPolicy.MinimalChildrenToApply)
             {
                 return new List<FeeInstallment>
                 {
-                    new FeeInstallment
-                    {
-                        Description = "Paiement complet de l'inscription/Complete Registration Payment",
-                        DueDate = DateTime.UtcNow.Date.AddDays(1),
-                        Amount = totalPayable
-                    }
+                    CreatePolicyInstallment(firstPolicy, totalPayable + registrationFee)
                 };
             }
 
-            var installmentCount = DetermineInstallmentCount(feePolicy.Count, enrollmentGroupCountsByChild);
-            if (installmentCount <= 1)
+            var installmentAmounts = new List<decimal>(sortedPolicy.Count);
+            var remainingAmount = totalPayable;
+
+            for (var index = 0; index < sortedPolicy.Count; index++)
+            {
+                var amount = remainingAmount;
+                if (index < sortedPolicy.Count - 1)
+                {
+                    var percentageAmount = totalPayable * sortedPolicy[index].PercentageToCover / 100m;
+                    amount = RoundToNearestFive(percentageAmount);
+                    if (amount < 0m)
+                    {
+                        amount = 0m;
+                    }
+
+                    if (amount > remainingAmount)
+                    {
+                        amount = remainingAmount;
+                    }
+                }
+
+                installmentAmounts.Add(amount);
+                remainingAmount -= amount;
+            }
+
+            if (installmentAmounts.Count == 0)
             {
                 return new List<FeeInstallment>
                 {
-                    new FeeInstallment
-                    {
-                        Description = feePolicy[0].Name,
-                        DueDate = feePolicy[0].PaymentDate,
-                        Amount = totalPayable
-                    }
+                    CreatePolicyInstallment(firstPolicy, totalPayable + registrationFee)
                 };
             }
 
-            var installmentAmounts = SplitInstallmentAmounts(totalPayable, installmentCount);
-            var installments = new List<FeeInstallment>(installmentCount);
+            installmentAmounts[0] += registrationFee;
+            return BuildInstallmentsFromPolicy(sortedPolicy, installmentAmounts);
+        }
 
-            for (var index = 0; index < installmentCount; index++)
+        private static List<FeeInstallment> BuildEnrollmentCountDrivenInstallments(
+            decimal totalPayable,
+            decimal registrationFee,
+            IReadOnlyList<FeePaymentPolicy> sortedPolicy,
+            IReadOnlyList<int> enrollmentGroupCountsByChild,
+            int totalEnrollmentGroups)
+        {
+            var firstPolicy = sortedPolicy[0];
+            if (enrollmentGroupCountsByChild.Count == 0 || enrollmentGroupCountsByChild[0] <= 0)
             {
-                installments.Add(new FeeInstallment
+                return new List<FeeInstallment>
                 {
-                    Description = feePolicy[index].Name,
-                    DueDate = feePolicy[index].PaymentDate,
-                    Amount = installmentAmounts[index]
-                });
+                    CreatePolicyInstallment(firstPolicy, totalPayable + registrationFee)
+                };
+            }
+
+            var maxEnrollmentCount = enrollmentGroupCountsByChild[0];
+            var unitPrice = totalPayable / maxEnrollmentCount;
+            var installmentAmounts = new List<decimal>(sortedPolicy.Count);
+            var applicablePolicy = new List<FeePaymentPolicy>(sortedPolicy.Count);
+            var remainingAmount = totalPayable;
+            var remainingEnrollments = maxEnrollmentCount;
+
+            for (var index = 0; index < sortedPolicy.Count && remainingEnrollments > 0 && remainingAmount > 0m; index++)
+            {
+                var isLastPolicyItem = index == sortedPolicy.Count - 1;
+                var enrollmentsToCover = isLastPolicyItem
+                    ? remainingEnrollments
+                    : Math.Max(sortedPolicy[index].EnrollmentsToCover, 0);
+
+                if (enrollmentsToCover > remainingEnrollments)
+                {
+                    enrollmentsToCover = remainingEnrollments;
+                }
+
+                if (enrollmentsToCover <= 0)
+                {
+                    continue;
+                }
+
+                var amount = remainingAmount;
+                if (!isLastPolicyItem)
+                {
+                    amount = RoundToNearestFive(enrollmentsToCover * unitPrice);
+                    if (amount < 0m)
+                    {
+                        amount = 0m;
+                    }
+
+                    if (amount > remainingAmount)
+                    {
+                        amount = remainingAmount;
+                    }
+                }
+
+                applicablePolicy.Add(sortedPolicy[index]);
+                installmentAmounts.Add(amount);
+                remainingAmount -= amount;
+                remainingEnrollments -= enrollmentsToCover;
+            }
+
+            if (installmentAmounts.Count == 0 || applicablePolicy.Count == 0)
+            {
+                return new List<FeeInstallment>
+                {
+                    CreatePolicyInstallment(firstPolicy, totalPayable + registrationFee)
+                };
+            }
+
+            if (remainingAmount > 0m)
+            {
+                installmentAmounts[^1] += remainingAmount;
+            }
+
+            installmentAmounts[0] += registrationFee;
+            return BuildInstallmentsFromPolicy(applicablePolicy, installmentAmounts);
+        }
+
+        private static List<FeeInstallment> BuildInstallmentsFromPolicy(
+            IReadOnlyList<FeePaymentPolicy> sortedPolicy,
+            IReadOnlyList<decimal> installmentAmounts)
+        {
+            var installments = new List<FeeInstallment>(Math.Min(sortedPolicy.Count, installmentAmounts.Count));
+
+            for (var index = 0; index < sortedPolicy.Count && index < installmentAmounts.Count; index++)
+            {
+                if (installmentAmounts[index] <= 0m)
+                {
+                    continue;
+                }
+
+                installments.Add(CreatePolicyInstallment(sortedPolicy[index], installmentAmounts[index]));
             }
 
             return installments;
         }
 
-        private static int DetermineInstallmentCount(int policyItemCount, IReadOnlyList<int> enrollmentGroupCountsByChild)
-        {
-            if (policyItemCount <= 0 || enrollmentGroupCountsByChild.Count == 0)
+        private static FeeInstallment CreatePolicyInstallment(FeePaymentPolicy policy, decimal amount)
+            => new FeeInstallment
             {
-                return 0;
-            }
+                Description = policy.Name,
+                DescriptionFr = policy.NameFr,
+                DueDate = policy.PaymentDate,
+                Amount = amount
+            };
 
-            if (enrollmentGroupCountsByChild.Count == 1)
+        private static FeeInstallment CreateDefaultInstallment(decimal amount)
+            => new FeeInstallment
             {
-                var singleChildEnrollmentGroupCount = enrollmentGroupCountsByChild[0];
-                if (singleChildEnrollmentGroupCount <= 2)
-                {
-                    return 1;
-                }
-
-                return singleChildEnrollmentGroupCount <= policyItemCount
-                    ? singleChildEnrollmentGroupCount - 1
-                    : policyItemCount;
-            }
-
-            if (enrollmentGroupCountsByChild.All(count => count <= 1))
-            {
-                return 1;
-            }
-
-            var maxEnrollmentGroupCount = enrollmentGroupCountsByChild.Max();
-            return maxEnrollmentGroupCount <= policyItemCount
-                ? maxEnrollmentGroupCount
-                : policyItemCount;
-        }
-
-        private static List<decimal> SplitInstallmentAmounts(decimal totalPayable, int installmentCount)
-        {
-            if (installmentCount <= 1)
-            {
-                return new List<decimal> { totalPayable };
-            }
-
-            var installmentAmounts = new List<decimal>(installmentCount);
-            var remainingAmount = totalPayable;
-
-            for (var index = 0; index < installmentCount - 1; index++)
-            {
-                var remainingInstallmentCount = installmentCount - index;
-                var roundedInstallmentAmount = RoundToNearestFive(remainingAmount / remainingInstallmentCount);
-
-                if (roundedInstallmentAmount > remainingAmount)
-                {
-                    roundedInstallmentAmount = remainingAmount;
-                }
-
-                installmentAmounts.Add(roundedInstallmentAmount);
-                remainingAmount -= roundedInstallmentAmount;
-            }
-
-            installmentAmounts.Add(remainingAmount);
-            return installmentAmounts;
-        }
+                Description = "Paiement complet de l'inscription/Complete Registration Payment",
+                DescriptionFr = "Paiement complet de l'inscription",
+                DueDate = DateTime.UtcNow.Date.AddDays(1),
+                Amount = amount
+            };
 
         private static decimal RoundToNearestFive(decimal amount)
             => Math.Round(amount / 5m, 0, MidpointRounding.AwayFromZero) * 5m;

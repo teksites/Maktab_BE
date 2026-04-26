@@ -113,7 +113,7 @@ public class StudentCourseEnrollmentServiceTests
     }
 
     [Fact]
-    public async Task RecalculateCourseFee_UsesFallbackSingleInstallmentWhenFeePolicyIsInvalid()
+    public async Task RecalculateCourseFee_UsesDefaultSingleInstallmentWhenPolicyFallbackApplies()
     {
         var courseId = Guid.NewGuid();
         var familyId = Guid.NewGuid();
@@ -150,19 +150,24 @@ public class StudentCourseEnrollmentServiceTests
                 {
                     InstitutePolicyId = Guid.NewGuid(),
                     InstituteId = Guid.NewGuid(),
+                    CourseId = courseId,
                     Details = JsonConvert.SerializeObject(new[]
                     {
                         new FeePaymentPolicy
                         {
-                            Name = "Installment 1",
-                            PaymentDate = DateTime.UtcNow.Date.AddDays(7),
-                            MinimumAmountDue = 40
+                            Name = "Second by date",
+                            PaymentDate = DateTime.UtcNow.Date.AddDays(14),
+                            PercentageToCover = 40,
+                            MinimalChildrenToApply = 1,
+                            ShouldApplyEnrollmentToCover = false
                         },
                         new FeePaymentPolicy
                         {
-                            Name = "Installment 2",
-                            PaymentDate = DateTime.UtcNow.Date.AddDays(14),
-                            MinimumAmountDue = 40
+                            Name = "First by date",
+                            PaymentDate = DateTime.UtcNow.Date.AddDays(7),
+                            PercentageToCover = 40,
+                            MinimalChildrenToApply = 1,
+                            ShouldApplyEnrollmentToCover = false
                         }
                     }),
                     InstutePolicy = PolicyType.CourseFeePayment,
@@ -185,7 +190,7 @@ public class StudentCourseEnrollmentServiceTests
     }
 
     [Fact]
-    public async Task RecalculateCourseFee_CreatesRuleBasedInstallmentsForSingleChildWithThreeGroups()
+    public async Task RecalculateCourseFee_CreatesEnrollmentDrivenInstallmentsForSingleChildWithThreeGroups()
     {
         var courseId = Guid.NewGuid();
         var familyId = Guid.NewGuid();
@@ -224,25 +229,29 @@ public class StudentCourseEnrollmentServiceTests
                 {
                     InstitutePolicyId = Guid.NewGuid(),
                     InstituteId = Guid.NewGuid(),
+                    CourseId = courseId,
                     Details = JsonConvert.SerializeObject(new[]
                     {
                         new FeePaymentPolicy
                         {
                             Name = "First installment",
                             PaymentDate = DateTime.UtcNow.Date.AddDays(7),
-                            MinimumAmountDue = 40
+                            EnrollmentsToCover = 1,
+                            ShouldApplyEnrollmentToCover = true
                         },
                         new FeePaymentPolicy
                         {
                             Name = "Second installment",
                             PaymentDate = DateTime.UtcNow.Date.AddDays(14),
-                            MinimumAmountDue = 30
+                            EnrollmentsToCover = 1,
+                            ShouldApplyEnrollmentToCover = true
                         },
                         new FeePaymentPolicy
                         {
                             Name = "Third installment",
                             PaymentDate = DateTime.UtcNow.Date.AddDays(21),
-                            MinimumAmountDue = 30
+                            EnrollmentsToCover = 1,
+                            ShouldApplyEnrollmentToCover = true
                         }
                     }),
                     InstutePolicy = PolicyType.CourseFeePayment,
@@ -260,12 +269,116 @@ public class StudentCourseEnrollmentServiceTests
         Assert.True(result);
         Assert.NotNull(capturedUpdate);
         Assert.Equal(300m, capturedUpdate!.TotalPayable);
+        Assert.Equal(3, capturedUpdate.FeeInstallments.Count);
+        Assert.Equal("First installment", capturedUpdate.FeeInstallments[0].Description);
+        Assert.Equal("Second installment", capturedUpdate.FeeInstallments[1].Description);
+        Assert.Equal("Third installment", capturedUpdate.FeeInstallments[2].Description);
+        Assert.Equal(300m, capturedUpdate.FeeInstallments.Sum(installment => installment.Amount));
+        Assert.Equal(100m, capturedUpdate.FeeInstallments[0].Amount);
+        Assert.Equal(100m, capturedUpdate.FeeInstallments[1].Amount);
+        Assert.Equal(100m, capturedUpdate.FeeInstallments[2].Amount);
+    }
+
+    [Fact]
+    public async Task RecalculateCourseFee_StopsEnrollmentDrivenInstallmentsAfterLastApplicablePolicyAndAddsRegistrationFeeToFirst()
+    {
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupIds = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        var capturedUpdate = default(AddStudentCourseTransaction);
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[]
+            {
+                CreateFamilyTransaction(courseId, familyId, new[]
+                {
+                    CreateEnrollment(childId, groupIds[0], courseId),
+                    CreateEnrollment(childId, groupIds[1], courseId),
+                    CreateEnrollment(childId, groupIds[2], courseId)
+                })
+            });
+        transactionService
+            .Setup(service => service.UpdateTransaction(It.IsAny<Guid>(), It.IsAny<AddStudentCourseTransaction>()))
+            .Callback<Guid, AddStudentCourseTransaction>((_, transaction) => capturedUpdate = transaction)
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupIds[0], 100, true, 50, true, groupIds[1], groupIds[2]));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(new[]
+            {
+                new InstitutePolicyResponse
+                {
+                    InstitutePolicyId = Guid.NewGuid(),
+                    InstituteId = Guid.NewGuid(),
+                    CourseId = courseId,
+                    Details = JsonConvert.SerializeObject(new[]
+                    {
+                        new FeePaymentPolicy
+                        {
+                            Name = "First installment",
+                            PaymentDate = DateTime.UtcNow.Date.AddDays(7),
+                            EnrollmentsToCover = 2,
+                            ShouldApplyEnrollmentToCover = true
+                        },
+                        new FeePaymentPolicy
+                        {
+                            Name = "Second installment",
+                            PaymentDate = DateTime.UtcNow.Date.AddDays(14),
+                            EnrollmentsToCover = 2,
+                            ShouldApplyEnrollmentToCover = true
+                        },
+                        new FeePaymentPolicy
+                        {
+                            Name = "Third installment",
+                            PaymentDate = DateTime.UtcNow.Date.AddDays(21),
+                            EnrollmentsToCover = 2,
+                            ShouldApplyEnrollmentToCover = true
+                        },
+                        new FeePaymentPolicy
+                        {
+                            Name = "Fourth installment",
+                            PaymentDate = DateTime.UtcNow.Date.AddDays(28),
+                            EnrollmentsToCover = 2,
+                            ShouldApplyEnrollmentToCover = true
+                        },
+                        new FeePaymentPolicy
+                        {
+                            Name = "Fifth installment",
+                            PaymentDate = DateTime.UtcNow.Date.AddDays(35),
+                            EnrollmentsToCover = 2,
+                            ShouldApplyEnrollmentToCover = true
+                        }
+                    }),
+                    InstutePolicy = PolicyType.CourseFeePayment,
+                    IsActive = true
+                }
+            });
+
+        var service = CreateEnrollmentService(
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService);
+
+        var result = await service.RecalculateCourseFee(courseId, familyId);
+
+        Assert.True(result);
+        Assert.NotNull(capturedUpdate);
+        Assert.Equal(350m, capturedUpdate!.TotalPayable);
         Assert.Equal(2, capturedUpdate.FeeInstallments.Count);
         Assert.Equal("First installment", capturedUpdate.FeeInstallments[0].Description);
         Assert.Equal("Second installment", capturedUpdate.FeeInstallments[1].Description);
-        Assert.Equal(300m, capturedUpdate.FeeInstallments.Sum(installment => installment.Amount));
-        Assert.Equal(150m, capturedUpdate.FeeInstallments[0].Amount);
-        Assert.Equal(150m, capturedUpdate.FeeInstallments[1].Amount);
+        Assert.Equal(350m, capturedUpdate.FeeInstallments.Sum(installment => installment.Amount));
+        Assert.Equal(250m, capturedUpdate.FeeInstallments[0].Amount);
+        Assert.Equal(100m, capturedUpdate.FeeInstallments[1].Amount);
     }
 
     [Fact]
@@ -629,13 +742,23 @@ public class StudentCourseEnrollmentServiceTests
     }
 
     private static CourseResponseDetailed CreateCourse(Guid courseId, Guid firstGroupId, int fee, params Guid[] otherGroupIds)
-        => CreateCourse(courseId, firstGroupId, fee, true, true, otherGroupIds);
+        => CreateCourse(courseId, firstGroupId, fee, true, 0, true, otherGroupIds);
 
     private static CourseResponseDetailed CreateCourse(
         Guid courseId,
         Guid firstGroupId,
         int fee,
         bool ifRegistrationOpen,
+        bool courseIsRegistrationOpen = true,
+        params Guid[] otherGroupIds)
+        => CreateCourse(courseId, firstGroupId, fee, ifRegistrationOpen, 0, courseIsRegistrationOpen, otherGroupIds);
+
+    private static CourseResponseDetailed CreateCourse(
+        Guid courseId,
+        Guid firstGroupId,
+        int fee,
+        bool ifRegistrationOpen,
+        int registrationFee,
         bool courseIsRegistrationOpen = true,
         params Guid[] otherGroupIds)
     {
@@ -645,8 +768,9 @@ public class StudentCourseEnrollmentServiceTests
         {
             CourseId = courseId,
             InstituteId = Guid.NewGuid(),
-            RegistrationFee = 0,
+            RegistrationFee = registrationFee,
             IsRegistrationOpened = courseIsRegistrationOpen,
+            CanSelectMultipleEnrollmentGroups = groupIds.Count > 1,
             CourseEnrollmentGroups = groupIds.Select(groupId => new CourseEnrollmentGroupResponse
             {
                 CourseEnrollmentGroupId = groupId,
