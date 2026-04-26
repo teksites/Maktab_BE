@@ -170,7 +170,7 @@ public class StudentCourseEnrollmentServiceTests
                             ShouldApplyEnrollmentToCover = false
                         }
                     }),
-                    InstutePolicy = PolicyType.CourseFeePayment,
+                    PolicyType = PolicyType.CourseFeePayment,
                     IsActive = true
                 }
             });
@@ -254,7 +254,7 @@ public class StudentCourseEnrollmentServiceTests
                             ShouldApplyEnrollmentToCover = true
                         }
                     }),
-                    InstutePolicy = PolicyType.CourseFeePayment,
+                    PolicyType = PolicyType.CourseFeePayment,
                     IsActive = true
                 }
             });
@@ -358,7 +358,7 @@ public class StudentCourseEnrollmentServiceTests
                             ShouldApplyEnrollmentToCover = true
                         }
                     }),
-                    InstutePolicy = PolicyType.CourseFeePayment,
+                    PolicyType = PolicyType.CourseFeePayment,
                     IsActive = true
                 }
             });

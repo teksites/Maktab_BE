@@ -36,7 +36,7 @@ namespace Courses.Implementation.Services
             {
                 InstitutePolicyId = institutePolicyId, // the existing policy id
                 Details = addPolicy.Details,
-                InstutePolicy = addPolicy.InstutePolicy,
+                PolicyType = addPolicy.PolicyType,
                 IsActive = addPolicy.IsActive
             };
         }

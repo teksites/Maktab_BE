@@ -18,15 +18,15 @@ namespace Courses.Repository.Implementation
             var policyId = Guid.NewGuid();
 
             cmd.CommandText = @"INSERT INTO institute_policy 
-                                (InstitutePolicyId, InstituteId, Details, InstutePolicyType, IsActive, CreatedAt, UpdatedOn, CourseId) 
+                                (InstitutePolicyId, InstituteId, Details, PolicyType, IsActive, CreatedAt, UpdatedOn, CourseId) 
                                 VALUES 
-                                (@InstitutePolicyId, @InstituteId, @Details, @InstutePolicyType, @IsActive, @CreatedAt, @UpdatedOn, @CourseId)";
+                                (@InstitutePolicyId, @InstituteId, @Details, @PolicyType, @IsActive, @CreatedAt, @UpdatedOn, @CourseId)";
 
             cmd.AddParameter("@InstitutePolicyId", policyId.ToByteArray());
             cmd.AddParameter("@InstituteId", policy.InstituteId.ToByteArray());
             cmd.AddParameter("@CourseId", policy.CourseId.HasValue ? policy.CourseId.Value.ToByteArray() : DBNull.Value);
             cmd.AddParameter("@Details", policy.Details);
-            cmd.AddParameter("@InstutePolicyType", (byte)policy.InstutePolicy);
+            cmd.AddParameter("@PolicyType", (byte)policy.PolicyType);
             cmd.AddParameter("@IsActive", policy.IsActive);
             cmd.AddParameter("@CreatedAt", DateTime.UtcNow);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
@@ -80,14 +80,14 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"UPDATE institute_policy 
                                 SET Details = @Details, 
-                                    InstutePolicyType = @InstutePolicyType, 
+                                    PolicyType = @PolicyType, 
                                     IsActive = @IsActive, 
                                     UpdatedOn = @UpdatedOn 
                                 WHERE InstitutePolicyId = @InstitutePolicyId";
 
             cmd.AddParameter("@InstitutePolicyId", policy.InstitutePolicyId.ToByteArray());
             cmd.AddParameter("@Details", policy.Details);
-            cmd.AddParameter("@InstutePolicyType", (byte)policy.InstutePolicy);
+            cmd.AddParameter("@PolicyType", (byte)policy.PolicyType);
             cmd.AddParameter("@IsActive", policy.IsActive);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
 
@@ -118,7 +118,7 @@ namespace Courses.Repository.Implementation
                 CourseId = reader.GetNullableGuidFromByteArray("CourseId") ?? Guid.Empty,
                 PolicyId = reader.GetGuidFromByteArray("InstitutePolicyId"), // Assuming PolicyId maps to InstitutePolicyId
                 Details = reader.GetString("Details"),
-                InstutePolicy = (PolicyType)(reader.GetNullableInt("InstutePolicyType") ?? 0),
+                PolicyType = (PolicyType)(reader.GetNullableInt("PolicyType") ?? 0),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn")
@@ -133,12 +133,12 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 SELECT *
                 FROM institute_policy
-                WHERE InstutePolicyType = @InstutePolicyType
+                WHERE PolicyType = @PolicyType
                   AND IsActive = TRUE
                 ORDER BY CreatedAt DESC
                 LIMIT 1";
 
-            cmd.AddParameter("@InstutePolicyType", (byte)policyType);
+            cmd.AddParameter("@PolicyType", (byte)policyType);
 
             using var reader = await cmd.ExecuteReaderAsync();
             if (!await reader.ReadAsync()) return null;

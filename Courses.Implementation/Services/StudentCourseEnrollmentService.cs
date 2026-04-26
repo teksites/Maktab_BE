@@ -95,7 +95,7 @@ namespace Courses.Implementation.Services
                     //here we have to add new enrollment and update the existing transaction to include the new enrollment for new child
                     //// We will calculate the discount and apply
                     //var policies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
-                    //var discountPolicy = policies.Where(p => p.IsActive && p.InstutePolicy == MaktabDataContracts.Enums.InstutePolicyType.SiblingDiscount).First().Details;
+                    //var discountPolicy = policies.Where(p => p.IsActive && p.PolicyType == MaktabDataContracts.Enums.PolicyType.SiblingDiscount).First().Details;
                     //SiblingDiscountPolicy policy = JsonConvert.DeserializeObject<SiblingDiscountPolicy>(discountPolicy);
 
                     var distinctChildIds = familyTransactions
@@ -152,7 +152,7 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
                     (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
                 var activePolicies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
-                var activeFeePaymentPolicy = activePolicies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.CourseFeePayment);
+                var activeFeePaymentPolicy = activePolicies.FirstOrDefault(p => p.IsActive && p.PolicyType == PolicyType.CourseFeePayment);
                 var (feePolicy, feePaymentPolicyFound) = ParseValidatedFeePaymentPolicy(activeFeePaymentPolicy?.Details);
                 addStudentCourseTransaction.FeeInstallments = BuildFeeInstallments(
                     addStudentCourseTransaction.TotalPayable - course.RegistrationFee,// exclude registration fee from installments
@@ -253,7 +253,7 @@ namespace Courses.Implementation.Services
                 }
                 else
                 {
-                    var activeSiblingPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.SiblingDiscount && p.CourseId == course.CourseId && p.IsActive);
+                    var activeSiblingPolicy = policies.FirstOrDefault(p => p.IsActive && p.PolicyType == PolicyType.SiblingDiscount && p.CourseId == course.CourseId && p.IsActive);
                     var discountPolicy = activeSiblingPolicy?.Details;
                     if (!string.IsNullOrEmpty(discountPolicy))
                     {
@@ -268,7 +268,7 @@ namespace Courses.Implementation.Services
                         }
                     }
 
-                    var activeFeePaymentPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.CourseFeePayment && p.CourseId == course.CourseId && p.IsActive);
+                    var activeFeePaymentPolicy = policies.FirstOrDefault(p => p.IsActive && p.PolicyType == PolicyType.CourseFeePayment && p.CourseId == course.CourseId && p.IsActive);
                     (feePolicy, feePaymentPolicyFound) = ParseValidatedFeePaymentPolicy(activeFeePaymentPolicy?.Details);
                 }
             }
