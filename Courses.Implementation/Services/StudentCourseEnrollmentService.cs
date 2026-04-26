@@ -253,7 +253,7 @@ namespace Courses.Implementation.Services
                 }
                 else
                 {
-                    var activeSiblingPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.SiblingDiscount);
+                    var activeSiblingPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.SiblingDiscount && p.CourseId == course.CourseId && p.IsActive);
                     var discountPolicy = activeSiblingPolicy?.Details;
                     if (!string.IsNullOrEmpty(discountPolicy))
                     {
@@ -268,7 +268,7 @@ namespace Courses.Implementation.Services
                         }
                     }
 
-                    var activeFeePaymentPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.CourseFeePayment && p.CourseId == course.CourseId);
+                    var activeFeePaymentPolicy = policies.FirstOrDefault(p => p.IsActive && p.InstutePolicy == PolicyType.CourseFeePayment && p.CourseId == course.CourseId && p.IsActive);
                     (feePolicy, feePaymentPolicyFound) = ParseValidatedFeePaymentPolicy(activeFeePaymentPolicy?.Details);
                 }
             }
@@ -279,27 +279,63 @@ namespace Courses.Implementation.Services
                 decimal childFee = 0m;
                 decimal childDayCareFee = 0m;
                 decimal applicableDiscountPercentage = 1m;
-
-                if (i == 2 && policyFound)
+                decimal applicableFee = 0m;// Convert.ToDecimal(enrollmentGroup.Fee);
+               
+                if (policyFound)
                 {
-                    applicableDiscountPercentage = policy.SecondChildFee / 100m;
+                    if (i == 1 && policy.IsFeeAbsolute)
+                    {
+                        applicableFee = policy.FirstChildFee;
+                    }
+                    else if (i == 1 && !policy.IsFeeAbsolute)
+                    {
+                        applicableDiscountPercentage = policy.FirstChildFee / 100m;
+                    }
+                    else if (i == 2 && policy.IsFeeAbsolute)
+                    {
+                        applicableFee = policy.SecondChildFee;
+                    }
+                    else if (i == 2 && !policy.IsFeeAbsolute)
+                    {
+                        applicableDiscountPercentage = policy.SecondChildFee/100m;
+                    }
+                    else if (i == 3 && policy.IsFeeAbsolute)
+                    {
+                        applicableFee = policy.ThirdChildFee;
+                    }
+                    else if (i == 3 && !policy.IsFeeAbsolute)
+                    {
+                        applicableDiscountPercentage = policy.ThirdChildFee / 100m;
+                    }
+                    else if (i > 3 && policy.IsFeeAbsolute)
+                    {
+                        applicableFee = policy.FourthAndOnwardChildFee;
+                    }
+                    else if (i > 3 && !policy.IsFeeAbsolute)
+                    {
+                        applicableDiscountPercentage = policy.FourthAndOnwardChildFee / 100m;
+                    }
                 }
-                else if (i == 3 && policyFound)
-                {
-                    applicableDiscountPercentage = policy.ThirdChildFee / 100m;
-                }
-                else if (i > 3 && policyFound)
-                {
-                    applicableDiscountPercentage = policy.FourthAndOnwardChildFee / 100m;
-                }
-
                 foreach (var enrollment in childEnrollments)
                 {
                     var enrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
 
                     if (enrollmentGroup != null && IsFeeBearingEnrollmentStatus(enrollment.EnrollmentStatus))// Only allowed billable ones
                     {
-                        childFee += (Convert.ToDecimal(enrollmentGroup.Fee) * applicableDiscountPercentage);
+                        if (!policyFound)
+                        {
+                            applicableFee = Convert.ToDecimal(enrollmentGroup.Fee);
+                            childFee += applicableFee;
+                        }
+                        else if (policyFound && policy.IsFeeAbsolute) 
+                        {
+                            childFee += applicableFee;
+                        }
+                        else
+                        {
+                            childFee += (Convert.ToDecimal(enrollmentGroup.Fee) * applicableDiscountPercentage);
+                        }
+                        
                         childDayCareFee += enrollment.WillUseDayCare ? Convert.ToDecimal(enrollmentGroup.DayCareFee) : 0m;
                     }
                 }

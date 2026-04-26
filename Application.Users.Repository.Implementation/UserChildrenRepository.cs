@@ -19,9 +19,9 @@ namespace Application.Users.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"INSERT INTO child_information 
-                (ChildId, FamilyId, FirstName, LastName, OtherHealthConditions, HasAllergy, Allergies, AcedemicGroupType, DateOfBirth, Gender, RAMQExpiry, RAMQNumber, RAMQSequenceNumber, IsActive, CreatedAt, UpdatedOn, RegistrationNumber)
+                (ChildId, FamilyId, FirstName, LastName, OtherHealthConditions, HasAllergy, Allergies, AcedemicGroupType, DateOfBirth, Gender, RAMQExpiry, RAMQNumber, RAMQSequenceNumber, IsActive, CreatedAt, UpdatedOn, RegistrationNumber, Consent)
                 VALUES 
-                (@ChildId, @FamilyId, @FirstName, @LastName, @OtherHealthConditions, @HasAllergy, @Allergies, @AcedemicGroupType, @DateOfBirth, @Gender, @RAMQExpiry, @RAMQNumber, @RAMQSequenceNumber, @IsActive, @CreatedAt, @UpdatedOn, @RegistrationNumber)";
+                (@ChildId, @FamilyId, @FirstName, @LastName, @OtherHealthConditions, @HasAllergy, @Allergies, @AcedemicGroupType, @DateOfBirth, @Gender, @RAMQExpiry, @RAMQNumber, @RAMQSequenceNumber, @IsActive, @CreatedAt, @UpdatedOn, @RegistrationNumber, @Consent)";
             cmd.Transaction = tx;
 
             child.RegistrationNumber = await GetNextRegistrationNumber(conn, tx).ConfigureAwait(false);
@@ -43,6 +43,7 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@CreatedAt", child.CreatedAt);
             cmd.AddParameter("@UpdatedOn", child.UpdatedOn);
             cmd.AddParameter("@RegistrationNumber", child.RegistrationNumber);
+            cmd.AddParameter("@Consent", (object?)child.Consent ?? DBNull.Value);
 
             var rows = await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             if (rows > 0)
@@ -72,6 +73,7 @@ namespace Application.Users.Repository.Implementation
                 RAMQNumber = @RAMQNumber,
                 RAMQSequenceNumber = @RAMQSequenceNumber,
                 HasAllergy = @HasAllergy,
+                Consent = @Consent,
                 UpdatedOn = @UpdatedOn
                 WHERE ChildId = @ChildId";
 
@@ -87,6 +89,7 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@RAMQNumber", child.RAMQNumber);
             cmd.AddParameter("@RAMQSequenceNumber", child.RAMQSequenceNumber);
             cmd.AddParameter("@HasAllergy", child.HasAllergy);
+            cmd.AddParameter("@Consent", GetConsent(child));
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
 
             var rows = await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
@@ -191,12 +194,25 @@ namespace Application.Users.Repository.Implementation
                 UpdatedOn = reader.GetDateTime("UpdatedOn"),
                 RegistrationNumber = GetRegistrationNumber(reader),
                 HasAllergy = reader.GetBooleanOrDefault("HasAllergy"),
+                Consent = GetConsent(reader),
             };
         }
 
         private static string GetRegistrationNumber(DbDataReader reader)
         {
             var ordinal = reader.GetOrdinal("RegistrationNumber");
+            return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
+        }
+
+        private static object GetConsent(UpdateChildRequest child)
+        {
+            var consentProperty = child.GetType().GetProperty("Consent");
+            return consentProperty?.GetValue(child) ?? DBNull.Value;
+        }
+
+        private static string GetConsent(DbDataReader reader)
+        {
+            var ordinal = reader.GetOrdinal("Consent");
             return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
         }
 

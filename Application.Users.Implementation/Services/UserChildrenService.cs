@@ -111,6 +111,7 @@ namespace Application.Users.Implementation
                 UpdatedOn = DateTime.UtcNow,
                 IsActive = true,
                 AcedemicGroup = child.AcedemicGroup,
+                Consent = GetConsent(child),
             };
         }
 
@@ -147,11 +148,24 @@ namespace Application.Users.Implementation
                 registrationNumberProperty.SetValue(response, child.RegistrationNumber);
             }
 
+            var consentProperty = typeof(ChildResponse).GetProperty("Consent");
+            if (consentProperty?.CanWrite == true)
+            {
+                consentProperty.SetValue(response, child.Consent);
+            }
+
             return new MaktabApiResult<ChildResponse>
             {
                 Result = response,
                 Errors = new List<PartnerApiError> { }
             };
+        }
+
+        private static string GetConsent(AddChildRequest child)
+        {
+            var consentProperty = child.GetType().GetProperty("Consent");
+            var consentValue = consentProperty?.GetValue(child) as string;
+            return consentValue ?? string.Empty;
         }
     }
 }

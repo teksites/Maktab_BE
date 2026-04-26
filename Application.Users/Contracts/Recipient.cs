@@ -21,5 +21,6 @@ namespace Application.Users.Contracts
         public AcedemicGroupType AcedemicGroup { get; set; } = AcedemicGroupType.None;
         public string RegistrationNumber { get; set; } = string.Empty;
         public bool HasAllergy { get; set; }
+        public string Consent { get; set; } = string.Empty;
     }
 }

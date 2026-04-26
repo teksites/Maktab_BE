@@ -270,14 +270,15 @@ namespace Courses.Repository.Implementation
             };
 
             // Load enrollment groups using DI (kept as-is)
-            course.CourseEnrollmentGroups = (await _groupRepo.GetAllGroups(courseId, true)).ToList();
+            course.CourseEnrollmentGroups = (await _groupRepo.GetAllGroups(courseId, true))
+                .OrderBy(group => group.CreatedAt)
+                .ToList();
 
             // Merge unique academic groups
             course.AcedemicGroups = course.CourseEnrollmentGroups
                                           .SelectMany(g => g.AcedemicGroups)
                                           .Distinct()
                                           .ToList();
-
             return course;
         }
 

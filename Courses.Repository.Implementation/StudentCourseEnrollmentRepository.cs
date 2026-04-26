@@ -75,6 +75,7 @@ namespace Courses.Repository.Implementation
             CAST(sce.EnrollmentStatus AS SIGNED) AS EnrollmentStatus,
             ci.FirstName AS ChildFirstName,
             ci.LastName AS ChildLastName,
+            ci.Consent AS ChildConsent,
             ui.UserId,
             ui.FirstName AS UserFirstName,
             ui.LastName AS UserLastName,
@@ -278,6 +279,7 @@ namespace Courses.Repository.Implementation
             CAST(sce.EnrollmentStatus AS SIGNED) AS EnrollmentStatus,
             ci.FirstName AS ChildFirstName,
             ci.LastName AS ChildLastName,
+            ci.Consent AS ChildConsent,
             ui.UserId,
             ui.FirstName AS UserFirstName,
             ui.LastName AS UserLastName,
@@ -314,7 +316,7 @@ namespace Courses.Repository.Implementation
 
         private StudentCourseEnrollmentResponse MapToEnrollmentResponse(DbDataReader reader)
         {
-            return new StudentCourseEnrollmentResponse
+            var response = new StudentCourseEnrollmentResponse
             {
                 StudentCourseEnrollmentId = reader.GetGuidFromByteArray("StudentCourseEnrollmentId"),
                 CourseEnrollmentGroupId = reader.GetGuidFromByteArray("CourseEnrollmentGroupId"),
@@ -334,6 +336,9 @@ namespace Courses.Repository.Implementation
 
                FamilyMembers = new List<FamilyInfo>()
             };
+
+            SetConsent(response, GetChildConsent(reader));
+            return response;
         }
 
         private FamilyInfo MapToFamilyInfo(DbDataReader reader)
@@ -346,6 +351,30 @@ namespace Courses.Repository.Implementation
                 Phone = reader.GetString("Phone"),
                 Relationship = (Relationship)reader.GetInt32("Relationship")
             };
+        }
+
+        private static string GetChildConsent(DbDataReader reader)
+        {
+            var ordinal = reader.GetOrdinal("ChildConsent");
+            return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
+        }
+
+        private static void SetConsent(StudentCourseEnrollmentResponse response, string consent)
+        {
+            var responseType = typeof(StudentCourseEnrollmentResponse);
+
+            var consentProperty = responseType.GetProperty("Consent");
+            if (consentProperty?.CanWrite == true)
+            {
+                consentProperty.SetValue(response, consent);
+                return;
+            }
+
+            var consntProperty = responseType.GetProperty("Consnt");
+            if (consntProperty?.CanWrite == true)
+            {
+                consntProperty.SetValue(response, consent);
+            }
         }
 
         public async Task<IEnumerable<CourseEnrollmentGroupInformationResponse>> GetCourseEnrollmentGroupsInformation(Guid courseId)

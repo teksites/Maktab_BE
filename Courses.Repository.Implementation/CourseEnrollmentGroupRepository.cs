@@ -74,6 +74,8 @@ namespace Courses.Repository.Implementation
             {
                 cmd.CommandText += " AND IsActive = TRUE";
             }
+
+            cmd.CommandText += " ORDER BY CreatedAt ASC";
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -143,7 +145,8 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 SELECT * 
                 FROM course_enrollment_groups 
-                WHERE CourseId = @CourseId";
+                WHERE CourseId = @CourseId ORDER BY CreatedAt ASC";
+
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
             if (isActive)
