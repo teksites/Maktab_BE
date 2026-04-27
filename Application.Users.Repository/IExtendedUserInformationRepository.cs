@@ -13,6 +13,7 @@ namespace Users.Repository
         Task<ExtendedUserInformationDetail> GetFamilyExtendedUserInformation(Guid familyId);
         Task<bool> CheckIfExtendedUserInformationExisit(Guid userId);
         Task<bool> CheckIfExtendedFamilyInformationExisit(Guid familyId);
+        Task<bool> CheckIfFamilySinExists(Guid familyId, string sin);
 
     }
 }

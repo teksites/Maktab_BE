@@ -12,6 +12,7 @@ namespace Users.Services
         Task<ExtendedUserInformationResponse> GetExtendedUserInformation(Guid userId);
         Task<bool> CheckIfExtendedUserInformationExisit(Guid userId);
         Task<bool> CheckIfExtendedFamilyInformationExisit(Guid familyId);
+        Task<bool> CheckIfFamilySinExists(Guid familyId, string sin);
         Task<bool> DeleteFamilyExtendedUserInformation(Guid familyId, bool ifHardDelete = false);
         Task<ExtendedUserInformationResponse> GetFamilyExtendedUserInformation(Guid familyId);
     }
