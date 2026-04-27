@@ -39,9 +39,13 @@ namespace Users.Implementation.Services
 
             var key = _configuration["JwtConfig:Key"].ToString();
             var keyBytes = Encoding.ASCII.GetBytes(key);
+            var tokenExpiryMinutesSetting = _configuration["JwtConfig:ExpiryMinutes"];
+            var tokenExpiryMinutes = int.TryParse(tokenExpiryMinutesSetting, out var configuredTokenExpiryMinutes)
+                ? configuredTokenExpiryMinutes
+                : 240;
 
             var tokenHandler = new JwtSecurityTokenHandler();
-            var tokenExpiry = DateTime.UtcNow.AddMinutes(60);
+            var tokenExpiry = DateTime.UtcNow.AddMinutes(tokenExpiryMinutes);
 
             var tokenDescriptor = new SecurityTokenDescriptor()
             {

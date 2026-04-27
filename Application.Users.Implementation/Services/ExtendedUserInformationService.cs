@@ -143,6 +143,17 @@ namespace Application.Users.Implementation
             return await _repository.CheckIfExtendedFamilyInformationExisit(familyId).ConfigureAwait(false);
         }
 
+        public async Task<bool> CheckIfFamilySinExists(Guid familyId, string sin)
+        {
+            var normalizedSin = NormalizeSin(sin);
+            if (string.IsNullOrEmpty(normalizedSin))
+            {
+                return false;
+            }
+
+            return await _repository.CheckIfFamilySinExists(familyId, normalizedSin).ConfigureAwait(false);
+        }
+
         public async Task<bool> DeleteFamilyExtendedUserInformation(Guid familyId, bool ifHardDelete = false)
         {
             return await _repository.DeleteFamilyExtendedUserInformation(familyId, ifHardDelete).ConfigureAwait(false);
@@ -155,9 +166,47 @@ namespace Application.Users.Implementation
             if (userInfo != null)
             {
                 var mappedUser = MapToUserInformationResponse(userInfo);
+                mappedUser.SIN = MaskSin(mappedUser.SIN);
                 return mappedUser;
             }
             return null;
+        }
+
+        private static string MaskSin(string sin)
+        {
+            if (string.IsNullOrWhiteSpace(sin))
+            {
+                return string.Empty;
+            }
+
+            var visibleDigits = 0;
+            var maskedChars = sin.ToCharArray();
+
+            for (var index = maskedChars.Length - 1; index >= 0; index--)
+            {
+                if (!char.IsDigit(maskedChars[index]))
+                {
+                    continue;
+                }
+
+                visibleDigits++;
+                if (visibleDigits > 3)
+                {
+                    maskedChars[index] = '*';
+                }
+            }
+
+            return new string(maskedChars);
+        }
+
+        private static string NormalizeSin(string sin)
+        {
+            if (string.IsNullOrWhiteSpace(sin))
+            {
+                return string.Empty;
+            }
+
+            return new string(sin.Where(char.IsDigit).ToArray());
         }
     }
 }

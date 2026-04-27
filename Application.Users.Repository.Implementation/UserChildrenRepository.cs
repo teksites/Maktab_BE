@@ -62,13 +62,9 @@ namespace Application.Users.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"UPDATE child_information SET
-                FirstName = @FirstName,
-                LastName = @LastName,
                 OtherHealthConditions = @OtherHealthConditions,
                 Allergies = @Allergies,
                 AcedemicGroupType = @AcedemicGroupType,
-                DateOfBirth = @DateOfBirth,
-                Gender = @Gender,
                 RAMQExpiry = @RAMQExpiry,
                 RAMQNumber = @RAMQNumber,
                 RAMQSequenceNumber = @RAMQSequenceNumber,
@@ -78,13 +74,9 @@ namespace Application.Users.Repository.Implementation
                 WHERE ChildId = @ChildId";
 
             cmd.AddParameter("@ChildId", child.ChildId.ToByteArray());
-            cmd.AddParameter("@FirstName", child.FirstName);
-            cmd.AddParameter("@LastName", child.LastName);
             cmd.AddParameter("@OtherHealthConditions", child.OtherHealthConditions);
             cmd.AddParameter("@Allergies", child.Allergies);
             cmd.AddParameter("@AcedemicGroupType", (int)child.AcedemicGroup);
-            cmd.AddParameter("@DateOfBirth", child.DateOfBirth);
-            cmd.AddParameter("@Gender", (int)child.Gender);
             cmd.AddParameter("@RAMQExpiry", child.RAMQExpiry);
             cmd.AddParameter("@RAMQNumber", child.RAMQNumber);
             cmd.AddParameter("@RAMQSequenceNumber", child.RAMQSequenceNumber);

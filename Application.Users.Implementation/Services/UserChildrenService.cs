@@ -88,7 +88,10 @@ namespace Application.Users.Implementation
 
         public async Task<MaktabApiResult<ChildResponse>> UpdateChild(UpdateChildRequest child)
         {
-            return MapToChildResponse(await _repository.UpdateChild(child).ConfigureAwait(false));
+            ArgumentNullException.ThrowIfNull(child);
+
+            var updatedChild = await _repository.UpdateChild(child).ConfigureAwait(false);
+            return MapToChildResponse(updatedChild);
         }
 
         private Child MapToChild(AddChildRequest child)

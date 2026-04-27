@@ -58,6 +58,27 @@ namespace Application.Users.Repository.Implementation
             }
         }
 
+        public async Task<bool> CheckIfFamilySinExists(Guid familyId, string sin)
+        {
+            using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"Select UserId
+                        from extended_user_info
+                        where FamilyId = @familyId
+                          and IsActive = true
+                          and REPLACE(REPLACE(REPLACE(SIN, '-', ''), ' ', ''), '.', '') = @sin";
+
+                    cmd.AddParameter("@familyId", familyId.ToByteArray());
+                    cmd.AddParameter("@sin", sin);
+
+                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    return reader.HasRows;
+                }
+            }
+        }
+
         public async Task<bool> CheckIfExtendedUserInformationExisit(Guid userId)
         {
             using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))

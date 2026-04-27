@@ -227,5 +227,13 @@ namespace Maktab.Controllers
         {
             return await _extendedUserInformationService.CheckIfExtendedFamilyInformationExisit(familyId).ConfigureAwait(false);
         }
+
+        [Authorize]
+        [HttpGet("families/{familyId:guid}/extendedinfo/sin/check")]
+        [EnableCors("corspolicy")]
+        public async Task<bool> CheckIfFamilySinExists(Guid familyId, string sin)
+        {
+            return await _extendedUserInformationService.CheckIfFamilySinExists(familyId, sin).ConfigureAwait(false);
+        }
     }
 }
