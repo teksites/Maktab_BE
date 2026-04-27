@@ -57,6 +57,15 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
+        [HttpPut("children/{childId:guid}")]
+        [EnableCors("corspolicy")]
+        public async Task<MaktabApiResult<ChildResponse>> UpdateChild(Guid childId, UpdateChildRequest child)
+        {
+            child.ChildId = childId;
+            return await _childrenService.UpdateChild(child).ConfigureAwait(false);
+        }
+
+        [Authorize]
         [HttpPost("children/{childId:guid}/delete")]
         [EnableCors("corspolicy")]
         public async Task<bool> DeleteChild(Guid childId, bool ifHardDelete = false)
