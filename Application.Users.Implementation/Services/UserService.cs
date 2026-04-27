@@ -34,6 +34,7 @@ namespace Application.Users.Implementation
             _userChildsService = userChildsService;
            _sendEmailService = sendEmailService;
         }
+
         public async Task<UserInformationResponse> AddTemporaryUser(AddUserInformation userInformation)
         {
             var userInforationToStore = MapToUserRegistrationInformation(userInformation);
