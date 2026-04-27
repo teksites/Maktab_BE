@@ -10,14 +10,14 @@ namespace Courses.Test;
 public class StudentCourseTransactionRepositoryTests
 {
     [Fact]
-    public async Task GetTransactionSimple_IncludesPastAndNextUpcomingInstallmentsInMinimumPayable()
+    public async Task GetTransactionSimple_IncludesPastAndNextUpcomingInstallmentsInMinimumPayableAfterDueDatePasses()
     {
-        var today = DateTime.UtcNow.Date;
+        var scheduleToday = GetScheduleToday();
         var feeInstallmentsJson = JsonConvert.SerializeObject(new[]
         {
-            new { Description = "First", DueDate = today.AddDays(-10), Amount = 100m },
-            new { Description = "Second", DueDate = today.AddDays(4), Amount = 50m },
-            new { Description = "Third", DueDate = today.AddDays(10), Amount = 25m }
+            new { Description = "First", DueDate = GetScheduleDateUtc(scheduleToday.AddDays(-10)), Amount = 100m },
+            new { Description = "Second", DueDate = GetScheduleDateUtc(scheduleToday.AddDays(4)), Amount = 50m },
+            new { Description = "Third", DueDate = GetScheduleDateUtc(scheduleToday.AddDays(10)), Amount = 25m }
         });
 
         var database = new FakeDatabase(() => CreateSingleTransactionReader(feeInstallmentsJson, 120m));
@@ -30,13 +30,32 @@ public class StudentCourseTransactionRepositoryTests
     }
 
     [Fact]
-    public async Task GetTransactionSimple_ReturnsNegativeMinimumPayableWhenFamilyIsAheadOfSchedule()
+    public async Task GetTransactionSimple_OnInstallmentDueDate_DoesNotIncludeNextUpcomingInstallment()
     {
-        var today = DateTime.UtcNow.Date;
+        var scheduleToday = GetScheduleToday();
         var feeInstallmentsJson = JsonConvert.SerializeObject(new[]
         {
-            new { Description = "First", DueDate = today.AddDays(-7), Amount = 100m },
-            new { Description = "Second", DueDate = today.AddDays(3), Amount = 50m }
+            new { Description = "First", DueDate = GetScheduleDateUtc(scheduleToday), Amount = 100m },
+            new { Description = "Second", DueDate = GetScheduleDateUtc(scheduleToday.AddDays(8)), Amount = 100m }
+        });
+
+        var database = new FakeDatabase(() => CreateSingleTransactionReader(feeInstallmentsJson, 0m));
+        var repository = new StudentCourseTransactionRepository(database);
+
+        var transaction = await repository.GetTransactionSimple(Guid.NewGuid());
+
+        Assert.NotNull(transaction);
+        Assert.Equal(100m, transaction.MinimumPayable);
+    }
+
+    [Fact]
+    public async Task GetTransactionSimple_ReturnsNegativeMinimumPayableWhenFamilyIsAheadOfSchedule()
+    {
+        var scheduleToday = GetScheduleToday();
+        var feeInstallmentsJson = JsonConvert.SerializeObject(new[]
+        {
+            new { Description = "First", DueDate = GetScheduleDateUtc(scheduleToday.AddDays(-7)), Amount = 100m },
+            new { Description = "Second", DueDate = GetScheduleDateUtc(scheduleToday.AddDays(3)), Amount = 50m }
         });
 
         var database = new FakeDatabase(() => CreateSingleTransactionReader(feeInstallmentsJson, 200m));
@@ -131,6 +150,38 @@ public class StudentCourseTransactionRepositoryTests
             DateTime.UtcNow);
 
         return table.CreateDataReader();
+    }
+
+    private static DateTime GetScheduleToday()
+    {
+        var timeZone = GetScheduleTimeZone();
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone).Date;
+    }
+
+    private static DateTime GetScheduleDateUtc(DateTime scheduleDate)
+    {
+        var timeZone = GetScheduleTimeZone();
+        var localMidnight = DateTime.SpecifyKind(scheduleDate.Date, DateTimeKind.Unspecified);
+        return TimeZoneInfo.ConvertTimeToUtc(localMidnight, timeZone);
+    }
+
+    private static TimeZoneInfo GetScheduleTimeZone()
+    {
+        foreach (var timeZoneId in new[] { "Eastern Standard Time", "America/Toronto" })
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+            }
+            catch (InvalidTimeZoneException)
+            {
+            }
+        }
+
+        return TimeZoneInfo.Utc;
     }
 
     private static DbDataReader CreateEnrollmentGroupInformationReader(Guid groupId)

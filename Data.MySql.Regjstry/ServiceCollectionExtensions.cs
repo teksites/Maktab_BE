@@ -4,8 +4,6 @@ using Microsoft.Extensions.Logging;
 using MySql.Data.MySqlClient;
 using Polly;
 using Resiliency.Registry;
-using System.Configuration;
-
 namespace Data.MySql.Regjstry
 {
     public static class ServiceCollectionExtensions
@@ -37,15 +35,30 @@ namespace Data.MySql.Regjstry
                .AddScoped(services =>
                {
                    var configuration = services.GetRequiredService<IConfiguration>();
-                   var connectionString = configuration["Database:ConnectionString"].ToString();
-                   var sslCertPath = configuration["Database:SslCertPath"].ToString();
+                   var connectionString = ResolveConnectionString(configuration);
+                   var sslCertPath = configuration["Database:SslCertPath"]?.ToString();
 
                    if (connectionString == null) 
                    {
                        throw new Exception("Database connection not found");
                    }
-                   return new DatabaseConfiguration(connectionString.ToString(), sslCertPath.ToString());
+                   return new DatabaseConfiguration(connectionString, sslCertPath ?? string.Empty);
                });
+        }
+
+        private static string? ResolveConnectionString(IConfiguration configuration)
+        {
+            var selectedSchema = configuration["Database:ActiveSchema"];
+            if (!string.IsNullOrWhiteSpace(selectedSchema))
+            {
+                var schemaConnectionString = configuration[$"Database:Schemas:{selectedSchema}"];
+                if (!string.IsNullOrWhiteSpace(schemaConnectionString))
+                {
+                    return schemaConnectionString;
+                }
+            }
+
+            return configuration["Database:ConnectionString"];
         }
     }
 }

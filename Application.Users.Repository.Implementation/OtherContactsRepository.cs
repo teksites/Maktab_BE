@@ -206,7 +206,7 @@ namespace Application.Users.Repository.Implementation
 
             var sql = new StringBuilder(@"SELECT
             ContactId, FamilyId, FirstName, LastName, Phone, ContactType, Relationship, IsActive, CreatedAt, UpdatedOn
-              FROM maktab.other_contacts_information
+              FROM other_contacts_information
               WHERE FamilyId = @FamilyId AND IsActive = 1");
 
             if (contactType.HasValue)

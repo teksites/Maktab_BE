@@ -1780,34 +1780,84 @@ namespace Courses.Repository.Implementation
 
         private static decimal CalculateMinimumPayable(IReadOnlyCollection<FeeInstallment> feeInstallments, decimal totalAmountPaid)
         {
-            var applicableInstallmentTotal = GetApplicableInstallmentTotal(feeInstallments, DateTime.UtcNow.Date);
+            var applicableInstallmentTotal = GetApplicableInstallmentTotal(feeInstallments, DateTime.UtcNow);
             return applicableInstallmentTotal - totalAmountPaid;
         }
 
-        private static decimal GetApplicableInstallmentTotal(IReadOnlyCollection<FeeInstallment> feeInstallments, DateTime asOfDate)
+        private static decimal GetApplicableInstallmentTotal(IReadOnlyCollection<FeeInstallment> feeInstallments, DateTime asOfDateTime)
         {
             if (feeInstallments.Count == 0)
             {
                 return 0m;
             }
 
+            // Minimum payable is driven by the schedule date only:
+            // on the due date, include that installment; after the date changes,
+            // include overdue installments plus the next upcoming installment.
+            var asOfScheduleDate = GetInstallmentScheduleDate(asOfDateTime);
             var orderedInstallments = feeInstallments
-                .OrderBy(installment => installment.DueDate.Date)
+                .Select(installment => new
+                {
+                    Installment = installment,
+                    ScheduleDate = GetInstallmentScheduleDate(installment.DueDate)
+                })
+                .OrderBy(item => item.ScheduleDate)
                 .ToList();
 
-            var dueInstallmentTotal = orderedInstallments
-                .Where(installment => installment.DueDate.Date <= asOfDate)
-                .Sum(installment => installment.Amount);
+            var overdueInstallmentTotal = orderedInstallments
+                .Where(item => item.ScheduleDate < asOfScheduleDate)
+                .Sum(item => item.Installment.Amount);
+
+            var installmentsDueToday = orderedInstallments
+                .Where(item => item.ScheduleDate == asOfScheduleDate)
+                .ToList();
+
+            if (installmentsDueToday.Count > 0)
+            {
+                return overdueInstallmentTotal + installmentsDueToday.Sum(item => item.Installment.Amount);
+            }
 
             var nextUpcomingInstallment = orderedInstallments
-                .FirstOrDefault(installment => installment.DueDate.Date > asOfDate);
+                .FirstOrDefault(item => item.ScheduleDate > asOfScheduleDate);
 
             if (nextUpcomingInstallment != null)
             {
-                dueInstallmentTotal += nextUpcomingInstallment.Amount;
+                overdueInstallmentTotal += nextUpcomingInstallment.Installment.Amount;
             }
 
-            return dueInstallmentTotal;
+            return overdueInstallmentTotal;
+        }
+
+        private static DateTime GetInstallmentScheduleDate(DateTime dateTime)
+        {
+            var scheduleTimeZone = GetInstallmentScheduleTimeZone();
+            var utcDateTime = dateTime.Kind switch
+            {
+                DateTimeKind.Utc => dateTime,
+                DateTimeKind.Local => dateTime.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(dateTime, DateTimeKind.Utc)
+            };
+
+            return TimeZoneInfo.ConvertTimeFromUtc(utcDateTime, scheduleTimeZone).Date;
+        }
+
+        private static TimeZoneInfo GetInstallmentScheduleTimeZone()
+        {
+            foreach (var timeZoneId in new[] { "Eastern Standard Time", "America/Toronto" })
+            {
+                try
+                {
+                    return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+                }
+                catch (TimeZoneNotFoundException)
+                {
+                }
+                catch (InvalidTimeZoneException)
+                {
+                }
+            }
+
+            return TimeZoneInfo.Utc;
         }
 
         public async Task<bool> DeleteStudentCourseTransactionEnrollmentByEnrollmentId(Guid studentCourseEnrollmentId)
