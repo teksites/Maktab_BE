@@ -189,6 +189,7 @@ public class StudentCourseTransactionRepositoryTests
         var table = new DataTable();
         table.Columns.Add("CourseEnrollmentGroupId", typeof(byte[]));
         table.Columns.Add("CourseId", typeof(byte[]));
+        table.Columns.Add("GroupIndex", typeof(int));
         table.Columns.Add("MaxStudents", typeof(int));
         table.Columns.Add("IfRegistrationOpen", typeof(bool));
         table.Columns.Add("UnknownCount", typeof(int));
@@ -201,7 +202,7 @@ public class StudentCourseTransactionRepositoryTests
         var courseId = Guid.NewGuid().ToByteArray();
         var groupBytes = groupId.ToByteArray();
 
-        table.Rows.Add(groupBytes, courseId, 3, true, 0, 2, 0, 0, 1, 0);
+        table.Rows.Add(groupBytes, courseId, 1, 3, true, 0, 2, 0, 0, 1, 0);
 
         return table.CreateDataReader();
     }
@@ -221,8 +222,10 @@ public class StudentCourseTransactionRepositoryTests
         table.Columns.Add("UpdatedOn", typeof(DateTime));
         table.Columns.Add("EnrollmentIndex", typeof(int));
         table.Columns.Add("EnrollmentStatus", typeof(int));
+        table.Columns.Add("GroupIndex", typeof(int));
         table.Columns.Add("ChildFirstName", typeof(string));
         table.Columns.Add("ChildLastName", typeof(string));
+        table.Columns.Add("ChildConsent", typeof(string));
         table.Columns.Add("UserId", typeof(byte[]));
         table.Columns.Add("UserFirstName", typeof(string));
         table.Columns.Add("UserLastName", typeof(string));
@@ -243,8 +246,10 @@ public class StudentCourseTransactionRepositoryTests
             DateTime.UtcNow,
             1,
             (int)EnrollmentStatus.Cancelled,
+            1,
             "Child",
             "One",
+            string.Empty,
             Guid.NewGuid().ToByteArray(),
             "Parent",
             "One",

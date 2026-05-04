@@ -156,6 +156,7 @@ namespace Courses.Repository.Implementation
                     CAST(sce.EnrollmentStatus AS SIGNED) as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
+                    ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
@@ -277,6 +278,7 @@ namespace Courses.Repository.Implementation
                     CAST(sce.EnrollmentStatus AS SIGNED) as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
+                    ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
@@ -529,6 +531,7 @@ namespace Courses.Repository.Implementation
                     CAST(sce.EnrollmentStatus AS SIGNED) as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
+                    ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
@@ -651,6 +654,7 @@ namespace Courses.Repository.Implementation
                     CAST(sce.EnrollmentStatus AS SIGNED) as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
+                    ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
@@ -766,6 +770,7 @@ namespace Courses.Repository.Implementation
                     CAST(sce.EnrollmentStatus AS SIGNED) as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
+                    ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
@@ -883,6 +888,7 @@ namespace Courses.Repository.Implementation
                     CAST(sce.EnrollmentStatus AS SIGNED) as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
+                    ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
@@ -1000,6 +1006,7 @@ namespace Courses.Repository.Implementation
                     CAST(sce.EnrollmentStatus AS SIGNED) as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
+                    ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
@@ -1115,6 +1122,7 @@ namespace Courses.Repository.Implementation
                     CAST(sce.EnrollmentStatus AS SIGNED) as EnrollmentStatus,
                     ceg.GroupTitle AS GroupTitle,
                     ceg.GroupTitleFr AS GroupTitleFr,
+                    ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
@@ -1302,12 +1310,14 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-                SELECT sce.*
+                SELECT sce.*, ceg.GroupIndex AS GroupIndex
                 FROM student_course_transaction_enrollment scte
                 JOIN student_course_enrollment sce
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
+                JOIN course_enrollment_groups ceg
+                    ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 WHERE scte.StudentCourseTransactionId = @TransactionId
-                ORDER BY sce.CreatedAt;
+                ORDER BY ceg.GroupIndex ASC, sce.CreatedAt;
             ";
 
             cmd.AddParameter("@TransactionId", transactionId.ToByteArray());
@@ -1327,6 +1337,7 @@ namespace Courses.Repository.Implementation
                     DayCareDays = reader.GetInt32("DayCareDays"),
                     CreatedAt = reader.GetDateTime("CreatedAt"),
                     UpdatedOn = reader.GetDateTime("UpdatedOn"),
+                    GroupIndex = reader.GetInt32("GroupIndex"),
                     EnrollmentIndex = reader.GetInt32("EnrollmentIndex"),
                     EnrollmentStatus = (EnrollmentStatus)reader.GetInt32("EnrollmentStatus")
                 });
@@ -1548,6 +1559,7 @@ namespace Courses.Repository.Implementation
             var ordEnrollmentStatus = reader.GetOrdinal("EnrollmentStatus");
             var ordGroupTitle = reader.GetOrdinal("GroupTitle");
             var ordGroupTitleFr = reader.GetOrdinal("GroupTitleFr");
+            var ordGroupIndex = reader.GetOrdinal("GroupIndex");
             var ordChildFirstName = reader.GetOrdinal("ChildFirstName");
             var ordChildLastName = reader.GetOrdinal("ChildLastName");
             var ordChildRegistrationNumber = reader.GetOrdinal("ChildRegistrationNumber");
@@ -1627,6 +1639,7 @@ namespace Courses.Repository.Implementation
                         DayCareDays = reader.GetInt32(ordDayCareDays),
                         CreatedAt = reader.GetDateTime(ordEnrollmentCreatedAt),
                         UpdatedOn = reader.GetDateTime(ordEnrollmentUpdatedOn),
+                        GroupIndex = reader.GetInt32(ordGroupIndex),
                         EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex),
                         EnrollmentStatus = (EnrollmentStatus)reader.GetInt32(ordEnrollmentStatus),
                         GroupTitle = reader.IsDBNull(ordGroupTitle) ? string.Empty : reader.GetString(ordGroupTitle),
