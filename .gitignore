@@ -166,3 +166,13 @@
 /.codex-dbprobe
 /Courses.Test/bin/Debug/net8.0
 /Courses.Test/obj
+/Helcim/bin/Debug/net8.0
+/Helcim/obj
+/Helcim.Implementation/bin/Debug/net8.0
+/Helcim.Implementation/obj
+/Helcim.Registry/bin/Debug/net8.0
+/Helcim.Registry/obj
+/Helcim.Repository/bin/Debug/net8.0
+/Helcim.Repository/obj
+/Helcim.Repository.Implementation/bin/Debug/net8.0
+/Helcim.Repository.Implementation/obj

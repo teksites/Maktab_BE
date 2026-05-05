@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Courses.Registry\Courses.Registry.csproj" />
+    <ProjectReference Include="..\Helcim.Registry\Helcim.Registry.csproj" />
     <ProjectReference Include="..\Zeffy.Registry\Zeffy.Registry.csproj" />
     <ProjectReference Include="..\Data.MySql.Regjstry\Data.MySql.Regjstry.csproj" />
     <ProjectReference Include="..\Elavon.Registry\Elavon.Registry.csproj" />

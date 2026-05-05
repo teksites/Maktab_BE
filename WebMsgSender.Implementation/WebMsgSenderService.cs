@@ -65,14 +65,14 @@ namespace WebMsgSender.Implementation
 
             using (_client = httpSdk.GetHttpClient())//.CreateWebhookHttpClient(subscription.ExternalEndpoint, subscription.DefaultHeaders))
             {
-                var requestMesssage = await CreateHttpMessageRequest(message.ExternalEndpoint, message.Payload, httpMethod, null).ConfigureAwait(false);
+                var requestMesssage = await CreateHttpMessageRequest(message.ExternalEndpoint, message.Payload, httpMethod, message.Headers).ConfigureAwait(false);
 
                 try
                 {
                     var response = await httpRetryPolicy.ExecuteAsync(() =>
                     timeOutPolicy.ExecuteAsync(async () =>
                     {
-                        return await _client.SendAsync(await CreateHttpMessageRequest(message.ExternalEndpoint, message.Payload, httpMethod, null).ConfigureAwait(false)).ConfigureAwait(false);
+                        return await _client.SendAsync(await CreateHttpMessageRequest(message.ExternalEndpoint, message.Payload, httpMethod, message.Headers).ConfigureAwait(false)).ConfigureAwait(false);
 
                     }));
 
@@ -107,16 +107,18 @@ namespace WebMsgSender.Implementation
             );
         }
 
-        public async Task<HttpRequestMessage> CreateHttpMessageRequest(string url, StringContent content, HttpMethod method, Dictionary<string, string> headers = null)
+        public async Task<HttpRequestMessage> CreateHttpMessageRequest(string url, StringContent? content, HttpMethod method, Dictionary<string, string> headers = null)
         {
             var httpRequest = new HttpRequestMessage()
             {
                 RequestUri = new Uri(url),
-                Method = method,
-                Content = content
+                Method = method
             };
 
-        
+            if (content != null)
+            {
+                httpRequest.Content = content;
+            }
 
             if (headers != null)
             {

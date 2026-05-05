@@ -1,13 +1,15 @@
-﻿using Courses.Services;
+using Courses.Services;
+using Helcim.Services;
 using Maktab.Attributes;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
+using MaktabDataContracts.Responses.Helcim;
+using MaktabDataContracts.Responses.Transactions;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using System;
-using MaktabDataContracts.Responses.Transactions;
-using MaktabDataContracts.Enums;
 
 [Route("api/student-course-transactions")]
 [ApiController]
@@ -15,10 +17,12 @@ using MaktabDataContracts.Enums;
 public class StudentCourseTransactionController : ControllerBase
 {
     private readonly IStudentCourseTransactionService _service;
+    private readonly IHelcimTransactionService _helcimService;
 
-    public StudentCourseTransactionController(IStudentCourseTransactionService service)
+    public StudentCourseTransactionController(IStudentCourseTransactionService service, IHelcimTransactionService helcimService)
     {
         _service = service;
+        _helcimService = helcimService;
     }
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
@@ -40,14 +44,14 @@ public class StudentCourseTransactionController : ControllerBase
     [HttpGet("family/{familyId:guid}/institute/{instituteId:guid}")]
     public async Task<IEnumerable<StudentCourseTransactionResponse>> GetFamilyTransactionsByInstitute(Guid familyId, Guid instituteId)
     {
-        return  await _service.GetInstituteTransactionsByFamily(familyId, instituteId).ConfigureAwait(false);
+        return await _service.GetInstituteTransactionsByFamily(familyId, instituteId).ConfigureAwait(false);
     }
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
     [HttpGet("family/{familyId:guid}/course/{courseId:guid}")]
     public async Task<IEnumerable<StudentCourseTransactionResponse>> GetFamilyTransactionsByCourse(Guid familyId, Guid courseId)
     {
-        return await _service.GetCourseTransactionsByFamily( courseId, familyId).ConfigureAwait(false);
+        return await _service.GetCourseTransactionsByFamily(courseId, familyId).ConfigureAwait(false);
     }
 
     [ApiAuthorize(false, false, UserRoleType.Admin)]
@@ -55,6 +59,20 @@ public class StudentCourseTransactionController : ControllerBase
     public async Task<StudentCourseTransactionResponse> GetTransactionByPaymentCode(string paymentCode)
     {
         return await _service.GetTransactionByPaymentCode(paymentCode).ConfigureAwait(false);
+    }
+
+    [ApiAuthorize(false, false, UserRoleType.Admin)]
+    [HttpGet("paymentcode/{paymentCode}/helcim")]
+    public async Task<List<HelcimTransactionResponse>> GetHelcimTransactionsByPaymentCode(string paymentCode)
+    {
+        return await _helcimService.GetByPaymentCode(paymentCode).ConfigureAwait(false);
+    }
+
+    [ApiAuthorize(false, false, UserRoleType.Admin)]
+    [HttpGet("transaction/{transactionId:guid}")]
+    public async Task<List<HelcimTransactionResponse>> GetHelcimTransactionsByTransactionId(Guid transactionId)
+    {
+        return await _helcimService.GetByMaktabTransactionId(transactionId).ConfigureAwait(false);
     }
 
     //[HttpPost]

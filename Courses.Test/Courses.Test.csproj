@@ -23,6 +23,10 @@
     <ProjectReference Include="..\Courses.Repository\Courses.Repository.csproj" />
     <ProjectReference Include="..\Courses.Repository.Implementation\Courses.Repository.Implementation.csproj" />
     <ProjectReference Include="..\Data\Data.csproj" />
+    <ProjectReference Include="..\Helcim\Helcim.csproj" />
+    <ProjectReference Include="..\Helcim.Implementation\Helcim.Implementation.csproj" />
+    <ProjectReference Include="..\Helcim.Repository\Helcim.Repository.csproj" />
+    <ProjectReference Include="..\Helcim.Repository.Implementation\Helcim.Repository.Implementation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

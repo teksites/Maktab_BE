@@ -1,7 +1,8 @@
-using System.Text;
+ï»¿using System.Text;
 using System.Text.Json.Serialization;
 using Application.Users.Registry;
 using Courses.Registry;
+using Helcim.Registry;
 using Zeffy.Registry;
 using Data.MySql.Regjstry;
 using Email.Registry;
@@ -91,7 +92,7 @@ namespace Maktab
                     }
                 };
 
-                // 3) Session_Info – shown in the Authorize popup
+                // 3) Session_Info ï¿½ shown in the Authorize popup
                 var sessionInfoScheme = new OpenApiSecurityScheme
                 {
                     Description = "Session_Info header used to identify the user session.",
@@ -174,6 +175,7 @@ namespace Maktab
             services.AddWebMsgSender();
             services.AddElavonServices();
             services.AddCoursesServices();
+            services.AddHelcimServices();
             services.AddZeffyServices();
 
             // Quartz jobs
