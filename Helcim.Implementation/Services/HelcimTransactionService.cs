@@ -428,7 +428,7 @@ namespace Helcim.Implementation.Services
                 ["paymentType"] = JToken.FromObject(HelcimPaymentType.Purchase, HelcimJsonSerializer),
                 ["amount"] = JToken.FromObject(amount, HelcimJsonSerializer),
                 ["currency"] = JToken.FromObject(HelcimCurrency.Cad, HelcimJsonSerializer),
-                ["paymentMethod"] = JToken.FromObject(HelcimPaymentMethod.CreditCardOrAch, HelcimJsonSerializer),
+                ["paymentMethod"] = JToken.FromObject(HelcimPaymentMethod.CreditCard, HelcimJsonSerializer),
                 ["HelcimDigitalWalletRequest"] = JToken.FromObject(1, HelcimJsonSerializer),
                 ["invoiceRequest"] = invoiceRequest
             };
