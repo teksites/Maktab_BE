@@ -24,7 +24,25 @@ namespace Courses.Services.Implementation
                 throw new Exception("The transaaction doesn't exist");
             }
 
-            var paymentResponse = await _repository.AddPayment(payment).ConfigureAwait(false);
+            var result = await TryAddPayment(payment).ConfigureAwait(false);
+            return result.Payment;
+        }
+
+        public async Task<(CoursePaymentResponse Payment, bool Created)> TryAddPayment(AddCoursePayment payment)
+        {
+            var transaction = await _studentCourseTransactionService.GetTransaction(payment.StudentCourseTransactionId).ConfigureAwait(false);
+
+            if (transaction == null)
+            {
+                throw new Exception("The transaaction doesn't exist");
+            }
+
+            var result = await _repository.TryAddPayment(payment).ConfigureAwait(false);
+            if (!result.Created)
+            {
+                return result;
+            }
+
             var allPayments = await _repository.GetAllPayments(payment.StudentCourseTransactionId).ConfigureAwait(false);
             decimal totalPaid = allPayments.Sum(p => p.AmountPaid);
 
@@ -58,7 +76,7 @@ namespace Courses.Services.Implementation
 
             await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, updatedTransaction).ConfigureAwait(false);
 
-            return paymentResponse;
+            return result;
         }
 
         public async Task<CoursePaymentResponse> GetPayment(Guid paymentId)

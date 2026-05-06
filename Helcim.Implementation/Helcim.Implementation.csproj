@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Courses\Courses.csproj" />
     <ProjectReference Include="..\InternalContracts\InternalContracts.csproj" />
     <ProjectReference Include="..\InternalContracts.Implementation\InternalContracts.Implementation.csproj" />
     <ProjectReference Include="..\Helcim.Repository\Helcim.Repository.csproj" />

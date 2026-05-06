@@ -6,6 +6,7 @@ namespace Courses.Repository
     public interface ICoursePaymentRepository
     {
         Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment);
+        Task<(CoursePaymentResponse Payment, bool Created)> TryAddPayment(AddCoursePayment payment);
         Task<bool> UpdatePayment(Guid paymentId, AddCoursePayment payment);
         Task<bool> DeletePayment(Guid paymentId, bool hardDelete = false);
         Task<CoursePaymentResponse?> GetPayment(Guid paymentId);

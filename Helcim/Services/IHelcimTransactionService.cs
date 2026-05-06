@@ -6,9 +6,16 @@ namespace Helcim.Services
     public interface IHelcimTransactionService
     {
         Task<HelcimPayInitializeResponse> InitializePayment(InitiatePaymentRequest request);
-        Task HandleWebhook(HelcimCardTransactionWebhookResponse webhook);
+        Task<HelcimWebhookHandlingStatus> HandleWebhook(
+            HelcimCardTransactionWebhookResponse webhook,
+            string rawBody,
+            string? webhookId,
+            string? webhookTimestamp,
+            string? signatureHeader);
         Task AddTransactionDetails(AddHelcimTransactionDetails transactionDetails);
         Task<List<HelcimTransactionResponse>> GetByPaymentCode(string paymentCode);
+        Task<List<HelcimTransactionResponseDetailed>> GetDetailedByPaymentCode(string paymentCode);
         Task<List<HelcimTransactionResponse>> GetByMaktabTransactionId(Guid maktabTransactionId);
+        Task<List<HelcimTransactionResponseDetailed>> GetDetailedByMaktabTransactionId(Guid maktabTransactionId);
     }
 }
