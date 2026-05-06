@@ -20,7 +20,7 @@ public class HelcimController : ControllerBase
         _service = service;
     }
 
-    [ApiAuthorize]
+    //[ApiAuthorize]
     [HttpPost("initialize-payment")]
     public Task<HelcimPayInitializeResponse> InitializePayment(InitiatePaymentRequest request)
         => _service.InitializePayment(request);

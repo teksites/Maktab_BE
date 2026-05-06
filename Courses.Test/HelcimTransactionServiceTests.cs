@@ -74,6 +74,7 @@ public class HelcimTransactionServiceTests
         Assert.Equal("purchase", payload["paymentType"]!.Value<string>());
         Assert.Equal("CAD", payload["currency"]!.Value<string>());
         Assert.Equal("cc-ach", payload["paymentMethod"]!.Value<string>());
+        Assert.Equal(1, payload["HelcimDigitalWalletRequest"]!.Value<int>());
         Assert.Equal(99m, payload["amount"]!.Value<decimal>());
         Assert.Matches(@"^INV-PAY001-\d{12}-6$", payload["invoiceRequest"]!["invoiceNumber"]!.Value<string>());
         Assert.Equal("PAY001", payload["invoiceRequest"]!["notes"]!.Value<string>());
@@ -116,6 +117,7 @@ public class HelcimTransactionServiceTests
         var payload = JObject.Parse(payloadJson);
 
         Assert.Null(payload["invoiceNumber"]);
+        Assert.Equal(1, payload["HelcimDigitalWalletRequest"]!.Value<int>());
 
         var invoiceRequestProperties = payload["invoiceRequest"]!.Children<JProperty>().Select(property => property.Name);
         var lineItemProperties = payload["invoiceRequest"]!["lineItems"]![0]!.Children<JProperty>().Select(property => property.Name);
@@ -158,7 +160,7 @@ public class HelcimTransactionServiceTests
         var payload = JObject.Parse(payloadJson);
 
         Assert.Equal(
-            new[] { "paymentType", "amount", "currency", "paymentMethod", "invoiceRequest" },
+            new[] { "paymentType", "amount", "currency", "paymentMethod", "HelcimDigitalWalletRequest", "invoiceRequest" },
             payload.Properties().Select(property => property.Name).ToArray());
 
         Assert.Null(payload["invoiceNumber"]);
@@ -166,6 +168,7 @@ public class HelcimTransactionServiceTests
         Assert.Equal(100m, payload["amount"]!.Value<decimal>());
         Assert.Equal("CAD", payload["currency"]!.Value<string>());
         Assert.Equal("cc-ach", payload["paymentMethod"]!.Value<string>());
+        Assert.Equal(1, payload["HelcimDigitalWalletRequest"]!.Value<int>());
 
         var invoiceRequest = (JObject)payload["invoiceRequest"]!;
         Assert.Equal(
