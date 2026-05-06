@@ -176,3 +176,9 @@
 /Helcim.Repository/obj
 /Helcim.Repository.Implementation/bin/Debug/net8.0
 /Helcim.Repository.Implementation/obj
+/.tmp-cloudflared-err.log
+/.tmp-maktab-err.log
+/.tmp-ngrok-out.log
+/.tmp-maktab-out.log
+/.tmp-cloudflared-out.log
+/.tmp-ngrok-err.log

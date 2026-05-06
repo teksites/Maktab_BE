@@ -25,7 +25,7 @@ public class HelcimController : ControllerBase
     public Task<HelcimPayInitializeResponse> InitializePayment(InitiatePaymentRequest request)
         => _service.InitializePayment(request);
 
-    [HttpPost("/api/helcim-webhook")]
+    [HttpPost("/api/payment-notifier")]
     public async Task<IActionResult> HelcimWebhook([FromBody] JsonElement body)
     {
         var rawBody = body.GetRawText();
