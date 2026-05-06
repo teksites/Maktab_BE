@@ -9,7 +9,9 @@ using MaktabDataContracts.Enums;
 using MaktabDataContracts.Enums.Helcim;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Requests.Helcim;
+using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Helcim;
+using MaktabDataContracts.Responses.Transactions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using WebMsgSender;
@@ -80,11 +82,16 @@ namespace Helcim.Implementation.Services
                 throw new InvalidOperationException("Helcim initialize payment returned an empty response.");
             }
 
-            var response = JsonConvert.DeserializeObject<HelcimPayInitializeResponse>(responseJson);
-            if (response == null)
+            var responseReceived = JsonConvert.DeserializeObject<HelcimPayInitialize>(responseJson);
+
+            if (responseReceived == null)
             {
                 throw new InvalidOperationException($"Unable to deserialize Helcim initialize payment response. Raw response: {responseJson}");
             }
+            var response = new HelcimPayInitializeResponse
+            {
+                CheckoutToken = responseReceived.CheckoutToken
+            };
 
             return response;
         }
@@ -180,9 +187,17 @@ namespace Helcim.Implementation.Services
                     throw new InvalidOperationException($"Helcim invoice lookup for invoice number {cardTransaction.InvoiceNumber} returned no results.");
                 }
 
+                StudentCourseTransactionResponse? localTransaction = null;
+                if (!string.IsNullOrWhiteSpace(invoice.PaymentCode))
+                {
+                    localTransaction = await _studentCourseTransactionService
+                        .GetTransactionByPaymentCode(invoice.PaymentCode)
+                        .ConfigureAwait(false);
+                }
+
                 if (invoice.Status == HelcimInvoiceStatus.Paid)
                 {
-                    await ProcessPaidInvoiceAsync(invoice, cardTransaction).ConfigureAwait(false);
+                    await ProcessPaidInvoiceAsync(invoice, cardTransaction, localTransaction).ConfigureAwait(false);
                 }
 
                 var lineItem = invoice.LineItems?.FirstOrDefault();
@@ -219,7 +234,8 @@ namespace Helcim.Implementation.Services
                     DatePaid = invoice.DatePaid,
                     IsActive = true,
                     RawResponse = invoiceRaw,
-                    TransactionResponse = cardTransactionRaw
+                    TransactionResponse = cardTransactionRaw,
+                    FamilyId = localTransaction?.FamilyId ?? Guid.Empty
                 };
 
                 try
@@ -273,14 +289,15 @@ namespace Helcim.Implementation.Services
 
         private async Task ProcessPaidInvoiceAsync(
             HelcimInvoiceResponse invoice,
-            HelcimCardTransactionResponse cardTransaction)
+            HelcimCardTransactionResponse cardTransaction,
+            StudentCourseTransactionResponse? transaction = null)
         {
             if (string.IsNullOrWhiteSpace(invoice.PaymentCode))
             {
                 return;
             }
 
-            var transaction = await _studentCourseTransactionService
+            transaction ??= await _studentCourseTransactionService
                 .GetTransactionByPaymentCode(invoice.PaymentCode)
                 .ConfigureAwait(false);
 
@@ -316,8 +333,14 @@ namespace Helcim.Implementation.Services
             }
         }
 
+        public Task<List<HelcimTransactionResponse>> GetByFamilyId(Guid familyId)
+            => _repository.GetByFamilyId(familyId);
+
         public Task<List<HelcimTransactionResponse>> GetByPaymentCode(string paymentCode)
             => _repository.GetByPaymentCode(paymentCode);
+
+        public Task<List<HelcimTransactionResponseDetailed>> GetDetailedByFamilyId(Guid familyId)
+            => _repository.GetDetailedByFamilyId(familyId);
 
         public Task<List<HelcimTransactionResponseDetailed>> GetDetailedByPaymentCode(string paymentCode)
             => _repository.GetDetailedByPaymentCode(paymentCode);

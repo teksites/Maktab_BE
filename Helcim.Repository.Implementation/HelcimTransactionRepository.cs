@@ -50,7 +50,8 @@ namespace Helcim.Repository.Implementation
                     DatePaid,
                     IsActive,
                     RawResponse,
-                    TransactionResponse
+                    TransactionResponse,
+                    FamilyId
                 )
                 VALUES
                 (
@@ -85,7 +86,8 @@ namespace Helcim.Repository.Implementation
                     @DatePaid,
                     @IsActive,
                     @RawResponse,
-                    @TransactionResponse
+                    @TransactionResponse,
+                    @FamilyId
                 )";
 
             cmd.AddParameter("@PaymentCode", transactionDetails.PaymentCode);
@@ -120,6 +122,7 @@ namespace Helcim.Repository.Implementation
             cmd.AddParameter("@IsActive", transactionDetails.IsActive);
             cmd.AddParameter("@RawResponse", (object?)transactionDetails.RawResponse ?? DBNull.Value);
             cmd.AddParameter("@TransactionResponse", (object?)transactionDetails.TransactionResponse ?? DBNull.Value);
+            cmd.AddParameter("@FamilyId", transactionDetails.FamilyId == Guid.Empty ? DBNull.Value : transactionDetails.FamilyId.ToByteArray());
 
             await cmd.ExecuteNonQueryAsync();
         }
@@ -272,8 +275,14 @@ namespace Helcim.Repository.Implementation
             await cmd.ExecuteNonQueryAsync();
         }
 
+        public Task<List<HelcimTransactionResponse>> GetByFamilyId(Guid familyId)
+            => GetByColumnAsync("FamilyId", familyId.ToByteArray());
+
         public Task<List<HelcimTransactionResponse>> GetByPaymentCode(string paymentCode)
             => GetByColumnAsync("PaymentCode", paymentCode);
+
+        public Task<List<HelcimTransactionResponseDetailed>> GetDetailedByFamilyId(Guid familyId)
+            => GetDetailedByColumnAsync("FamilyId", familyId.ToByteArray(), "ORDER BY InvoiceNumber DESC, TransactionId DESC");
 
         public Task<List<HelcimTransactionResponseDetailed>> GetDetailedByPaymentCode(string paymentCode)
             => GetDetailedByColumnAsync("PaymentCode", paymentCode);
@@ -289,6 +298,11 @@ namespace Helcim.Repository.Implementation
 
         private async Task<List<HelcimTransactionResponse>> GetByColumnAsync(string columnName, object value)
         {
+            return await GetByColumnAsync(columnName, value, "ORDER BY InvoiceNumber DESC, TransactionId DESC").ConfigureAwait(false);
+        }
+
+        private async Task<List<HelcimTransactionResponse>> GetByColumnAsync(string columnName, object value, string orderByClause)
+        {
             var results = new List<HelcimTransactionResponse>();
 
             using var conn = await Database.CreateAndOpenConnectionAsync();
@@ -298,7 +312,7 @@ namespace Helcim.Repository.Implementation
                 SELECT *
                 FROM helcim_transaction
                 WHERE {columnName} = @Value
-                ORDER BY InvoiceNumber ASC, TransactionId ASC";
+                {orderByClause}";
 
             cmd.AddParameter("@Value", value);
 
@@ -313,6 +327,11 @@ namespace Helcim.Repository.Implementation
 
         private async Task<List<HelcimTransactionResponseDetailed>> GetDetailedByColumnAsync(string columnName, object value)
         {
+            return await GetDetailedByColumnAsync(columnName, value, "ORDER BY InvoiceNumber DESC, TransactionId DESC").ConfigureAwait(false);
+        }
+
+        private async Task<List<HelcimTransactionResponseDetailed>> GetDetailedByColumnAsync(string columnName, object value, string orderByClause)
+        {
             var results = new List<HelcimTransactionResponseDetailed>();
 
             using var conn = await Database.CreateAndOpenConnectionAsync();
@@ -322,7 +341,7 @@ namespace Helcim.Repository.Implementation
                 SELECT *
                 FROM helcim_transaction
                 WHERE {columnName} = @Value
-                ORDER BY InvoiceNumber ASC, TransactionId ASC";
+                {orderByClause}";
 
             cmd.AddParameter("@Value", value);
 
@@ -371,6 +390,7 @@ namespace Helcim.Repository.Implementation
             {
                 PaymentCode = reader.GetString("PaymentCode"),
                 MaktabTransactionId = reader.GetGuidFromByteArray("MaktabTransactionId"),
+                FamilyId = reader.GetNullableGuidFromByteArray("FamilyId") ?? Guid.Empty,
                 UserIp = reader.GetNullableString("UserIp"),
                 InvoiceId = reader.GetInt32("InvoiceId"),
                 InvoiceNumber = reader.GetNullableString("InvoiceNumber"),
@@ -408,6 +428,7 @@ namespace Helcim.Repository.Implementation
             {
                 PaymentCode = reader.GetString("PaymentCode"),
                 MaktabTransactionId = reader.GetGuidFromByteArray("MaktabTransactionId"),
+                FamilyId = reader.GetNullableGuidFromByteArray("FamilyId") ?? Guid.Empty,
                 UserIp = reader.GetNullableString("UserIp"),
                 InvoiceId = reader.GetInt32("InvoiceId"),
                 InvoiceNumber = reader.GetNullableString("InvoiceNumber"),

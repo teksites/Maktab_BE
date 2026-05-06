@@ -9,7 +9,7 @@ namespace Courses.Test;
 public class HelcimTransactionRepositoryTests
 {
     [Fact]
-    public async Task GetByPaymentCode_OrdersByInvoiceNumberAscending()
+    public async Task GetByPaymentCode_OrdersByInvoiceNumberDescending()
     {
         string? commandText = null;
 
@@ -23,11 +23,29 @@ public class HelcimTransactionRepositoryTests
 
         Assert.Empty(result);
         Assert.NotNull(commandText);
-        Assert.Contains("ORDER BY InvoiceNumber ASC, TransactionId ASC", commandText);
+        Assert.Contains("ORDER BY InvoiceNumber DESC, TransactionId DESC", commandText);
     }
 
     [Fact]
-    public async Task GetDetailedByPaymentCode_MapsRawResponseAndTransactionResponse()
+    public async Task GetByFamilyId_OrdersByInvoiceNumberDescending()
+    {
+        string? commandText = null;
+
+        var database = new FakeDatabase(
+            CreateEmptyReader,
+            command => commandText = command.CommandText);
+
+        var repository = new HelcimTransactionRepository(database);
+
+        var result = await repository.GetByFamilyId(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+
+        Assert.Empty(result);
+        Assert.NotNull(commandText);
+        Assert.Contains("ORDER BY InvoiceNumber DESC, TransactionId DESC", commandText);
+    }
+
+    [Fact]
+    public async Task GetDetailedByPaymentCode_MapsRawResponseTransactionResponseAndFamilyId()
     {
         var database = new FakeDatabase(CreateDetailedReader);
         var repository = new HelcimTransactionRepository(database);
@@ -37,6 +55,7 @@ public class HelcimTransactionRepositoryTests
         var item = Assert.Single(result);
         Assert.Equal("PAY001", item.PaymentCode);
         Assert.Equal(Guid.Parse("11111111-1111-1111-1111-111111111111"), item.MaktabTransactionId);
+        Assert.Equal(Guid.Parse("22222222-2222-2222-2222-222222222222"), item.FamilyId);
         Assert.Equal("INV-PAY001-202605052141-1", item.InvoiceNumber);
         Assert.Equal(47889842, item.TransactionId);
         Assert.Equal("[{\"invoiceId\":63677011}]", item.RawResponse);
@@ -89,6 +108,7 @@ public class HelcimTransactionRepositoryTests
         table.Columns.Add("IsActive", typeof(bool));
         table.Columns.Add("RawResponse", typeof(string));
         table.Columns.Add("TransactionResponse", typeof(string));
+        table.Columns.Add("FamilyId", typeof(byte[]));
 
         table.Rows.Add(
             "PAY001",
@@ -122,7 +142,8 @@ public class HelcimTransactionRepositoryTests
             new DateTime(2026, 5, 3, 11, 42, 9, DateTimeKind.Utc),
             true,
             "[{\"invoiceId\":63677011}]",
-            "{\"transactionId\":47889842}");
+            "{\"transactionId\":47889842}",
+            Guid.Parse("22222222-2222-2222-2222-222222222222").ToByteArray());
 
         return table.CreateDataReader();
     }

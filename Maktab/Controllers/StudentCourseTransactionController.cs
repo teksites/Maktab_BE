@@ -62,6 +62,20 @@ public class StudentCourseTransactionController : ControllerBase
     }
 
     [ApiAuthorize(false, false, UserRoleType.Admin)]
+    [HttpGet("family/{familyId:guid}/helcim")]
+    public async Task<List<HelcimTransactionResponse>> GetHelcimTransactionsByFamilyId(Guid familyId)
+    {
+        return await _helcimService.GetByFamilyId(familyId).ConfigureAwait(false);
+    }
+
+    [ApiAuthorize(false, false, UserRoleType.Admin)]
+    [HttpGet("family/{familyId:guid}/helcim/detailed")]
+    public async Task<List<HelcimTransactionResponseDetailed>> GetDetailedHelcimTransactionsByFamilyId(Guid familyId)
+    {
+        return await _helcimService.GetDetailedByFamilyId(familyId).ConfigureAwait(false);
+    }
+
+    [ApiAuthorize(false, false, UserRoleType.Admin)]
     [HttpGet("paymentcode/{paymentCode}/helcim")]
     public async Task<List<HelcimTransactionResponse>> GetHelcimTransactionsByPaymentCode(string paymentCode)
     {

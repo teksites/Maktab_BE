@@ -8,7 +8,9 @@ namespace Helcim.Repository
         Task Add(AddHelcimTransactionDetails transactionDetails);
         Task<HelcimWebhookReservationResult> TryReserveWebhookProcessing(ReserveHelcimWebhookProcessing webhookProcessing);
         Task UpdateWebhookProcessing(UpdateHelcimWebhookProcessing webhookProcessing);
+        Task<List<HelcimTransactionResponse>> GetByFamilyId(Guid familyId);
         Task<List<HelcimTransactionResponse>> GetByPaymentCode(string paymentCode);
+        Task<List<HelcimTransactionResponseDetailed>> GetDetailedByFamilyId(Guid familyId);
         Task<List<HelcimTransactionResponseDetailed>> GetDetailedByPaymentCode(string paymentCode);
         Task<List<HelcimTransactionResponse>> GetByMaktabTransactionId(Guid maktabTransactionId);
         Task<List<HelcimTransactionResponseDetailed>> GetDetailedByMaktabTransactionId(Guid maktabTransactionId);
