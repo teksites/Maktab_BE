@@ -61,7 +61,7 @@ namespace Application.Users.Implementation
             {
                 UserId = userInformation.UserId,
                 FamilyId = userInformation.FamilyId,
-                SIN = userInformation.SIN,
+                SIN = MaskSin(userInformation.SIN),
                 AddressId = userInformation.AddressId,
                 IsActive = userInformation.IsActive,
                 CreatedAt = userInformation.CreatedAt,
@@ -165,9 +165,7 @@ namespace Application.Users.Implementation
 
             if (userInfo != null)
             {
-                var mappedUser = MapToUserInformationResponse(userInfo);
-                mappedUser.SIN = MaskSin(mappedUser.SIN);
-                return mappedUser;
+                return MapToUserInformationResponse(userInfo);
             }
             return null;
         }

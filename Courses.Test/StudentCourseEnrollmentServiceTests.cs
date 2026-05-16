@@ -187,6 +187,7 @@ public class StudentCourseEnrollmentServiceTests
         var installment = Assert.Single(capturedUpdate!.FeeInstallments);
         Assert.Equal("Paiement complet de l'inscription/Complete Registration Payment", installment.Description);
         Assert.Equal(120m, installment.Amount);
+        Assert.Equal(PaymentStatus.Unpaid, installment.PaymentStatus);
     }
 
     [Fact]
@@ -277,6 +278,7 @@ public class StudentCourseEnrollmentServiceTests
         Assert.Equal(100m, capturedUpdate.FeeInstallments[0].Amount);
         Assert.Equal(100m, capturedUpdate.FeeInstallments[1].Amount);
         Assert.Equal(100m, capturedUpdate.FeeInstallments[2].Amount);
+        Assert.All(capturedUpdate.FeeInstallments, installment => Assert.Equal(PaymentStatus.Unpaid, installment.PaymentStatus));
     }
 
     [Fact]
@@ -379,6 +381,148 @@ public class StudentCourseEnrollmentServiceTests
         Assert.Equal(350m, capturedUpdate.FeeInstallments.Sum(installment => installment.Amount));
         Assert.Equal(250m, capturedUpdate.FeeInstallments[0].Amount);
         Assert.Equal(100m, capturedUpdate.FeeInstallments[1].Amount);
+        Assert.All(capturedUpdate.FeeInstallments, installment => Assert.Equal(PaymentStatus.Unpaid, installment.PaymentStatus));
+    }
+
+    [Fact]
+    public async Task RecalculateCourseFee_AssignsInstallmentPaymentStatusesFromTotalPaidSoFar()
+    {
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupIds = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        var capturedUpdate = default(AddStudentCourseTransaction);
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[]
+            {
+                CreateFamilyTransaction(
+                    courseId,
+                    familyId,
+                    new[]
+                    {
+                        CreateEnrollment(childId, groupIds[0], courseId),
+                        CreateEnrollment(childId, groupIds[1], courseId),
+                        CreateEnrollment(childId, groupIds[2], courseId)
+                    },
+                    totalAmountPaid: 150m)
+            });
+        transactionService
+            .Setup(service => service.UpdateTransaction(It.IsAny<Guid>(), It.IsAny<AddStudentCourseTransaction>()))
+            .Callback<Guid, AddStudentCourseTransaction>((_, transaction) => capturedUpdate = transaction)
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupIds[0], 100, groupIds[1], groupIds[2]));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(new[]
+            {
+                new InstitutePolicyResponse
+                {
+                    InstitutePolicyId = Guid.NewGuid(),
+                    InstituteId = Guid.NewGuid(),
+                    CourseId = courseId,
+                    Details = JsonConvert.SerializeObject(new[]
+                    {
+                        new FeePaymentPolicy
+                        {
+                            Name = "First installment",
+                            PaymentDate = DateTime.UtcNow.Date.AddDays(7),
+                            EnrollmentsToCover = 1,
+                            ShouldApplyEnrollmentToCover = true
+                        },
+                        new FeePaymentPolicy
+                        {
+                            Name = "Second installment",
+                            PaymentDate = DateTime.UtcNow.Date.AddDays(14),
+                            EnrollmentsToCover = 1,
+                            ShouldApplyEnrollmentToCover = true
+                        },
+                        new FeePaymentPolicy
+                        {
+                            Name = "Third installment",
+                            PaymentDate = DateTime.UtcNow.Date.AddDays(21),
+                            EnrollmentsToCover = 1,
+                            ShouldApplyEnrollmentToCover = true
+                        }
+                    }),
+                    PolicyType = PolicyType.CourseFeePayment,
+                    IsActive = true
+                }
+            });
+
+        var service = CreateEnrollmentService(
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService);
+
+        var result = await service.RecalculateCourseFee(courseId, familyId);
+
+        Assert.True(result);
+        Assert.NotNull(capturedUpdate);
+        Assert.Equal(PaymentStatus.Paid, capturedUpdate!.FeeInstallments[0].PaymentStatus);
+        Assert.Equal(PaymentStatus.PartiallyPaid, capturedUpdate.FeeInstallments[1].PaymentStatus);
+        Assert.Equal(PaymentStatus.Unpaid, capturedUpdate.FeeInstallments[2].PaymentStatus);
+    }
+
+    [Fact]
+    public async Task RecalculateCourseFee_WhenCompletelyPaid_PromotesEnrolledStatusesToRegistered()
+    {
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var enrolledEnrollment = CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Enrolled);
+
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.UpdateEnrollmentStatus(enrolledEnrollment.StudentCourseEnrollmentId, EnrollmentStatus.Registered))
+            .ReturnsAsync(true);
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[]
+            {
+                CreateFamilyTransaction(
+                    courseId,
+                    familyId,
+                    new[] { enrolledEnrollment },
+                    totalAmountPaid: 100m)
+            });
+        transactionService
+            .Setup(service => service.UpdateTransaction(It.IsAny<Guid>(), It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 100));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService);
+
+        var result = await service.RecalculateCourseFee(courseId, familyId);
+
+        Assert.True(result);
+        repository.Verify(
+            repo => repo.UpdateEnrollmentStatus(enrolledEnrollment.StudentCourseEnrollmentId, EnrollmentStatus.Registered),
+            Times.Once);
     }
 
     [Fact]
@@ -615,6 +759,130 @@ public class StudentCourseEnrollmentServiceTests
     }
 
     [Fact]
+    public async Task UpdateEnrollmentsBatch_SendsSingleFamilyEmailAndRecalculatesOncePerCourseFamily()
+    {
+        var enrollmentIdOne = Guid.NewGuid();
+        var enrollmentIdTwo = Guid.NewGuid();
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childIdOne = Guid.NewGuid();
+        var childIdTwo = Guid.NewGuid();
+        var groupIdOne = Guid.NewGuid();
+        var groupIdTwo = Guid.NewGuid();
+        MultiUserEmailData? sentEmail = null;
+
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetEnrollment(enrollmentIdOne))
+            .ReturnsAsync(CreateEnrollment(childIdOne, groupIdOne, courseId, familyId, EnrollmentStatus.Enrolled, "Maryam"));
+        repository
+            .Setup(repo => repo.GetEnrollment(enrollmentIdTwo))
+            .ReturnsAsync(CreateEnrollment(childIdTwo, groupIdTwo, courseId, familyId, EnrollmentStatus.Enrolled, "Yusuf"));
+        repository
+            .Setup(repo => repo.UpdateEnrollment(It.IsAny<Guid>(), It.IsAny<AddStudentCourseEnrollment>()))
+            .ReturnsAsync(true);
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[]
+            {
+                CreateFamilyTransaction(courseId, familyId, new[]
+                {
+                    CreateEnrollment(childIdOne, groupIdOne, courseId, familyId, EnrollmentStatus.Enrolled, "Maryam"),
+                    CreateEnrollment(childIdTwo, groupIdTwo, courseId, familyId, EnrollmentStatus.Enrolled, "Yusuf")
+                })
+            });
+        transactionService
+            .Setup(service => service.UpdateTransaction(It.IsAny<Guid>(), It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupIdOne, 100, true, 0, true, groupIdTwo));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
+
+        var userService = new Mock<IUserService>();
+        userService
+            .Setup(service => service.GetAllFamilyUsersInformation(familyId, true))
+            .ReturnsAsync(new[]
+            {
+                new UserInformationResponse
+                {
+                    Email = "parent1@example.com",
+                    Relationship = Relationship.Mother
+                },
+                new UserInformationResponse
+                {
+                    Email = "parent2@example.com",
+                    Relationship = Relationship.Father
+                }
+            });
+
+        var sendEmailService = new Mock<ISendEmailService>();
+        sendEmailService
+            .Setup(service => service.SendBulkEmail(It.IsAny<MultiUserEmailData>()))
+            .Callback<MultiUserEmailData>(email => sentEmail = email)
+            .ReturnsAsync(true);
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService,
+            userService: userService,
+            sendEmailService: sendEmailService);
+
+        var result = await service.UpdateEnrollmentsBatch(new UpdateStudentCourseEnrollmentsBatchRequest
+        {
+            Enrollments = new List<UpdateStudentCourseEnrollmentBatchItem>
+            {
+                new()
+                {
+                    EnrollmentId = enrollmentIdOne,
+                    Enrollment = new AddStudentCourseEnrollment
+                    {
+                        ChildId = childIdOne,
+                        FamilyId = familyId,
+                        CourseId = courseId,
+                        CourseEnrollmentGroupId = groupIdOne,
+                        EnrollmentStatus = EnrollmentStatus.Registered,
+                        WillUseDayCare = false,
+                        DayCareDays = 0
+                    }
+                },
+                new()
+                {
+                    EnrollmentId = enrollmentIdTwo,
+                    Enrollment = new AddStudentCourseEnrollment
+                    {
+                        ChildId = childIdTwo,
+                        FamilyId = familyId,
+                        CourseId = courseId,
+                        CourseEnrollmentGroupId = groupIdTwo,
+                        EnrollmentStatus = EnrollmentStatus.Registered,
+                        WillUseDayCare = false,
+                        DayCareDays = 0
+                    }
+                }
+            }
+        }, ifUpdatedByAdmin: true);
+
+        Assert.True(result);
+        Assert.NotNull(sentEmail);
+        Assert.Contains("Maryam", sentEmail!.Body);
+        Assert.Contains("Yusuf", sentEmail.Body);
+        sendEmailService.Verify(service => service.SendBulkEmail(It.IsAny<MultiUserEmailData>()), Times.Once);
+        transactionService.Verify(service => service.UpdateTransaction(It.IsAny<Guid>(), It.IsAny<AddStudentCourseTransaction>()), Times.Once);
+        repository.Verify(repo => repo.UpdateEnrollment(It.IsAny<Guid>(), It.IsAny<AddStudentCourseEnrollment>()), Times.Exactly(2));
+    }
+
+    [Fact]
     public async Task DeleteEnrollment_ReopensClosedGroupWhenConfirmedEnrollmentIsRemoved()
     {
         var enrollmentId = Guid.NewGuid();
@@ -688,7 +956,8 @@ public class StudentCourseEnrollmentServiceTests
         Mock<ICourseService>? courseService = null,
         Mock<IInstitutePolicyService>? policyService = null,
         Mock<ICourseEnrollmentGroupService>? groupService = null,
-        Mock<IUserService>? userService = null)
+        Mock<IUserService>? userService = null,
+        Mock<ISendEmailService>? sendEmailService = null)
     {
         return new StudentCourseEnrollmentService(
             (repository ?? new Mock<IStudentCourseEnrollmentRepository>()).Object,
@@ -696,14 +965,15 @@ public class StudentCourseEnrollmentServiceTests
             (courseService ?? new Mock<ICourseService>()).Object,
             (policyService ?? new Mock<IInstitutePolicyService>()).Object,
             (groupService ?? new Mock<ICourseEnrollmentGroupService>()).Object,
-            Mock.Of<ISendEmailService>(),
+            (sendEmailService ?? new Mock<ISendEmailService>()).Object,
             (userService ?? new Mock<IUserService>()).Object);
     }
 
     private static StudentCourseTransactionResponse CreateFamilyTransaction(
         Guid courseId,
         Guid familyId,
-        IEnumerable<StudentCourseEnrollmentResponse> enrollments)
+        IEnumerable<StudentCourseEnrollmentResponse> enrollments,
+        decimal totalAmountPaid = 0m)
     {
         return new StudentCourseTransactionResponse
         {
@@ -713,7 +983,7 @@ public class StudentCourseEnrollmentServiceTests
             TransactionStatus = TransactionStatus.AwaitingPayment,
             RegistrationStatus = RegistrationStatus.Pending,
             IsActive = true,
-            TotalAmountPaid = 0m,
+            TotalAmountPaid = totalAmountPaid,
             FeeAmountDiscount = 0m,
             DayCareDiscount = 0m,
             Enrollments = enrollments.ToList()
@@ -725,7 +995,8 @@ public class StudentCourseEnrollmentServiceTests
         Guid groupId,
         Guid courseId,
         Guid? familyId = null,
-        EnrollmentStatus status = EnrollmentStatus.Registered)
+        EnrollmentStatus status = EnrollmentStatus.Registered,
+        string childName = "Child")
     {
         return new StudentCourseEnrollmentResponse
         {
@@ -735,6 +1006,7 @@ public class StudentCourseEnrollmentServiceTests
             CourseId = courseId,
             FamilyId = familyId ?? Guid.NewGuid(),
             EnrollmentStatus = status,
+            ChildName = childName,
             WillUseDayCare = false,
             CreatedAt = DateTime.UtcNow.AddMinutes(-5),
             UpdatedOn = DateTime.UtcNow
@@ -770,8 +1042,10 @@ public class StudentCourseEnrollmentServiceTests
             InstituteId = Guid.NewGuid(),
             RegistrationFee = registrationFee,
             IsRegistrationOpened = courseIsRegistrationOpen,
+            Name = "Summer Camp",
+            NameFr = "Camp d'ete",
             CanSelectMultipleEnrollmentGroups = groupIds.Count > 1,
-            CourseEnrollmentGroups = groupIds.Select(groupId => new CourseEnrollmentGroupResponse
+            CourseEnrollmentGroups = groupIds.Select((groupId, index) => new CourseEnrollmentGroupResponse
             {
                 CourseEnrollmentGroupId = groupId,
                 CourseId = courseId,
@@ -781,6 +1055,8 @@ public class StudentCourseEnrollmentServiceTests
                 IfRegistrationOpen = ifRegistrationOpen,
                 GroupTitle = "Group",
                 GroupTitleFr = "Groupe",
+                Details = $"Group {index + 1}",
+                DetailsFr = $"Groupe {index + 1}",
                 AcedemicGroups = new List<string>()
             }).ToList()
         };

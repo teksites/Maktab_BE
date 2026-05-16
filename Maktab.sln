@@ -111,6 +111,16 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helcim.Implementation", "He
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helcim.Registry", "Helcim.Registry\Helcim.Registry.csproj", "{F88D4543-43DE-40F7-8F8A-76913A83B5CE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppConfigurations", "AppConfigurations\AppConfigurations.csproj", "{240CAC35-89F7-40CE-8CC3-F7F6E55615F2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppConfigurations.Repository", "AppConfigurations.Repository\AppConfigurations.Repository.csproj", "{882AE03C-68BC-4A0F-B838-D0917E4429BE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppConfigurations.Implementation", "AppConfigurations.Implementation\AppConfigurations.Implementation.csproj", "{9F6B08F9-5C5C-41E3-A130-F71FF1F3D472}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppConfigurations.Repository.Implementation", "AppConfigurations.Repository.Implementation\AppConfigurations.Repository.Implementation.csproj", "{A459A4ED-D9C8-4F76-8BD6-73F0C72B763B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppConfigurations.Registry", "AppConfigurations.Registry\AppConfigurations.Registry.csproj", "{B476365E-76B1-45A1-9816-B4D9CDA41B40}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -285,6 +295,26 @@ Global
 		{F88D4543-43DE-40F7-8F8A-76913A83B5CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F88D4543-43DE-40F7-8F8A-76913A83B5CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F88D4543-43DE-40F7-8F8A-76913A83B5CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{240CAC35-89F7-40CE-8CC3-F7F6E55615F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{240CAC35-89F7-40CE-8CC3-F7F6E55615F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{240CAC35-89F7-40CE-8CC3-F7F6E55615F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{240CAC35-89F7-40CE-8CC3-F7F6E55615F2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{882AE03C-68BC-4A0F-B838-D0917E4429BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{882AE03C-68BC-4A0F-B838-D0917E4429BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{882AE03C-68BC-4A0F-B838-D0917E4429BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{882AE03C-68BC-4A0F-B838-D0917E4429BE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F6B08F9-5C5C-41E3-A130-F71FF1F3D472}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F6B08F9-5C5C-41E3-A130-F71FF1F3D472}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9F6B08F9-5C5C-41E3-A130-F71FF1F3D472}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9F6B08F9-5C5C-41E3-A130-F71FF1F3D472}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A459A4ED-D9C8-4F76-8BD6-73F0C72B763B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A459A4ED-D9C8-4F76-8BD6-73F0C72B763B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A459A4ED-D9C8-4F76-8BD6-73F0C72B763B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A459A4ED-D9C8-4F76-8BD6-73F0C72B763B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B476365E-76B1-45A1-9816-B4D9CDA41B40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B476365E-76B1-45A1-9816-B4D9CDA41B40}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B476365E-76B1-45A1-9816-B4D9CDA41B40}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B476365E-76B1-45A1-9816-B4D9CDA41B40}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -182,3 +182,14 @@
 /.tmp-maktab-out.log
 /.tmp-cloudflared-out.log
 /.tmp-ngrok-err.log
+/AppConfigurations/bin/Debug/net8.0
+/AppConfigurations/obj
+/AppConfigurations.Implementation/bin/Debug/net8.0
+/AppConfigurations.Implementation/obj
+/AppConfigurations.Registry/bin/Debug/net8.0
+/AppConfigurations.Registry/obj
+/AppConfigurations.Repository/bin/Debug/net8.0
+/AppConfigurations.Repository/obj
+/AppConfigurations.Repository.Implementation/bin/Debug/net8.0
+/AppConfigurations.Repository.Implementation/obj
+/AppConfigurations.Repository.Implementation/Scripts/CreateAppConfigTable.sql

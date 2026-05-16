@@ -16,6 +16,7 @@ public class CoursePaymentServiceTests
     {
         var studentTransactionId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var familyId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var courseId = Guid.Parse("77777777-7777-7777-7777-777777777777");
 
         var repository = new Mock<ICoursePaymentRepository>();
         repository
@@ -56,13 +57,28 @@ public class CoursePaymentServiceTests
                 RegistrationStatus = RegistrationStatus.Pending,
                 TransactionStatus = TransactionStatus.AwaitingPayment,
                 IsActive = true,
-                TotalPayable = 100m
+                TotalPayable = 100m,
+                Enrollments = new List<StudentCourseEnrollmentResponse>
+                {
+                    new()
+                    {
+                        CourseId = courseId
+                    }
+                }
             });
         studentCourseTransactionService
             .Setup(service => service.UpdateTransaction(studentTransactionId, It.IsAny<AddStudentCourseTransaction>()))
             .ReturnsAsync(true);
 
-        var service = new CoursePaymentService(repository.Object, studentCourseTransactionService.Object);
+        var studentCourseEnrollmentService = new Mock<IStudentCourseEnrollmentService>();
+        studentCourseEnrollmentService
+            .Setup(service => service.RecalculateCourseFee(courseId, familyId))
+            .ReturnsAsync(true);
+
+        var service = new CoursePaymentService(
+            repository.Object,
+            studentCourseTransactionService.Object,
+            studentCourseEnrollmentService.Object);
 
         var response = await service.AddPayment(new AddCoursePayment
         {
@@ -77,6 +93,9 @@ public class CoursePaymentServiceTests
         Assert.Equal(studentTransactionId, response.StudentCourseTransactionId);
         studentCourseTransactionService.Verify(
             service => service.UpdateTransaction(studentTransactionId, It.IsAny<AddStudentCourseTransaction>()),
+            Times.Once);
+        studentCourseEnrollmentService.Verify(
+            service => service.RecalculateCourseFee(courseId, familyId),
             Times.Once);
     }
 
@@ -116,7 +135,10 @@ public class CoursePaymentServiceTests
                 TotalPayable = 100m
             });
 
-        var service = new CoursePaymentService(repository.Object, studentCourseTransactionService.Object);
+        var service = new CoursePaymentService(
+            repository.Object,
+            studentCourseTransactionService.Object,
+            Mock.Of<IStudentCourseEnrollmentService>());
 
         var result = await service.TryAddPayment(new AddCoursePayment
         {

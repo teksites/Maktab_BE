@@ -323,14 +323,6 @@ namespace Helcim.Implementation.Services
             {
                 return;
             }
-
-            var courseId = transaction.Enrollments.FirstOrDefault()?.CourseId ?? Guid.Empty;
-            if (courseId != Guid.Empty)
-            {
-                await _studentCourseEnrollmentService
-                    .RecalculateCourseFee(courseId, transaction.FamilyId)
-                    .ConfigureAwait(false);
-            }
         }
 
         public Task<List<HelcimTransactionResponse>> GetByFamilyId(Guid familyId)
@@ -428,7 +420,7 @@ namespace Helcim.Implementation.Services
                 ["paymentType"] = JToken.FromObject(HelcimPaymentType.Purchase, HelcimJsonSerializer),
                 ["amount"] = JToken.FromObject(amount, HelcimJsonSerializer),
                 ["currency"] = JToken.FromObject(HelcimCurrency.Cad, HelcimJsonSerializer),
-                ["paymentMethod"] = JToken.FromObject(HelcimPaymentMethod.CreditCard, HelcimJsonSerializer),
+                ["paymentMethod"] = JToken.FromObject(HelcimPaymentMethod.CreditCardOrAch, HelcimJsonSerializer),//changed on faisal request 15 05 2026
                 ["HelcimDigitalWalletRequest"] = JToken.FromObject(1, HelcimJsonSerializer),
                 ["invoiceRequest"] = invoiceRequest
             };

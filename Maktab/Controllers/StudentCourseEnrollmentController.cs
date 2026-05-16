@@ -78,10 +78,18 @@ public class StudentCourseEnrollmentController : ControllerBase
     public async Task<bool> UpdateEnrollmentByAdmin(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
         => await _service.UpdateEnrollment(enrollmentId, enrollment, true);
 
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
+    [HttpPut("byadmin/batch")]
+    public async Task<bool> UpdateEnrollmentsBatchByAdmin(UpdateStudentCourseEnrollmentsBatchRequest request)
+        => await _service.UpdateEnrollmentsBatch(request, true);
 
     [HttpPut("{enrollmentId:guid}")]
     public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
         => await _service.UpdateEnrollment(enrollmentId, enrollment, false);
+
+    [HttpPut("batch")]
+    public async Task<bool> UpdateEnrollmentsBatch(UpdateStudentCourseEnrollmentsBatchRequest request)
+        => await _service.UpdateEnrollmentsBatch(request, false);
 
     [HttpDelete("{enrollmentId:guid}")]
     public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false)

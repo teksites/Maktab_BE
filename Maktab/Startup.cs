@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json.Serialization;
+using AppConfigurations.Registry;
 using Application.Users.Registry;
 using Courses.Registry;
 using Helcim.Registry;
@@ -171,6 +172,7 @@ namespace Maktab
             services.AddResiliency();
             services.AddMySql();
             services.AddEmail();
+            services.AddAppConfigurationsServices();
             services.AddUserServices();
             services.AddWebMsgSender();
             services.AddElavonServices();

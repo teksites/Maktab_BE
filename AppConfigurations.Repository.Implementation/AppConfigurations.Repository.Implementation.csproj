@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AppConfigurations.Repository\AppConfigurations.Repository.csproj" />
+    <ProjectReference Include="..\AppConfigurations\AppConfigurations.csproj" />
+    <ProjectReference Include="..\Data\Data.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="MaktabDataContracts">
+      <HintPath>..\ExternalContracts\MaktabDataContracts.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

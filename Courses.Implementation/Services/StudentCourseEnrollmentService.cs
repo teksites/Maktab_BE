@@ -33,9 +33,29 @@ namespace Courses.Implementation.Services
             _sendEmailService = sendEmailService;
             _userService = userService;
 
-    }
+        }
 
-    public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment, bool ifAddedByAdmin = false)
+        private sealed class EnrollmentUpdateExecutionResult
+        {
+            public bool Success { get; init; }
+            public Guid FamilyId { get; init; }
+            public Guid CourseId { get; init; }
+            public bool RequiresRecalculation { get; init; }
+            public EnrollmentEmailNotification? EmailNotification { get; init; }
+        }
+
+        private sealed class EnrollmentEmailNotification
+        {
+            public Guid FamilyId { get; init; }
+            public EnrollmentStatus Status { get; init; }
+            public string ChildName { get; init; } = string.Empty;
+            public string CourseName { get; init; } = string.Empty;
+            public string CourseNameFr { get; init; } = string.Empty;
+            public string CourseGroupDetails { get; init; } = string.Empty;
+            public string CourseGroupDetailsFr { get; init; } = string.Empty;
+        }
+
+        public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment, bool ifAddedByAdmin = false)
         {
 
             var familyTransactions = await _studentCourseTransactionService.GetCourseTransactionsByFamily(enrollment.CourseId, enrollment.FamilyId).ConfigureAwait(false);
@@ -369,9 +389,22 @@ namespace Courses.Implementation.Services
                 feePolicy,
                 enrollmentGroupCountsByChild,
                 course.CourseEnrollmentGroups.Count);
+            ApplyInstallmentPaymentStatuses(
+                addStudentCourseTransaction.FeeInstallments,
+                addStudentCourseTransaction.TotalAmountPaid);
 
             addStudentCourseTransaction.Comments = familyTransaction.Comments +$"\n Updated the transaction on {DateTime.UtcNow.ToString()}";
             addStudentCourseTransaction.IsCompletelyPaid = recalculatedTotalPayable <= addStudentCourseTransaction.TotalAmountPaid;
+
+            if (addStudentCourseTransaction.IsCompletelyPaid)
+            {
+                foreach (var enrollment in effectiveEnrollments.Where(e => e.EnrollmentStatus == EnrollmentStatus.Enrolled))
+                {
+                    await _repository
+                        .UpdateEnrollmentStatus(enrollment.StudentCourseEnrollmentId, EnrollmentStatus.Registered)
+                        .ConfigureAwait(false);
+                }
+            }
 
             return await _studentCourseTransactionService.UpdateTransaction(familyTransaction.StudentCourseTransactionId, addStudentCourseTransaction).ConfigureAwait(false);
         }
@@ -572,6 +605,32 @@ namespace Courses.Implementation.Services
             return BuildInstallmentsFromPolicy(applicablePolicy, installmentAmounts);
         }
 
+        private static void ApplyInstallmentPaymentStatuses(
+            IReadOnlyList<FeeInstallment> feeInstallments,
+            decimal totalAmountPaid)
+        {
+            var remainingPaidAmount = totalAmountPaid;
+
+            foreach (var installment in feeInstallments.OrderBy(installment => installment.DueDate))
+            {
+                if (remainingPaidAmount <= 0m)
+                {
+                    installment.PaymentStatus = PaymentStatus.Unpaid;
+                    continue;
+                }
+
+                if (remainingPaidAmount >= installment.Amount)
+                {
+                    installment.PaymentStatus = PaymentStatus.Paid;
+                    remainingPaidAmount -= installment.Amount;
+                    continue;
+                }
+
+                installment.PaymentStatus = PaymentStatus.PartiallyPaid;
+                remainingPaidAmount = 0m;
+            }
+        }
+
         private static List<FeeInstallment> BuildInstallmentsFromPolicy(
             IReadOnlyList<FeePaymentPolicy> sortedPolicy,
             IReadOnlyList<decimal> installmentAmounts)
@@ -685,24 +744,93 @@ namespace Courses.Implementation.Services
 
         public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment, bool ifUpdatedByAdmin = false)
         {
+            var result = await UpdateEnrollmentInternal(
+                enrollmentId,
+                enrollment,
+                ifUpdatedByAdmin,
+                shouldRecalculate: true,
+                shouldSendEmail: true).ConfigureAwait(false);
+
+            return result.Success;
+        }
+
+        public async Task<bool> UpdateEnrollmentsBatch(UpdateStudentCourseEnrollmentsBatchRequest request, bool ifUpdatedByAdmin = false)
+        {
+            if (request?.Enrollments == null || !request.Enrollments.Any())
+            {
+                return false;
+            }
+
+            var updateResults = new List<EnrollmentUpdateExecutionResult>(request.Enrollments.Count);
+
+            foreach (var item in request.Enrollments)
+            {
+                if (item == null || item.EnrollmentId == Guid.Empty || item.Enrollment == null)
+                {
+                    return false;
+                }
+
+                var updateResult = await UpdateEnrollmentInternal(
+                    item.EnrollmentId,
+                    item.Enrollment,
+                    ifUpdatedByAdmin,
+                    shouldRecalculate: false,
+                    shouldSendEmail: false).ConfigureAwait(false);
+
+                if (!updateResult.Success)
+                {
+                    return false;
+                }
+
+                updateResults.Add(updateResult);
+            }
+
+            var recalculations = updateResults
+                .Where(result => result.RequiresRecalculation)
+                .Select(result => new { result.CourseId, result.FamilyId })
+                .Distinct()
+                .ToList();
+
+            foreach (var recalculation in recalculations)
+            {
+                var recalculated = await RecalculateCourseFee(recalculation.CourseId, recalculation.FamilyId).ConfigureAwait(false);
+                if (!recalculated)
+                {
+                    return false;
+                }
+            }
+
+            var notifications = updateResults
+                .Where(result => result.EmailNotification != null)
+                .Select(result => result.EmailNotification!)
+                .ToList();
+
+            await SendEnrollmentStatusEmailsAsync(notifications).ConfigureAwait(false);
+            return true;
+        }
+
+        private async Task<EnrollmentUpdateExecutionResult> UpdateEnrollmentInternal(
+            Guid enrollmentId,
+            AddStudentCourseEnrollment enrollment,
+            bool ifUpdatedByAdmin,
+            bool shouldRecalculate,
+            bool shouldSendEmail)
+        {
             var enrollmentDetails = await _repository.GetEnrollment(enrollmentId).ConfigureAwait(false);
 
             if (enrollmentDetails == null)
             {
-                return false;
+                return new EnrollmentUpdateExecutionResult { Success = false };
             }
 
             var enrollmentStatus = enrollmentDetails.EnrollmentStatus;
-
             var courseDetails = await _courseService.GetCourse(enrollmentDetails.CourseId).ConfigureAwait(false);
-            //var enrollmentGroup = courseDetails.CourseEnrollmentGroups.FirstOrDefault(x => x.CourseEnrollmentGroupId == enrollmentDetails.CourseEnrollmentGroupId);
 
             if (!courseDetails.IsRegistrationOpened && !ifUpdatedByAdmin)
             {
-                return false;
+                return new EnrollmentUpdateExecutionResult { Success = false };
             }
 
-            // Preserve the existing status when the caller does not explicitly send one.
             if (enrollment.EnrollmentStatus == EnrollmentStatus.Unknown)
             {
                 enrollment.EnrollmentStatus = enrollmentStatus;
@@ -719,21 +847,23 @@ namespace Courses.Implementation.Services
                 var enrollmentGroupState = await GetCourseEnrollmentGroupInformation(enrollmentDetails.CourseEnrollmentGroupId).ConfigureAwait(false);
                 if (enrollmentGroupState == null)
                 {
-                    return false;
+                    return new EnrollmentUpdateExecutionResult { Success = false };
                 }
 
                 var occupiedSeatCount = GetOccupiedSeatCount(enrollmentGroupState.EnrollmentStatusCount);
                 if (!enrollmentGroupState.IfRegistrationOpen || occupiedSeatCount >= enrollmentGroupState.MaxStudents)
                 {
-                    return false;
+                    return new EnrollmentUpdateExecutionResult { Success = false };
                 }
             }
 
             var response = await _repository.UpdateEnrollment(enrollmentId, enrollment).ConfigureAwait(false);
+            if (!response)
+            {
+                return new EnrollmentUpdateExecutionResult { Success = false };
+            }
 
-            if (response &&
-                isMovingIntoSeatHoldingStatus &&
-                enrollmentGroup != null)
+            if (isMovingIntoSeatHoldingStatus && enrollmentGroup != null)
             {
                 var enrollmentGroupState = await GetCourseEnrollmentGroupInformation(enrollmentDetails.CourseEnrollmentGroupId).ConfigureAwait(false);
                 if (enrollmentGroupState != null)
@@ -746,80 +876,198 @@ namespace Courses.Implementation.Services
                 }
             }
 
-            //if previous state was registered and its deleted, then we have to set the isregistered to true if the isregistered is false 
-            // it means we have a room now
-            if (enrollmentDetails != null &&
-                HoldsSeat(enrollmentStatus) &&
+            if (HoldsSeat(enrollmentStatus) &&
                 !HoldsSeat(enrollment.EnrollmentStatus) &&
-                enrollment.EnrollmentStatus != enrollmentStatus)
+                enrollment.EnrollmentStatus != enrollmentStatus &&
+                enrollmentGroup != null &&
+                !enrollmentGroup.IfRegistrationOpen)
             {
-                if (!enrollmentGroup.IfRegistrationOpen)
-                {
-                    await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
-                }
+                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
             }
 
-            if (response && enrollment.EnrollmentStatus != enrollmentStatus && enrollment.EnrollmentStatus != EnrollmentStatus.Refunded)//No need calc fee on refund
+            var statusChanged = enrollment.EnrollmentStatus != enrollmentStatus;
+            var result = new EnrollmentUpdateExecutionResult
+            {
+                Success = true,
+                FamilyId = enrollmentDetails.FamilyId,
+                CourseId = enrollmentDetails.CourseId,
+                RequiresRecalculation = statusChanged && enrollment.EnrollmentStatus != EnrollmentStatus.Refunded,
+                EmailNotification = CreateEnrollmentEmailNotification(
+                    statusChanged,
+                    enrollment.EnrollmentStatus,
+                    enrollmentDetails,
+                    courseDetails,
+                    enrollmentGroup)
+            };
+
+            if (shouldRecalculate && result.RequiresRecalculation)
             {
                 await RecalculateCourseFee(enrollmentDetails.CourseId, enrollmentDetails.FamilyId).ConfigureAwait(false);
             }
 
-
-            var familyUsers = await _userService.GetAllFamilyUsersInformation(enrollment.FamilyId).ConfigureAwait(false);
-
-            var targetEmails = familyUsers
-            .Where(x => x.Relationship == Relationship.Mother ||
-                        x.Relationship == Relationship.Father ||
-                        x.Relationship == Relationship.Guardian)
-            .Select(x => x.Email)
-            .ToList();
-
-            var emailBody = string.Empty;
-            var emailSubject = string.Empty;
-            //now emails
-            if (response && enrollment.EnrollmentStatus != enrollmentStatus && (enrollment.EnrollmentStatus == EnrollmentStatus.Registered || enrollment.EnrollmentStatus == EnrollmentStatus.Enrolled))//No need calc fee on refund
+            if (shouldSendEmail && result.EmailNotification != null)
             {
-                emailSubject = "Confirmation de l'inscription / Confirmation of enrollment";
-                emailBody = $"<p><strong>Chèr parent,</strong></p>" +
-                       $"<p>Merci d'avoir inscrit votre enfant au <strong>{courseDetails.NameFr}-</strong><strong>{enrollmentGroup.DetailsFr}</strong>. L'inscription sera complétée seulement après réception du paiement, conformément à la politique du {{school / camp}}. Veuillez vous connecter au portail et payer les frais d'inscription.</p>" +
-                       $"<div>&nbsp;</div>" +
-                       $"<p><strong>Dear parent,</strong></p>" +
-                       $"<p>Thank you for enrolling your child in the <strong>{courseDetails.Name}-</strong><strong>{enrollmentGroup.Details}</strong>. Registration is only complete when payment is made based on the policy of the {{school / camp}}. Please login to the portal and pay the fee to register your child.</p>" +
-                       $"<div>&nbsp;</div>" +
-                       $"<div>Cheers</div>" +
-                       $"<div>&nbsp;</div>" +
-                       $"<div><strong>ICC Brossard School Registration Portal</strong></div>";
-
-            }
-            else if (response && enrollment.EnrollmentStatus != enrollmentStatus && enrollment.EnrollmentStatus == EnrollmentStatus.Cancelled)//No need calc fee on refund
-
-            {
-                emailSubject = $"Annulation de l'inscription / Cancellation of Registration";
-                emailBody = $"<p><strong>Chèr parent,</strong></p>" +
-               $"<p>L'inscription de votre enfant a été annulée à cause que les frais requis n'ayant pas été réglés dans les délais précédemment communiqués.</p>" +
-               $"<div>&nbsp;</div>" +
-               $"<p><strong>Dear parent,</strong></p>" +
-               $"<p>Due to the required fees being unpaid by the deadline previously given, your child's registration has been cancelled.</p>" +
-               $"<div>&nbsp;</div>" +
-               $"<div>Cheers</div>" +
-               $"<div>&nbsp;</div>" +
-               $"<div><strong>ICC Brossard School Registration Portal</strong></div>";
-
+                await SendEnrollmentStatusEmailsAsync(new[] { result.EmailNotification }).ConfigureAwait(false);
             }
 
-            if (!string.IsNullOrEmpty(emailBody) && targetEmails.Any())
+            return result;
+        }
+
+        private static EnrollmentEmailNotification? CreateEnrollmentEmailNotification(
+            bool statusChanged,
+            EnrollmentStatus enrollmentStatus,
+            StudentCourseEnrollmentResponse enrollmentDetails,
+            CourseResponseDetailed courseDetails,
+            CourseEnrollmentGroupResponse? enrollmentGroup)
+        {
+            if (!statusChanged)
             {
-               // _sendEmailService.
-                 var success = _sendEmailService.SendBulkEmail(new MultiUserEmailData
+                return null;
+            }
+
+            return enrollmentStatus switch
+            {
+                EnrollmentStatus.Enrolled or EnrollmentStatus.Registered or EnrollmentStatus.Cancelled => new EnrollmentEmailNotification
                 {
-                    To = targetEmails.ToList(),
-                    Subject = emailSubject,
-                    Body = emailBody
-                });
+                    FamilyId = enrollmentDetails.FamilyId,
+                    Status = enrollmentStatus,
+                    ChildName = enrollmentDetails.ChildName ?? string.Empty,
+                    CourseName = courseDetails.Name ?? string.Empty,
+                    CourseNameFr = courseDetails.NameFr ?? string.Empty,
+                    CourseGroupDetails = enrollmentGroup?.Details ?? string.Empty,
+                    CourseGroupDetailsFr = enrollmentGroup?.DetailsFr ?? string.Empty
+                },
+                _ => null
+            };
         }
 
-            return response;
+        private async Task SendEnrollmentStatusEmailsAsync(IEnumerable<EnrollmentEmailNotification> notifications)
+        {
+            foreach (var familyNotifications in notifications.GroupBy(notification => notification.FamilyId))
+            {
+                var email = BuildEnrollmentStatusEmail(familyNotifications.ToList());
+                if (email == null)
+                {
+                    continue;
+                }
+
+                var familyUsers = await _userService.GetAllFamilyUsersInformation(familyNotifications.Key).ConfigureAwait(false);
+                var targetEmails = familyUsers
+                    .Where(x => x.Relationship == Relationship.Mother ||
+                                x.Relationship == Relationship.Father ||
+                                x.Relationship == Relationship.Guardian)
+                    .Select(x => x.Email)
+                    .Where(emailAddress => !string.IsNullOrWhiteSpace(emailAddress))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (!targetEmails.Any())
+                {
+                    continue;
+                }
+
+                await _sendEmailService.SendBulkEmail(new MultiUserEmailData
+                {
+                    To = targetEmails,
+                    Subject = email.Value.Subject,
+                    Body = email.Value.Body
+                }).ConfigureAwait(false);
+            }
         }
+
+        private static (string Subject, string Body)? BuildEnrollmentStatusEmail(IReadOnlyList<EnrollmentEmailNotification> notifications)
+        {
+            if (notifications.Count == 0)
+            {
+                return null;
+            }
+
+            if (notifications.Count == 1)
+            {
+                return BuildSingleEnrollmentStatusEmail(notifications[0]);
+            }
+
+            var frenchItems = string.Join(string.Empty, notifications.Select(BuildFrenchEnrollmentStatusListItem));
+            var englishItems = string.Join(string.Empty, notifications.Select(BuildEnglishEnrollmentStatusListItem));
+
+            return (
+                "Mise a jour des inscriptions / Enrollment Update",
+                $"<p><strong>Cher parent,</strong></p>" +
+                $"<p>Voici les dernieres mises a jour pour les inscriptions de votre famille :</p>" +
+                $"<ul>{frenchItems}</ul>" +
+                $"<div>&nbsp;</div>" +
+                $"<p><strong>Dear parent,</strong></p>" +
+                $"<p>Here are the latest updates for your family's enrollments:</p>" +
+                $"<ul>{englishItems}</ul>" +
+                $"<div>&nbsp;</div>" +
+                $"<div><strong>ICC Brossard School / Activities Registration Portal - Portail de l'inscription ecoles / activites</strong></div>");
+        }
+
+        private static (string Subject, string Body)? BuildSingleEnrollmentStatusEmail(EnrollmentEmailNotification notification)
+        {
+            return notification.Status switch
+            {
+                EnrollmentStatus.Enrolled => (
+                    "Confirmation de l'inscription / Confirmation of enrollment",
+                    $"<p><strong>Chèr parent,</strong></p>" +
+                    $"<p>Merci d'avoir inscrit votre enfant au <strong>{notification.CourseNameFr}-</strong><strong>{notification.CourseGroupDetailsFr}</strong>. L'inscription sera complétée seulement après réception du paiement, conformément à la politique du {{school / camp}}. Veuillez vous connecter au portail et payer les frais d'inscription.</p>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<p><strong>Dear parent,</strong></p>" +
+                    $"<p>Thank you for enrolling your child in the <strong>{notification.CourseName}-</strong><strong>{notification.CourseGroupDetails}</strong>. Registration is only complete when payment is made based on the policy of the {{school / camp}}. Please login to the portal and pay the fee to register your child.</p>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<div><strong>ICC Brossard School Registration Portal</strong></div>"),
+                EnrollmentStatus.Registered => (
+                    $"{notification.CourseNameFr} Confirmation d'inscription / {notification.CourseName} Registration Confirmation",
+                    $"<p><strong>Cher parent,</strong></p>" +
+                    $"<p>Votre enfant {notification.ChildName} est inscrit(e) au cours / à l'activité <strong>{notification.CourseNameFr}</strong>. Tous les frais sont réglés.</p>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<p><strong>Dear parent,</strong></p>" +
+                    $"<p>Your child {notification.ChildName} has been registered for the course / activity <strong>{notification.CourseName}</strong>. All fees are fully paid.</p>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<div><strong>ICC Brossard School / Activities Registration Portal - Portail de l'inscription écoles / activités</strong></div>"),
+                EnrollmentStatus.Cancelled => (
+                    "Annulation de l'inscription / Cancellation of Registration",
+                    $"<p><strong>Chèr parent,</strong></p>" +
+                    $"<p>L'inscription de votre enfant a été annulée à cause que les frais requis n'ayant pas été réglés dans les délais précédemment communiqués.</p>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<p><strong>Dear parent,</strong></p>" +
+                    $"<p>Due to the required fees being unpaid by the deadline previously given, your child's registration has been cancelled.</p>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<div><strong>ICC Brossard School Registration Portal</strong></div>"),
+                _ => null
+            };
+        }
+
+        private static string BuildFrenchEnrollmentStatusListItem(EnrollmentEmailNotification notification)
+        {
+            return notification.Status switch
+            {
+                EnrollmentStatus.Enrolled => $"<li>{notification.ChildName} - <strong>{notification.CourseNameFr}</strong>{FormatGroupSuffix(notification.CourseGroupDetailsFr)} : inscription recue, paiement requis.</li>",
+                EnrollmentStatus.Registered => $"<li>{notification.ChildName} - <strong>{notification.CourseNameFr}</strong> : inscription confirmee, tous les frais sont regles.</li>",
+                EnrollmentStatus.Cancelled => $"<li>{notification.ChildName} - <strong>{notification.CourseNameFr}</strong> : inscription annulee.</li>",
+                _ => string.Empty
+            };
+        }
+
+        private static string BuildEnglishEnrollmentStatusListItem(EnrollmentEmailNotification notification)
+        {
+            return notification.Status switch
+            {
+                EnrollmentStatus.Enrolled => $"<li>{notification.ChildName} - <strong>{notification.CourseName}</strong>{FormatGroupSuffix(notification.CourseGroupDetails)}: enrollment received, payment required.</li>",
+                EnrollmentStatus.Registered => $"<li>{notification.ChildName} - <strong>{notification.CourseName}</strong>: registration confirmed, all fees are paid.</li>",
+                EnrollmentStatus.Cancelled => $"<li>{notification.ChildName} - <strong>{notification.CourseName}</strong>: registration cancelled.</li>",
+                _ => string.Empty
+            };
+        }
+
+        private static string FormatGroupSuffix(string details)
+            => string.IsNullOrWhiteSpace(details)
+                ? string.Empty
+                : $" - <strong>{details}</strong>";
+
         public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false, bool ifDeletedByAdmin = false)
         {
             var enrollmentDetails = await _repository.GetEnrollment(enrollmentId).ConfigureAwait(false);

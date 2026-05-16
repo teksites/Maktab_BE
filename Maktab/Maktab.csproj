@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AppConfigurations.Registry\AppConfigurations.Registry.csproj" />
     <ProjectReference Include="..\Courses.Registry\Courses.Registry.csproj" />
     <ProjectReference Include="..\Helcim.Registry\Helcim.Registry.csproj" />
     <ProjectReference Include="..\Zeffy.Registry\Zeffy.Registry.csproj" />

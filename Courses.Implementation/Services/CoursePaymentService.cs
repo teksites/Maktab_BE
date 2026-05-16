@@ -1,6 +1,7 @@
 ﻿using Courses.Repository;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
+using MaktabDataContracts.Responses.Transactions;
 
 namespace Courses.Services.Implementation
 {
@@ -8,11 +9,16 @@ namespace Courses.Services.Implementation
     {
         private readonly ICoursePaymentRepository _repository;
         private readonly IStudentCourseTransactionService _studentCourseTransactionService;
+        private readonly IStudentCourseEnrollmentService _studentCourseEnrollmentService;
 
-        public CoursePaymentService(ICoursePaymentRepository repository, IStudentCourseTransactionService studentCourseTransactionService)
+        public CoursePaymentService(
+            ICoursePaymentRepository repository,
+            IStudentCourseTransactionService studentCourseTransactionService,
+            IStudentCourseEnrollmentService studentCourseEnrollmentService)
         {
             _repository = repository;
             _studentCourseTransactionService = studentCourseTransactionService;
+            _studentCourseEnrollmentService = studentCourseEnrollmentService;
         }
 
         public async Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment)
@@ -75,6 +81,7 @@ namespace Courses.Services.Implementation
             }
 
             await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, updatedTransaction).ConfigureAwait(false);
+            await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
 
             return result;
         }
@@ -129,6 +136,7 @@ namespace Courses.Services.Implementation
             }
 
             await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, updatedTransaction).ConfigureAwait(false);
+            await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
 
             return paymentResponse;
         }
@@ -180,6 +188,7 @@ namespace Courses.Services.Implementation
             }
 
             await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, updatedTransaction).ConfigureAwait(false);
+            await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
 
             return paymentResponse;
             
@@ -188,6 +197,19 @@ namespace Courses.Services.Implementation
         public async Task<IEnumerable<CoursePaymentResponse>> GetAllPaymentsByStudentTransactionId(Guid studentTransactionId)
         {
             return await _repository.GetAllPaymentsByStudentTransactionId(studentTransactionId).ConfigureAwait(false);
+        }
+
+        private async Task RecalculateEnrollmentState(StudentCourseTransactionResponse transaction)
+        {
+            var courseId = transaction.Enrollments.FirstOrDefault()?.CourseId ?? Guid.Empty;
+            if (courseId == Guid.Empty)
+            {
+                return;
+            }
+
+            await _studentCourseEnrollmentService
+                .RecalculateCourseFee(courseId, transaction.FamilyId)
+                .ConfigureAwait(false);
         }
     }
 }

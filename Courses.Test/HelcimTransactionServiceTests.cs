@@ -16,6 +16,8 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using SystemTextJsonSerializer = System.Text.Json.JsonSerializer;
 using WebMsgSender;
 
 namespace Courses.Test;
@@ -187,6 +189,21 @@ public class HelcimTransactionServiceTests
         Assert.Equal(100m, lineItem["price"]!.Value<decimal>());
         Assert.Equal(100m, lineItem["total"]!.Value<decimal>());
         Assert.Equal("192.168.1.1", lineItem["description"]!.Value<string>());
+    }
+
+    [Fact]
+    public void HelcimPayInitializeResponse_SystemTextJsonSerialization_UsesCheckoutTokenPropertyName()
+    {
+        var response = new HelcimPayInitializeResponse
+        {
+            CheckoutToken = "chk_456"
+        };
+
+        var json = SystemTextJsonSerializer.Serialize(response);
+        using var payload = JsonDocument.Parse(json);
+
+        Assert.Equal("chk_456", payload.RootElement.GetProperty("checkoutToken").GetString());
+        Assert.False(payload.RootElement.TryGetProperty("CheckoutToken", out _));
     }
 
     [Fact]
@@ -490,9 +507,6 @@ public class HelcimTransactionServiceTests
             .ReturnsAsync((new CoursePaymentResponse(), true));
 
         var studentCourseEnrollmentService = new Mock<IStudentCourseEnrollmentService>();
-        studentCourseEnrollmentService
-            .Setup(service => service.RecalculateCourseFee(courseId, familyId))
-            .ReturnsAsync(true);
 
         var service = CreateService(
             repository.Object,
@@ -526,7 +540,7 @@ public class HelcimTransactionServiceTests
         Assert.NotNull(capturedDetails);
         Assert.Equal(familyId, capturedDetails!.FamilyId);
         coursePaymentService.Verify(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()), Times.Once);
-        studentCourseEnrollmentService.Verify(service => service.RecalculateCourseFee(courseId, familyId), Times.Once);
+        studentCourseEnrollmentService.Verify(service => service.RecalculateCourseFee(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
     }
 
     [Fact]
