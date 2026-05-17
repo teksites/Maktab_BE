@@ -52,6 +52,32 @@ public class SendEmailServiceTests
         Assert.Empty(nullMessage.Bcc);
     }
 
+    [Fact]
+    public void BuildMailMessage_AddsAttachments()
+    {
+        var message = InvokeBuildMailMessage(new MultiUserEmailData
+        {
+            To = new[] { "to@example.com" },
+            Subject = "subject",
+            Body = "<p>body</p>",
+            Attachments = new[]
+            {
+                new EmailAttachmentPayload
+                {
+                    FileName = "sample.png",
+                    ContentType = "image/png",
+                    Content = new byte[] { 1, 2, 3 }
+                }
+            }
+        });
+
+        var attachment = Assert.Single(message.Attachments);
+        Assert.Equal("sample.png", attachment.Name);
+        Assert.Equal("image/png", attachment.ContentType.MediaType);
+        Assert.False(attachment.ContentDisposition.Inline);
+        Assert.Equal("attachment", attachment.ContentDisposition.DispositionType);
+    }
+
     private static MailMessage InvokeBuildMailMessage(MultiUserEmailData emailData)
     {
         var method = typeof(SendEmailService).GetMethod(

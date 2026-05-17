@@ -1,5 +1,6 @@
 using AppConfigurations.Repository;
 using AppConfigurations.Services;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Configs;
 using MaktabDataContracts.Responses.Configs;
 
@@ -22,6 +23,9 @@ namespace AppConfigurations.Implementation.Services
 
         public Task<IEnumerable<AppConfigResponse>> GetAllAppConfigs(bool onlyActive = true)
             => _repository.GetAllAppConfigs(onlyActive);
+
+        public Task<AppConfigResponse> GetLatestAppConfigByType(ConfigurationType configurationType, bool onlyActive = true)
+            => _repository.GetLatestAppConfigByType(configurationType, onlyActive);
 
         public Task<bool> UpdateAppConfig(Guid appConfigId, UpdateAppConfigRequest request)
             => _repository.UpdateAppConfig(appConfigId, request);

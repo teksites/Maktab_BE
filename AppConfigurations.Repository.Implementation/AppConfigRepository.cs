@@ -1,6 +1,7 @@
 using AppConfigurations.Repository;
 using Cumulus.Data;
 using Data;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Configs;
 using MaktabDataContracts.Responses.Configs;
 using System.Data.Common;
@@ -79,6 +80,35 @@ namespace AppConfigurations.Repository.Implementation
             }
 
             return responses;
+        }
+
+        public async Task<AppConfigResponse> GetLatestAppConfigByType(ConfigurationType configurationType, bool onlyActive = true)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                SELECT *
+                FROM app_config
+                WHERE ConfigurationType = @ConfigurationType";
+
+            cmd.AddParameter("@ConfigurationType", (int)configurationType);
+
+            if (onlyActive)
+            {
+                cmd.CommandText += " AND IsActive = @IsActive";
+                cmd.AddParameter("@IsActive", true);
+            }
+
+            cmd.CommandText += " ORDER BY UpdatedOn DESC, CreatedAt DESC LIMIT 1";
+
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            if (!await reader.ReadAsync().ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            return MapToResponse(reader);
         }
 
         public async Task<bool> UpdateAppConfig(Guid appConfigId, UpdateAppConfigRequest request)

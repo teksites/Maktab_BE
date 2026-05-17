@@ -67,6 +67,23 @@ public class AppConfigServiceTests
     }
 
     [Fact]
+    public async Task GetLatestAppConfigByType_DelegatesToRepository()
+    {
+        var expected = CreateResponse(Guid.NewGuid(), ConfigurationType.EmailAttachments);
+        var repository = new Mock<IAppConfigRepository>();
+        repository
+            .Setup(repo => repo.GetLatestAppConfigByType(ConfigurationType.EmailAttachments, true))
+            .ReturnsAsync(expected);
+
+        var service = new AppConfigService(repository.Object);
+
+        var result = await service.GetLatestAppConfigByType(ConfigurationType.EmailAttachments, true);
+
+        Assert.Same(expected, result);
+        repository.Verify(repo => repo.GetLatestAppConfigByType(ConfigurationType.EmailAttachments, true), Times.Once);
+    }
+
+    [Fact]
     public async Task UpdateAppConfig_DelegatesToRepository()
     {
         var appConfigId = Guid.NewGuid();
