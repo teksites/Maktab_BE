@@ -34,10 +34,12 @@
     <ProjectReference Include="..\Courses.Repository.Implementation\Courses.Repository.Implementation.csproj" />
     <ProjectReference Include="..\Data\Data.csproj" />
     <ProjectReference Include="..\Email\Email.csproj" />
+    <ProjectReference Include="..\Email.Implementation\Email.Implementation.csproj" />
     <ProjectReference Include="..\Helcim\Helcim.csproj" />
     <ProjectReference Include="..\Helcim.Implementation\Helcim.Implementation.csproj" />
     <ProjectReference Include="..\Helcim.Repository\Helcim.Repository.csproj" />
     <ProjectReference Include="..\Helcim.Repository.Implementation\Helcim.Repository.Implementation.csproj" />
+    <ProjectReference Include="..\Maktab\Maktab.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -122,7 +122,7 @@ namespace Email.Implementation
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Subject, emailData.Body);
+            return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Bcc, emailData.Subject, emailData.Body);
         }
 
         private static MailMessage BuildMailMessage(string fromAddress, MultiUserEmailData emailData)
@@ -132,13 +132,14 @@ namespace Email.Implementation
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Subject, emailData.Body);
+            return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Bcc, emailData.Subject, emailData.Body);
         }
 
         private static MailMessage BuildMailMessage(
             string fromAddress,
             IEnumerable<string> recipients,
             IEnumerable<string> ccRecipients,
+            IEnumerable<string> bccRecipients,
             string subject,
             string body)
         {
@@ -162,9 +163,18 @@ namespace Email.Implementation
                 message.To.Add(recipient);
             }
 
-            foreach (var cc in ccRecipients.Where(address => !string.IsNullOrWhiteSpace(address)).Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (var cc in (ccRecipients ?? Enumerable.Empty<string>())
+                .Where(address => !string.IsNullOrWhiteSpace(address))
+                .Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 message.CC.Add(cc);
+            }
+
+            foreach (var bcc in (bccRecipients ?? Enumerable.Empty<string>())
+                .Where(address => !string.IsNullOrWhiteSpace(address))
+                .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                message.Bcc.Add(bcc);
             }
 
             return message;

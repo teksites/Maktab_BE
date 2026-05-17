@@ -35,7 +35,9 @@ public class EmailController : ControllerBase
             {
                 Subject = request.Subject,
                 Body = request.Body,
-                To = request.Recipients
+                To = request.Recipients,
+                Cc = request.RecipientsCC ?? Enumerable.Empty<string>(),
+                Bcc = request.RecipientsBCC ?? Enumerable.Empty<string>()
             }).ConfigureAwait(false);
         }
         catch (Exception)
