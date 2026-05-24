@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Mail;
+using System.Net.Mime;
 
 namespace Email.Implementation
 {
@@ -122,7 +123,7 @@ namespace Email.Implementation
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Subject, emailData.Body);
+            return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Bcc, emailData.Attachments, emailData.Subject, emailData.Body);
         }
 
         private static MailMessage BuildMailMessage(string fromAddress, MultiUserEmailData emailData)
@@ -132,13 +133,15 @@ namespace Email.Implementation
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Subject, emailData.Body);
+            return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Bcc, emailData.Attachments, emailData.Subject, emailData.Body);
         }
 
         private static MailMessage BuildMailMessage(
             string fromAddress,
             IEnumerable<string> recipients,
             IEnumerable<string> ccRecipients,
+            IEnumerable<string> bccRecipients,
+            IEnumerable<EmailAttachmentPayload> attachments,
             string subject,
             string body)
         {
@@ -162,9 +165,35 @@ namespace Email.Implementation
                 message.To.Add(recipient);
             }
 
-            foreach (var cc in ccRecipients.Where(address => !string.IsNullOrWhiteSpace(address)).Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (var cc in (ccRecipients ?? Enumerable.Empty<string>())
+                .Where(address => !string.IsNullOrWhiteSpace(address))
+                .Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 message.CC.Add(cc);
+            }
+
+            foreach (var bcc in (bccRecipients ?? Enumerable.Empty<string>())
+                .Where(address => !string.IsNullOrWhiteSpace(address))
+                .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                message.Bcc.Add(bcc);
+            }
+
+            foreach (var attachment in (attachments ?? Enumerable.Empty<EmailAttachmentPayload>())
+                .Where(attachment => attachment != null
+                    && !string.IsNullOrWhiteSpace(attachment.FileName)
+                    && attachment.Content != null
+                    && attachment.Content.Length > 0))
+            {
+                var contentType = string.IsNullOrWhiteSpace(attachment.ContentType)
+                    ? MediaTypeNames.Application.Octet
+                    : attachment.ContentType;
+                var stream = new MemoryStream(attachment.Content, writable: false);
+                var mailAttachment = new Attachment(stream, attachment.FileName, contentType);
+                mailAttachment.ContentDisposition.Inline = false;
+                mailAttachment.ContentDisposition.DispositionType = DispositionTypeNames.Attachment;
+                mailAttachment.ContentType.Name = attachment.FileName;
+                message.Attachments.Add(mailAttachment);
             }
 
             return message;

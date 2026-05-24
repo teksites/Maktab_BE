@@ -16,6 +16,12 @@ namespace Courses.Repository.Implementation
 
         public async Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment)
         {
+            var result = await TryAddPayment(payment).ConfigureAwait(false);
+            return result.Payment;
+        }
+
+        public async Task<(CoursePaymentResponse Payment, bool Created)> TryAddPayment(AddCoursePayment payment)
+        {
             var paymentId = Guid.NewGuid();
             var now = DateTime.UtcNow;
 
@@ -30,6 +36,7 @@ namespace Courses.Repository.Implementation
                     FamilyId,
                     AmountPaid,
                     Comments,
+                    ExternalPaymentId,
                     PaymentMode,
                     IsActive,
                     CreatedAt,
@@ -42,17 +49,21 @@ namespace Courses.Repository.Implementation
                     @FamilyId,
                     @AmountPaid,
                     @Comments,
+                    @ExternalPaymentId,
                     @PaymentMode,
                     @IsActive,
                     @CreatedAt,
                     @UpdatedOn
-                );";
+                )
+                ON DUPLICATE KEY UPDATE
+                    CoursePaymentId = CoursePaymentId;";
 
             cmd.AddParameter("@CoursePaymentId", paymentId.ToByteArray());
             cmd.AddParameter("@StudentCourseTransactionId", payment.StudentCourseTransactionId.ToByteArray());
             cmd.AddParameter("@FamilyId", payment.FamilyId.ToByteArray());
             cmd.AddParameter("@AmountPaid", payment.AmountPaid);
             cmd.AddParameter("@Comments", (object?)payment.Comments ?? DBNull.Value);
+            cmd.AddParameter("@ExternalPaymentId", (object?)payment.ExternalPaymentId ?? DBNull.Value);
             cmd.AddParameter("@PaymentMode", (int)payment.PaymentMode);
             cmd.AddParameter("@IsActive", payment.IsActive);
             cmd.AddParameter("@CreatedAt", now);
@@ -60,8 +71,22 @@ namespace Courses.Repository.Implementation
 
             await cmd.ExecuteNonQueryAsync();
 
-            // ✅ Fix: method returns non-nullable
-            return await GetPayment(paymentId) ?? throw new Exception("Failed to retrieve created payment.");
+            var createdPayment = await GetPayment(paymentId).ConfigureAwait(false);
+            if (createdPayment != null)
+            {
+                return (createdPayment, true);
+            }
+
+            if (!string.IsNullOrWhiteSpace(payment.ExternalPaymentId))
+            {
+                var existingPayment = await GetPaymentByExternalPaymentId(payment.PaymentMode, payment.ExternalPaymentId).ConfigureAwait(false);
+                if (existingPayment != null)
+                {
+                    return (existingPayment, false);
+                }
+            }
+
+            throw new Exception("Failed to retrieve created payment.");
         }
 
         public async Task<bool> UpdatePayment(Guid paymentId, AddCoursePayment payment)
@@ -74,6 +99,7 @@ namespace Courses.Repository.Implementation
                 SET
                     AmountPaid  = @AmountPaid,
                     Comments    = @Comments,
+                    ExternalPaymentId = @ExternalPaymentId,
                     PaymentMode = @PaymentMode,
                     IsActive    = @IsActive,
                     UpdatedOn   = @UpdatedOn
@@ -82,6 +108,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@CoursePaymentId", paymentId.ToByteArray());
             cmd.AddParameter("@AmountPaid", payment.AmountPaid);
             cmd.AddParameter("@Comments", (object?)payment.Comments ?? DBNull.Value);
+            cmd.AddParameter("@ExternalPaymentId", (object?)payment.ExternalPaymentId ?? DBNull.Value);
             cmd.AddParameter("@PaymentMode", (int)payment.PaymentMode);
             cmd.AddParameter("@IsActive", payment.IsActive);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
@@ -184,6 +211,30 @@ namespace Courses.Repository.Implementation
             return await GetAllPayments(transactionId);
         }
 
+        private async Task<CoursePaymentResponse?> GetPaymentByExternalPaymentId(PaymentMode paymentMode, string externalPaymentId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                SELECT *
+                FROM course_payment
+                WHERE PaymentMode = @PaymentMode
+                  AND ExternalPaymentId = @ExternalPaymentId
+                LIMIT 1";
+
+            cmd.AddParameter("@PaymentMode", (int)paymentMode);
+            cmd.AddParameter("@ExternalPaymentId", externalPaymentId);
+
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            if (!await reader.ReadAsync().ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            return MapReaderToCoursePayment(reader);
+        }
+
         private CoursePaymentResponse MapReaderToCoursePayment(DbDataReader reader)
         {
             return new CoursePaymentResponse
@@ -193,6 +244,7 @@ namespace Courses.Repository.Implementation
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
                 AmountPaid = reader.GetDecimal("AmountPaid"),
                 Comments = reader.GetNullableString("Comments"),
+                ExternalPaymentId = reader.GetNullableString("ExternalPaymentId"),
                 PaymentMode = (PaymentMode)reader.GetInt32("PaymentMode"),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),

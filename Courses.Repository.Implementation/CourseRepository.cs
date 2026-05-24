@@ -271,7 +271,8 @@ namespace Courses.Repository.Implementation
 
             // Load enrollment groups using DI (kept as-is)
             course.CourseEnrollmentGroups = (await _groupRepo.GetAllGroups(courseId, true))
-                .OrderBy(group => group.CreatedAt)
+                .OrderBy(group => group.GroupIndex)
+                .ThenBy(group => group.CreatedAt)
                 .ToList();
 
             // Merge unique academic groups

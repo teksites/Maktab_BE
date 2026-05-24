@@ -11,14 +11,15 @@ namespace Zeffy.Implementation.Services
     {
         private IZeffyTransactionRepository _repository;
         private readonly IStudentCourseTransactionService _studentTransactionService;
-        private readonly IStudentCourseEnrollmentService _studentCourseEnrollmentService;
         private readonly ICoursePaymentService _coursePaymentService;
 
-        public ZeffyTransactionService(IZeffyTransactionRepository repository, IStudentCourseTransactionService studentTransactionService, IStudentCourseEnrollmentService studentCourseEnrollmentService, ICoursePaymentService coursePaymentService)
+        public ZeffyTransactionService(
+            IZeffyTransactionRepository repository,
+            IStudentCourseTransactionService studentTransactionService,
+            ICoursePaymentService coursePaymentService)
         {
             _repository = repository;
             _studentTransactionService = studentTransactionService;
-            _studentCourseEnrollmentService = studentCourseEnrollmentService;
             _coursePaymentService = coursePaymentService;
         }
 
@@ -47,7 +48,6 @@ namespace Zeffy.Implementation.Services
                 };
 
                 var response = await _coursePaymentService.AddPayment(addPayment).ConfigureAwait(false);
-                var recalculateFee = await _studentCourseEnrollmentService.RecalculateCourseFee(transaction.Enrollments[0].CourseId, transaction.FamilyId).ConfigureAwait(false);
                 await _repository.Add(MapToAddRequest(zeffy, paymentCode, Guid.NewGuid(), transaction.FamilyId, transaction.StudentCourseTransactionId)).ConfigureAwait(false);
             }
         }

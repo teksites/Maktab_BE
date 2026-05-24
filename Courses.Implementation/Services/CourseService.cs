@@ -139,6 +139,7 @@ namespace Courses.Implementation.Services
                 Fee = update.Fee,
                 IfRegistrationOpen = update.IfRegistrationOpen,
                 DayCareFee = update.DayCareFee,
+                GroupIndex = update.GroupIndex,
                 
                 // Map enum list to string list
                 AcedemicGroups = update.AcedemicGroups?.Select(g => g.ToString()).ToList() ?? new List<string>()

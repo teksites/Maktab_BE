@@ -6,6 +6,7 @@ namespace Courses.Services
     public interface ICoursePaymentService
     {
         Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment);
+        Task<(CoursePaymentResponse Payment, bool Created)> TryAddPayment(AddCoursePayment payment);
         Task<bool> DeletePayment(Guid paymentId, bool hardDelete = false);
         Task<IEnumerable<CoursePaymentResponse>> GetAllPayments(Guid courseId);
         Task<IEnumerable<CoursePaymentResponse>> GetAllPaymentsByStudentTransactionId(Guid studentTransactionId);

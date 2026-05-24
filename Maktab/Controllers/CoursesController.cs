@@ -68,8 +68,11 @@ public class CoursesController : ControllerBase
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
     [HttpPut("groups/{groupId:guid}")]
-    public async Task<bool> UpdateGroup(Guid groupId, AddCourseEnrollmentGroup group)
-        => await _groupService.UpdateCourseEnrollmentGroup(groupId, group);
+    public async Task<bool> UpdateGroup(Guid groupId, UpdateCourseEnrollmentGroup group)
+    {
+        group.CourseEnrollmentGroupId = groupId;
+        return await _courseService.UpdateCourseEnrollmentGroup(group) != null;
+    }
 
     [ApiAuthorize(false, false, UserRoleType.Admin)]
     [HttpDelete("groups/{groupId:guid}")]

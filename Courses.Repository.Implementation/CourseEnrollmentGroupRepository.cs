@@ -20,11 +20,11 @@ namespace Courses.Repository.Implementation
                 INSERT INTO course_enrollment_groups 
                 (CourseEnrollmentGroupId, CourseId, InstituteId, GroupTitle, GroupTitleFr, 
                  Details, DetailsFr, IsActive, CreatedAt, UpdatedOn, MaxStudents, 
-                 AcedemicGroup, Fee, IfRegistrationOpen, DayCareFee)
+                 AcedemicGroup, Fee, IfRegistrationOpen, DayCareFee, GroupIndex)
                 VALUES 
                 (@CourseEnrollmentGroupId, @CourseId, @InstituteId, @GroupTitle, @GroupTitleFr,
                  @Details, @DetailsFr, @IsActive, @CreatedAt, @UpdatedOn, @MaxStudents,
-                 @AcedemicGroup, @Fee, @IfRegistrationOpen, @DayCareFee)";
+                 @AcedemicGroup, @Fee, @IfRegistrationOpen, @DayCareFee, @GroupIndex)";
 
             var groupId = Guid.NewGuid();
 
@@ -43,6 +43,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@Fee", group.Fee);
             cmd.AddParameter("@DayCareFee", group.DayCareFee);
             cmd.AddParameter("@IfRegistrationOpen", group.IfRegistrationOpen);
+            cmd.AddParameter("@GroupIndex", group.GroupIndex);
 
             await cmd.ExecuteNonQueryAsync();
             return await GetGroup(groupId);
@@ -75,7 +76,7 @@ namespace Courses.Repository.Implementation
                 cmd.CommandText += " AND IsActive = TRUE";
             }
 
-            cmd.CommandText += " ORDER BY CreatedAt ASC";
+            cmd.CommandText += " ORDER BY GroupIndex ASC, CreatedAt ASC";
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -102,7 +103,8 @@ namespace Courses.Repository.Implementation
                     AcedemicGroup = @AcedemicGroup,
                     Fee = @Fee,
                     DayCareFee = @DayCareFee,
-                    IfRegistrationOpen = @IfRegistrationOpen
+                    IfRegistrationOpen = @IfRegistrationOpen,
+                    GroupIndex = @GroupIndex
                 WHERE CourseEnrollmentGroupId = @CourseEnrollmentGroupId";
 
             cmd.AddParameter("@CourseEnrollmentGroupId", groupId.ToByteArray());
@@ -116,6 +118,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@Fee", group.Fee);
             cmd.AddParameter("@DayCareFee", group.DayCareFee);
             cmd.AddParameter("@IfRegistrationOpen", group.IfRegistrationOpen);
+            cmd.AddParameter("@GroupIndex", group.GroupIndex);
 
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
@@ -145,7 +148,7 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 SELECT * 
                 FROM course_enrollment_groups 
-                WHERE CourseId = @CourseId ORDER BY CreatedAt ASC";
+                WHERE CourseId = @CourseId";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
@@ -154,6 +157,8 @@ namespace Courses.Repository.Implementation
                 cmd.AddParameter("@IsActive", isActive);
                 cmd.CommandText += " AND IsActive = TRUE";
             }
+
+            cmd.CommandText += " ORDER BY GroupIndex ASC, CreatedAt ASC";
 
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -220,7 +225,8 @@ namespace Courses.Repository.Implementation
                 AcedemicGroups = AcedemicGroupHelper.FromInt( reader.GetInt32("AcedemicGroup")),
                 Fee = reader.GetInt32("Fee"),
                 DayCareFee = reader.GetInt32("DayCareFee"),
-                IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen")
+                IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen"),
+                GroupIndex = reader.GetInt32("GroupIndex")
             };
         }
     }

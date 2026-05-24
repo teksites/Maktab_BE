@@ -73,6 +73,7 @@ namespace Courses.Repository.Implementation
             sce.UpdatedOn,
             sce.EnrollmentIndex,
             CAST(sce.EnrollmentStatus AS SIGNED) AS EnrollmentStatus,
+            ceg.GroupIndex AS GroupIndex,
             ci.FirstName AS ChildFirstName,
             ci.LastName AS ChildLastName,
             ci.Consent AS ChildConsent,
@@ -83,6 +84,7 @@ namespace Courses.Repository.Implementation
             ui.Phone,
             ui.Relationship
         FROM student_course_enrollment sce
+        LEFT JOIN course_enrollment_groups ceg ON ceg.CourseEnrollmentGroupId = sce.CourseEnrollmentGroupId
         INNER JOIN child_information ci ON ci.ChildId = sce.ChildId
         LEFT JOIN user_info ui ON ui.FamilyId = sce.FamilyId AND ui.IsActive = b'1'
         WHERE sce.ChildId = @ChildId AND sce.CourseId = @CourseId AND sce.IsActive = TRUE";
@@ -277,6 +279,7 @@ namespace Courses.Repository.Implementation
             sce.UpdatedOn,
             sce.EnrollmentIndex,
             CAST(sce.EnrollmentStatus AS SIGNED) AS EnrollmentStatus,
+            ceg.GroupIndex AS GroupIndex,
             ci.FirstName AS ChildFirstName,
             ci.LastName AS ChildLastName,
             ci.Consent AS ChildConsent,
@@ -287,6 +290,7 @@ namespace Courses.Repository.Implementation
             ui.Phone,
             ui.Relationship
         FROM student_course_enrollment sce
+        LEFT JOIN course_enrollment_groups ceg ON ceg.CourseEnrollmentGroupId = sce.CourseEnrollmentGroupId
         INNER JOIN child_information ci ON ci.ChildId = sce.ChildId
         LEFT JOIN user_info ui ON ui.FamilyId = sce.FamilyId AND ui.IsActive = b'1'
         WHERE sce.{columnName} = @Value AND sce.IsActive = TRUE";
@@ -332,6 +336,7 @@ namespace Courses.Repository.Implementation
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn"),
                 EnrollmentIndex = reader.GetInt32("EnrollmentIndex"),
+                GroupIndex = reader.GetInt32("GroupIndex"),
                 EnrollmentStatus= (EnrollmentStatus)reader.GetInt32("EnrollmentStatus"),
 
                FamilyMembers = new List<FamilyInfo>()
@@ -388,6 +393,7 @@ namespace Courses.Repository.Implementation
         SELECT
             ceg.CourseEnrollmentGroupId,
             ceg.CourseId,
+            ceg.GroupIndex,
             ceg.MaxStudents,
             ceg.IfRegistrationOpen,
             SUM(CASE WHEN sce.EnrollmentStatus = 0 THEN 1 ELSE 0 END) AS UnknownCount,
@@ -400,7 +406,8 @@ namespace Courses.Repository.Implementation
         LEFT JOIN student_course_enrollment sce ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId 
             AND sce.IsActive = TRUE
         WHERE ceg.CourseId = @CourseId AND ceg.IsActive = TRUE
-        GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.MaxStudents, ceg.IfRegistrationOpen";
+        GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.GroupIndex, ceg.MaxStudents, ceg.IfRegistrationOpen
+        ORDER BY ceg.GroupIndex ASC, ceg.CreatedAt ASC";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
@@ -418,6 +425,7 @@ namespace Courses.Repository.Implementation
                 {
                     CourseEnrollmentGroupId = groupId,
                     CourseId = reader.GetGuidFromByteArray("CourseId"),
+                    GroupIndex = reader.GetInt32("GroupIndex"),
                     MaxStudents = reader.IsDBNull("MaxStudents") ? 0 : reader.GetInt32("MaxStudents"),
                     IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen"),
                     EnrollmentStatusCount = CreateEnrollmentStatusCountMap(reader)
@@ -439,6 +447,7 @@ namespace Courses.Repository.Implementation
         SELECT
             ceg.CourseEnrollmentGroupId,
             ceg.CourseId,
+            ceg.GroupIndex,
             ceg.MaxStudents,
             ceg.IfRegistrationOpen,
             SUM(CASE WHEN sce.EnrollmentStatus = 0 THEN 1 ELSE 0 END) AS UnknownCount,
@@ -451,7 +460,7 @@ namespace Courses.Repository.Implementation
         LEFT JOIN student_course_enrollment sce ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId 
             AND sce.IsActive = TRUE
         WHERE ceg.CourseEnrollmentGroupId = @CourseGroupId AND ceg.IsActive = TRUE
-        GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.MaxStudents, ceg.IfRegistrationOpen";
+        GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.GroupIndex, ceg.MaxStudents, ceg.IfRegistrationOpen";
 
             cmd.AddParameter("@CourseGroupId", courseGroupId.ToByteArray());
 
@@ -462,6 +471,7 @@ namespace Courses.Repository.Implementation
                 {
                     result.CourseEnrollmentGroupId = reader.GetGuidFromByteArray("CourseEnrollmentGroupId");
                     result.CourseId = reader.GetGuidFromByteArray("CourseId");
+                    result.GroupIndex = reader.GetInt32("GroupIndex");
                     result.MaxStudents = reader.IsDBNull("MaxStudents") ? 0 : reader.GetInt32("MaxStudents");
                     result.IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen");
                     result.EnrollmentStatusCount = CreateEnrollmentStatusCountMap(reader);

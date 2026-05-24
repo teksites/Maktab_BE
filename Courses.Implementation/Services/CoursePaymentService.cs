@@ -1,6 +1,7 @@
 ﻿using Courses.Repository;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
+using MaktabDataContracts.Responses.Transactions;
 
 namespace Courses.Services.Implementation
 {
@@ -8,11 +9,16 @@ namespace Courses.Services.Implementation
     {
         private readonly ICoursePaymentRepository _repository;
         private readonly IStudentCourseTransactionService _studentCourseTransactionService;
+        private readonly IStudentCourseEnrollmentService _studentCourseEnrollmentService;
 
-        public CoursePaymentService(ICoursePaymentRepository repository, IStudentCourseTransactionService studentCourseTransactionService)
+        public CoursePaymentService(
+            ICoursePaymentRepository repository,
+            IStudentCourseTransactionService studentCourseTransactionService,
+            IStudentCourseEnrollmentService studentCourseEnrollmentService)
         {
             _repository = repository;
             _studentCourseTransactionService = studentCourseTransactionService;
+            _studentCourseEnrollmentService = studentCourseEnrollmentService;
         }
 
         public async Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment)
@@ -24,7 +30,25 @@ namespace Courses.Services.Implementation
                 throw new Exception("The transaaction doesn't exist");
             }
 
-            var paymentResponse = await _repository.AddPayment(payment).ConfigureAwait(false);
+            var result = await TryAddPayment(payment).ConfigureAwait(false);
+            return result.Payment;
+        }
+
+        public async Task<(CoursePaymentResponse Payment, bool Created)> TryAddPayment(AddCoursePayment payment)
+        {
+            var transaction = await _studentCourseTransactionService.GetTransaction(payment.StudentCourseTransactionId).ConfigureAwait(false);
+
+            if (transaction == null)
+            {
+                throw new Exception("The transaaction doesn't exist");
+            }
+
+            var result = await _repository.TryAddPayment(payment).ConfigureAwait(false);
+            if (!result.Created)
+            {
+                return result;
+            }
+
             var allPayments = await _repository.GetAllPayments(payment.StudentCourseTransactionId).ConfigureAwait(false);
             decimal totalPaid = allPayments.Sum(p => p.AmountPaid);
 
@@ -57,8 +81,9 @@ namespace Courses.Services.Implementation
             }
 
             await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, updatedTransaction).ConfigureAwait(false);
+            await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
 
-            return paymentResponse;
+            return result;
         }
 
         public async Task<CoursePaymentResponse> GetPayment(Guid paymentId)
@@ -111,6 +136,7 @@ namespace Courses.Services.Implementation
             }
 
             await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, updatedTransaction).ConfigureAwait(false);
+            await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
 
             return paymentResponse;
         }
@@ -162,6 +188,7 @@ namespace Courses.Services.Implementation
             }
 
             await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, updatedTransaction).ConfigureAwait(false);
+            await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
 
             return paymentResponse;
             
@@ -170,6 +197,19 @@ namespace Courses.Services.Implementation
         public async Task<IEnumerable<CoursePaymentResponse>> GetAllPaymentsByStudentTransactionId(Guid studentTransactionId)
         {
             return await _repository.GetAllPaymentsByStudentTransactionId(studentTransactionId).ConfigureAwait(false);
+        }
+
+        private async Task RecalculateEnrollmentState(StudentCourseTransactionResponse transaction)
+        {
+            var courseId = transaction.Enrollments.FirstOrDefault()?.CourseId ?? Guid.Empty;
+            if (courseId == Guid.Empty)
+            {
+                return;
+            }
+
+            await _studentCourseEnrollmentService
+                .RecalculateCourseFee(courseId, transaction.FamilyId)
+                .ConfigureAwait(false);
         }
     }
 }

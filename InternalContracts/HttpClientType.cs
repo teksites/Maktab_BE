@@ -10,6 +10,7 @@ namespace InternalContracts
     {
         Sedat,
         Elavon,
+        Helcim,
         ExchangeRates,
         Other
     }

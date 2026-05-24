@@ -18,6 +18,7 @@ namespace WebMsgSender.Implementation
             switch (clientConfiguration.ClientType)
             {
                 case HttpClientType.Elavon:
+                case HttpClientType.Helcim:
                 case HttpClientType.ExchangeRates:
                     {
                         _client = new KeyClientFactory(clientConfiguration.BaseUrl, clientConfiguration.RelativeUrl, "");
@@ -36,7 +37,7 @@ namespace WebMsgSender.Implementation
                 //        break;
                 //    }
                 default:
-                    throw new InvalidOperationException("Active configuration can have value Elavon or Sedat only");
+                    throw new InvalidOperationException("Active configuration can have value Elavon, Helcim, ExchangeRates or Sedat only");
             }
         }
 
