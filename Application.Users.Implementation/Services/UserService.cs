@@ -50,7 +50,6 @@ namespace Application.Users.Implementation
                        "<div></div>" +
                        "<div>Please activate your account by entering the code inside your ICC Brossard School account portal.</div>" +
                        "<div>&nbsp;</div>" +
-                       "<div>Cheers</div>" +
                        "<div>&nbsp;</div>" +
                        "<div><strong>ICC Brossard School Registration Portal</strong></div>"
             });
@@ -189,7 +188,6 @@ namespace Application.Users.Implementation
                        "<div></div>" +
                        "<div>Please activate your account by entering the code inside your ICC Brossard School account portal.</div>" +
                        "<div>&nbsp;</div>" +
-                       "<div>Cheers</div>" +
                        "<div>&nbsp;</div>" +
                        "<div><strong>ICC Brossard School Registration Portal</strong></div>"
                 }).ConfigureAwait(false);
@@ -224,7 +222,6 @@ namespace Application.Users.Implementation
                        "<div></div>" +
                        "<div>Please reset your account password before logging into Maktab App.</div>" +
                        "<div>&nbsp;</div>" +
-                       "<div>Cheers</div>" +
                        "<div>&nbsp;</div>" +
                        "<div><strong>ICC Brossard School Registration</strong></div>"
 
