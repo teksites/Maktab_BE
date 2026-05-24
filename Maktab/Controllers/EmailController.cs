@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 [Route("api/email")]
 [ApiController]
-[ApiAuthorize(false, false, UserRoleType.Admin)]
+[ApiAuthorize()]
 [EnableCors("corspolicy")]
 public class EmailController : ControllerBase
 {

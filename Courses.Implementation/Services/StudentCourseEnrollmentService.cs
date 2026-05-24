@@ -396,17 +396,47 @@ namespace Courses.Implementation.Services
             addStudentCourseTransaction.Comments = familyTransaction.Comments +$"\n Updated the transaction on {DateTime.UtcNow.ToString()}";
             addStudentCourseTransaction.IsCompletelyPaid = recalculatedTotalPayable <= addStudentCourseTransaction.TotalAmountPaid;
 
+            var promotedNotifications = new List<EnrollmentEmailNotification>();
             if (addStudentCourseTransaction.IsCompletelyPaid)
             {
                 foreach (var enrollment in effectiveEnrollments.Where(e => e.EnrollmentStatus == EnrollmentStatus.Enrolled))
                 {
-                    await _repository
+                    var updateSucceeded = await _repository
                         .UpdateEnrollmentStatus(enrollment.StudentCourseEnrollmentId, EnrollmentStatus.Registered)
                         .ConfigureAwait(false);
+
+                    if (!updateSucceeded)
+                    {
+                        continue;
+                    }
+
+                    var enrollmentGroup = course.CourseEnrollmentGroups
+                        .FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
+
+                    var notification = CreateEnrollmentEmailNotification(
+                        statusChanged: true,
+                        enrollmentStatus: EnrollmentStatus.Registered,
+                        enrollmentDetails: enrollment,
+                        courseDetails: course,
+                        enrollmentGroup: enrollmentGroup);
+
+                    if (notification != null)
+                    {
+                        promotedNotifications.Add(notification);
+                    }
                 }
             }
 
-            return await _studentCourseTransactionService.UpdateTransaction(familyTransaction.StudentCourseTransactionId, addStudentCourseTransaction).ConfigureAwait(false);
+            var transactionUpdated = await _studentCourseTransactionService
+                .UpdateTransaction(familyTransaction.StudentCourseTransactionId, addStudentCourseTransaction)
+                .ConfigureAwait(false);
+
+            if (transactionUpdated && promotedNotifications.Count > 0)
+            {
+                await SendEnrollmentStatusEmailsAsync(promotedNotifications).ConfigureAwait(false);
+            }
+
+            return transactionUpdated;
         }
 
         private static (List<FeePaymentPolicy> FeePolicy, bool FeePaymentPolicyFound) ParseValidatedFeePaymentPolicy(string? feePaymentPolicyDetails)

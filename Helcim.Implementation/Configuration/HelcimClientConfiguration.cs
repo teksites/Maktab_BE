@@ -19,9 +19,26 @@ namespace Helcim.Implementation.Configuration
                 ? throw new InvalidOperationException("Helcim api-version-path is null.")
                 : configuration[$"{configPrefix}:api-version-path"]!;
 
-            ApiToken = string.IsNullOrWhiteSpace(configuration[$"{configPrefix}:api-token"])
-                ? throw new InvalidOperationException("Helcim api-token is null.")
-                : configuration[$"{configPrefix}:api-token"]!;
+            var activeTokenKey = configuration[$"{configPrefix}:ActiveHelcimToken"];
+            var activeEnvironmentProfile = configuration["ActiveEnvironmentProfile"];
+            if (string.IsNullOrWhiteSpace(activeTokenKey) && !string.IsNullOrWhiteSpace(activeEnvironmentProfile))
+            {
+                activeTokenKey = configuration[$"{configPrefix}:EnvironmentTokens:{activeEnvironmentProfile}"];
+            }
+
+            if (!string.IsNullOrWhiteSpace(activeTokenKey))
+            {
+                var configuredToken = configuration[$"{configPrefix}:Tokens:{activeTokenKey}"];
+                ApiToken = string.IsNullOrWhiteSpace(configuredToken)
+                    ? throw new InvalidOperationException($"Helcim token '{activeTokenKey}' is null.")
+                    : configuredToken!;
+            }
+            else
+            {
+                ApiToken = string.IsNullOrWhiteSpace(configuration[$"{configPrefix}:api-token"])
+                    ? throw new InvalidOperationException("Helcim api-token is null.")
+                    : configuration[$"{configPrefix}:api-token"]!;
+            }
 
             SignatureVerificationToken = string.IsNullOrWhiteSpace(configuration[$"{configPrefix}:signature-verification-token"])
                 ? throw new InvalidOperationException("Helcim signature-verification-token is null.")

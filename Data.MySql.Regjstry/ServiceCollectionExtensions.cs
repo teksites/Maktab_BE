@@ -48,6 +48,20 @@ namespace Data.MySql.Regjstry
 
         private static string? ResolveConnectionString(IConfiguration configuration)
         {
+            var activeEnvironmentProfile = configuration["ActiveEnvironmentProfile"];
+            if (!string.IsNullOrWhiteSpace(activeEnvironmentProfile))
+            {
+                var mappedSchema = configuration[$"Database:EnvironmentSchemas:{activeEnvironmentProfile}"];
+                if (!string.IsNullOrWhiteSpace(mappedSchema))
+                {
+                    var mappedConnectionString = configuration[$"Database:Schemas:{mappedSchema}"];
+                    if (!string.IsNullOrWhiteSpace(mappedConnectionString))
+                    {
+                        return mappedConnectionString;
+                    }
+                }
+            }
+
             var selectedSchema = configuration["Database:ActiveSchema"];
             if (!string.IsNullOrWhiteSpace(selectedSchema))
             {
