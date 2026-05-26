@@ -40,9 +40,25 @@ namespace Helcim.Implementation.Configuration
                     : configuration[$"{configPrefix}:api-token"]!;
             }
 
-            SignatureVerificationToken = string.IsNullOrWhiteSpace(configuration[$"{configPrefix}:signature-verification-token"])
-                ? throw new InvalidOperationException("Helcim signature-verification-token is null.")
-                : configuration[$"{configPrefix}:signature-verification-token"]!;
+            var activeSignatureTokenKey = configuration[$"{configPrefix}:ActiveSignatureVerificationToken"];
+            if (string.IsNullOrWhiteSpace(activeSignatureTokenKey) && !string.IsNullOrWhiteSpace(activeEnvironmentProfile))
+            {
+                activeSignatureTokenKey = configuration[$"{configPrefix}:EnvironmentSignatureVerificationTokens:{activeEnvironmentProfile}"];
+            }
+
+            if (!string.IsNullOrWhiteSpace(activeSignatureTokenKey))
+            {
+                var configuredSignatureToken = configuration[$"{configPrefix}:SignatureVerificationTokens:{activeSignatureTokenKey}"];
+                SignatureVerificationToken = string.IsNullOrWhiteSpace(configuredSignatureToken)
+                    ? throw new InvalidOperationException($"Helcim signature verification token '{activeSignatureTokenKey}' is null.")
+                    : configuredSignatureToken!;
+            }
+            else
+            {
+                SignatureVerificationToken = string.IsNullOrWhiteSpace(configuration[$"{configPrefix}:signature-verification-token"])
+                    ? throw new InvalidOperationException("Helcim signature-verification-token is null.")
+                    : configuration[$"{configPrefix}:signature-verification-token"]!;
+            }
         }
     }
 }
