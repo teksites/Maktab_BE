@@ -24,6 +24,7 @@ namespace Courses.Repository.Implementation
         {
             var paymentId = Guid.NewGuid();
             var now = DateTime.UtcNow;
+            var normalizedPaymentType = NormalizePaymentType(payment.PaymentType);
 
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
@@ -37,6 +38,7 @@ namespace Courses.Repository.Implementation
                     AmountPaid,
                     Comments,
                     ExternalPaymentId,
+                    PaymentType,
                     PaymentMode,
                     IsActive,
                     CreatedAt,
@@ -50,6 +52,7 @@ namespace Courses.Repository.Implementation
                     @AmountPaid,
                     @Comments,
                     @ExternalPaymentId,
+                    @PaymentType,
                     @PaymentMode,
                     @IsActive,
                     @CreatedAt,
@@ -64,6 +67,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@AmountPaid", payment.AmountPaid);
             cmd.AddParameter("@Comments", (object?)payment.Comments ?? DBNull.Value);
             cmd.AddParameter("@ExternalPaymentId", (object?)payment.ExternalPaymentId ?? DBNull.Value);
+            cmd.AddParameter("@PaymentType", (int)normalizedPaymentType);
             cmd.AddParameter("@PaymentMode", (int)payment.PaymentMode);
             cmd.AddParameter("@IsActive", payment.IsActive);
             cmd.AddParameter("@CreatedAt", now);
@@ -91,6 +95,8 @@ namespace Courses.Repository.Implementation
 
         public async Task<bool> UpdatePayment(Guid paymentId, AddCoursePayment payment)
         {
+            var normalizedPaymentType = NormalizePaymentType(payment.PaymentType);
+
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
@@ -100,6 +106,7 @@ namespace Courses.Repository.Implementation
                     AmountPaid  = @AmountPaid,
                     Comments    = @Comments,
                     ExternalPaymentId = @ExternalPaymentId,
+                    PaymentType = @PaymentType,
                     PaymentMode = @PaymentMode,
                     IsActive    = @IsActive,
                     UpdatedOn   = @UpdatedOn
@@ -109,6 +116,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@AmountPaid", payment.AmountPaid);
             cmd.AddParameter("@Comments", (object?)payment.Comments ?? DBNull.Value);
             cmd.AddParameter("@ExternalPaymentId", (object?)payment.ExternalPaymentId ?? DBNull.Value);
+            cmd.AddParameter("@PaymentType", (int)normalizedPaymentType);
             cmd.AddParameter("@PaymentMode", (int)payment.PaymentMode);
             cmd.AddParameter("@IsActive", payment.IsActive);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
@@ -245,11 +253,19 @@ namespace Courses.Repository.Implementation
                 AmountPaid = reader.GetDecimal("AmountPaid"),
                 Comments = reader.GetNullableString("Comments"),
                 ExternalPaymentId = reader.GetNullableString("ExternalPaymentId"),
+                PaymentType = NormalizePaymentType((PaymentType)(reader.GetNullableInt("PaymentType") ?? (int)PaymentType.Credit)),
                 PaymentMode = (PaymentMode)reader.GetInt32("PaymentMode"),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn")
             };
+        }
+
+        private static PaymentType NormalizePaymentType(PaymentType paymentType)
+        {
+            return Enum.IsDefined(typeof(PaymentType), paymentType)
+                ? paymentType
+                : PaymentType.Credit;
         }
     }
 }

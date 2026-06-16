@@ -22,6 +22,9 @@ namespace Courses.Implementation.Services
         public Task<CourseResponseDetailed> GetCourse(Guid courseId)
             => _repository.GetCourse(courseId);
 
+        public Task<int?> GetHelcimTerminalId(Guid courseId)
+            => _repository.GetHelcimTerminalId(courseId);
+
         public async Task<IEnumerable<CourseResponseDetailed>> GetAllCourses(GetCourseOptions options)
         {
             var courses = await _repository.GetAllCourses(options).ConfigureAwait(false);
@@ -113,7 +116,9 @@ namespace Courses.Implementation.Services
                     CanSelectMultipleEnrollmentGroups = course.CanSelectMultipleEnrollmentGroups,
                     PolicyHyperLink = course.PolicyHyperLink,
                     IsCourseCompleted = course.IsCourseCompleted,
+                    IsCourseHasPrequisite = course.IsCourseHasPrequisite,
                     IsRegistrationOpened = ifRegistrationOpen,
+                    IsManualEnrollment = course.IsManualEnrollment,
                     OfferDaycare = course.OfferDaycare,
                     RegistrationStartDate = course.RegistrationStartDate,
                     RegistrationEndDate = course.RegistrationEndDate,
@@ -140,6 +145,9 @@ namespace Courses.Implementation.Services
                 IfRegistrationOpen = update.IfRegistrationOpen,
                 DayCareFee = update.DayCareFee,
                 GroupIndex = update.GroupIndex,
+                MinAge = update.MinAge,
+                MaxAge = update.MaxAge,
+                IsCourseGroupHasPrequisite = update.IsCourseGroupHasPrequisite,
                 
                 // Map enum list to string list
                 AcedemicGroups = update.AcedemicGroups?.Select(g => g.ToString()).ToList() ?? new List<string>()

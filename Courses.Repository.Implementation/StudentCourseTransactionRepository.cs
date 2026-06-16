@@ -45,11 +45,11 @@ namespace Courses.Repository.Implementation
                     cmd.CommandText = @"
                         INSERT INTO student_course_transaction
                         (StudentCourseTransactionId, FamilyId, PayableFee, DayCareFee, DayCareDiscount,
-                         FeeAmountDiscount, TotalPayable, Comments, FeeInstallmentsJson, Status, RegistrationStatus, PaymentCode, IsActive,
+                         FeeAmountDiscount, Surcharge, TotalPayable, Comments, FeeInstallmentsJson, Status, RegistrationStatus, PaymentCode, IsActive,
                          TotalAmountPaid, IsCompletelyPaid, CreatedAt, UpdatedOn)
                         VALUES
                         (@TransactionId, @FamilyId, @PayableFee, @DayCareFee, @DayCareDiscount,
-                         @FeeAmountDiscount, @TotalPayable, @Comments, @FeeInstallmentsJson, @Status, @RegistrationStatus, @PaymentCode, @IsActive,
+                         @FeeAmountDiscount, @Surcharge, @TotalPayable, @Comments, @FeeInstallmentsJson, @Status, @RegistrationStatus, @PaymentCode, @IsActive,
                          @TotalAmountPaid, @IsCompletelyPaid, @CreatedAt, @UpdatedOn)
                     ";
 
@@ -60,6 +60,7 @@ namespace Courses.Repository.Implementation
                        // schema: DayCareDiscount INT
                        .AddParameter("@DayCareDiscount", (int)transaction.DayCareDiscount)
                        .AddParameter("@FeeAmountDiscount", (int)transaction.FeeAmountDiscount)
+                       .AddParameter("@Surcharge", transaction.Surcharge)
                        .AddParameter("@TotalPayable", transaction.TotalPayable)
                        .AddParameter("@Comments", (object?)transaction.Comments ?? DBNull.Value)
                        .AddParameter("@FeeInstallmentsJson", SerializeFeeInstallments(transaction.FeeInstallments))
@@ -130,6 +131,7 @@ namespace Courses.Repository.Implementation
                     sct.DayCareFee,
                     sct.DayCareDiscount,
                     sct.FeeAmountDiscount,
+                    sct.Surcharge,
                     sct.TotalPayable,
                     sct.Comments,
                     sct.FeeInstallmentsJson,
@@ -252,6 +254,7 @@ namespace Courses.Repository.Implementation
                     sct.DayCareFee,
                     sct.DayCareDiscount,
                     sct.FeeAmountDiscount,
+                    sct.Surcharge,
                     sct.TotalPayable,
                     sct.Comments,
                     sct.FeeInstallmentsJson,
@@ -387,6 +390,7 @@ namespace Courses.Repository.Implementation
                 DayCareFee = reader.GetDecimal("DayCareFee"),
                 DayCareDiscount = Convert.ToDecimal(reader.GetInt32("DayCareDiscount")),
                 FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32("FeeAmountDiscount")),
+                Surcharge = GetSurcharge(reader, "Surcharge"),
                 TotalPayable = reader.GetDecimal("TotalPayable"),
                 TotalAmountPaid = totalAmountPaid,
                 Comments = reader.IsDBNull("Comments") ? string.Empty : reader.GetString("Comments"),
@@ -417,6 +421,7 @@ namespace Courses.Repository.Implementation
                     DayCareFee = @DayCareFee,
                     DayCareDiscount = @DayCareDiscount,
                     FeeAmountDiscount = @FeeAmountDiscount,
+                    Surcharge = @Surcharge,
                     TotalPayable = @TotalPayable,
                     Comments = @Comments,
                     FeeInstallmentsJson = @FeeInstallmentsJson,
@@ -436,6 +441,7 @@ namespace Courses.Repository.Implementation
                .AddParameter("@DayCareFee", transaction.DayCareFee)
                .AddParameter("@DayCareDiscount", (int)transaction.DayCareDiscount)
                .AddParameter("@FeeAmountDiscount", (int)transaction.FeeAmountDiscount)
+               .AddParameter("@Surcharge", transaction.Surcharge)
                .AddParameter("@TotalPayable", transaction.TotalPayable)
                .AddParameter("@Comments", (object?)transaction.Comments ?? DBNull.Value)
                .AddParameter("@FeeInstallmentsJson", SerializeFeeInstallments(transaction.FeeInstallments))
@@ -505,6 +511,7 @@ namespace Courses.Repository.Implementation
                     sct.DayCareFee,
                     sct.DayCareDiscount,
                     sct.FeeAmountDiscount,
+                    sct.Surcharge,
                     sct.TotalPayable,
                     sct.Comments,
                     sct.FeeInstallmentsJson,
@@ -628,6 +635,7 @@ namespace Courses.Repository.Implementation
                     sct.DayCareFee,
                     sct.DayCareDiscount,
                     sct.FeeAmountDiscount,
+                    sct.Surcharge,
                     sct.TotalPayable,
                     sct.Comments,
                     sct.FeeInstallmentsJson,
@@ -744,6 +752,7 @@ namespace Courses.Repository.Implementation
                     sct.DayCareFee,
                     sct.DayCareDiscount,
                     sct.FeeAmountDiscount,
+                    sct.Surcharge,
                     sct.TotalPayable,
                     sct.Comments,
                     sct.FeeInstallmentsJson,
@@ -862,6 +871,7 @@ namespace Courses.Repository.Implementation
                     sct.DayCareFee,
                     sct.DayCareDiscount,
                     sct.FeeAmountDiscount,
+                    sct.Surcharge,
                     sct.TotalPayable,
                     sct.Comments,
                     sct.FeeInstallmentsJson,
@@ -980,6 +990,7 @@ namespace Courses.Repository.Implementation
                     sct.DayCareFee,
                     sct.DayCareDiscount,
                     sct.FeeAmountDiscount,
+                    sct.Surcharge,
                     sct.TotalPayable,
                     sct.Comments,
                     sct.FeeInstallmentsJson,
@@ -1096,6 +1107,7 @@ namespace Courses.Repository.Implementation
                     sct.DayCareFee,
                     sct.DayCareDiscount,
                     sct.FeeAmountDiscount,
+                    sct.Surcharge,
                     sct.TotalPayable,
                     sct.Comments,
                     sct.FeeInstallmentsJson,
@@ -1533,6 +1545,7 @@ namespace Courses.Repository.Implementation
             var ordDayCareFee = reader.GetOrdinal("DayCareFee");
             var ordDayCareDiscount = reader.GetOrdinal("DayCareDiscount");
             var ordFeeAmountDiscount = reader.GetOrdinal("FeeAmountDiscount");
+            var ordSurcharge = reader.GetOrdinal("Surcharge");
             var ordTotalPayable = reader.GetOrdinal("TotalPayable");
             var ordComments = reader.GetOrdinal("Comments");
             var ordFeeInstallmentsJson = reader.GetOrdinal("FeeInstallmentsJson");
@@ -1595,6 +1608,7 @@ namespace Courses.Repository.Implementation
                         DayCareFee = reader.GetDecimal(ordDayCareFee),
                         DayCareDiscount = Convert.ToDecimal(reader.GetInt32(ordDayCareDiscount)),
                         FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32(ordFeeAmountDiscount)),
+                        Surcharge = GetSurcharge(reader, ordSurcharge),
                         TotalPayable = reader.GetDecimal(ordTotalPayable),
                         Comments = reader.IsDBNull(ordComments) ? string.Empty : reader.GetString(ordComments),
                         FeeInstallments = feeInstallments,
@@ -1718,6 +1732,7 @@ namespace Courses.Repository.Implementation
                 DayCareFee = reader.GetDecimal("DayCareFee"),
                 DayCareDiscount = Convert.ToDecimal(reader.GetInt32("DayCareDiscount")),
                 FeeAmountDiscount = Convert.ToDecimal(reader.GetInt32("FeeAmountDiscount")),
+                Surcharge = GetSurcharge(reader, "Surcharge"),
                 TotalPayable = reader.GetDecimal("TotalPayable"),
                 TotalAmountPaid = totalAmountPaid,
                 Comments = reader.IsDBNull("Comments") ? string.Empty : reader.GetString("Comments"),
@@ -1901,6 +1916,17 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = "DELETE FROM `student_course_transaction_enrollment` WHERE Id = @Id";
             cmd.AddParameter("@Id", id.ToByteArray());
             return await cmd.ExecuteNonQueryAsync() > 0;
+        }
+
+        private static double GetSurcharge(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return GetSurcharge(reader, ordinal);
+        }
+
+        private static double GetSurcharge(DbDataReader reader, int ordinal)
+        {
+            return reader.IsDBNull(ordinal) ? 0d : Convert.ToDouble(reader.GetValue(ordinal));
         }
     }
 }

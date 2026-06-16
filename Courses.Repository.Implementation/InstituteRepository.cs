@@ -15,9 +15,9 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"INSERT INTO institutes 
-                (InstituteId, Name, NameFr, Description, DescriptionFr, Email, Phone, IsActive, CreatedAt, UpdatedOn)
+                (InstituteId, Name, NameFr, Description, DescriptionFr, Email, Phone, TerminalId, IsActive, CreatedAt, UpdatedOn)
                 VALUES 
-                (@InstituteId, @Name, @NameFr, @Description, @DescriptionFr, @Email, @Phone, @IsActive, @CreatedAt, @UpdatedOn)";
+                (@InstituteId, @Name, @NameFr, @Description, @DescriptionFr, @Email, @Phone, @TerminalId, @IsActive, @CreatedAt, @UpdatedOn)";
 
             var instituteId = Guid.NewGuid();
             cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
@@ -27,6 +27,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@DescriptionFr", institute.DescriptionFr ?? string.Empty);
             cmd.AddParameter("@Email", institute.Email ?? string.Empty);
             cmd.AddParameter("@Phone", institute.Phone ?? string.Empty);
+            cmd.AddParameter("@TerminalId", (object?)institute.TerminalId ?? DBNull.Value);
             cmd.AddParameter("@IsActive", true);
             cmd.AddParameter("@CreatedAt", DateTime.UtcNow);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
@@ -74,6 +75,7 @@ namespace Courses.Repository.Implementation
                 DescriptionFr = @DescriptionFr, 
                 Email = @Email, 
                 Phone = @Phone, 
+                TerminalId = @TerminalId,
                 UpdatedOn = @UpdatedOn 
                 WHERE InstituteId = @InstituteId";
 
@@ -84,6 +86,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@DescriptionFr", institute.DescriptionFr ?? string.Empty);
             cmd.AddParameter("@Email", institute.Email ?? string.Empty);
             cmd.AddParameter("@Phone", institute.Phone ?? string.Empty);
+            cmd.AddParameter("@TerminalId", (object?)institute.TerminalId ?? DBNull.Value);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
 
             return await cmd.ExecuteNonQueryAsync() > 0;
@@ -113,6 +116,7 @@ namespace Courses.Repository.Implementation
                 DescriptionFr = reader.GetString("DescriptionFr"),
                 Email = reader.GetString("Email"),
                 Phone = reader.GetString("Phone"),
+                TerminalId = reader.GetNullableString("TerminalId") ?? string.Empty,
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn")

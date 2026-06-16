@@ -32,13 +32,15 @@ namespace Courses.Repository.Implementation
                  Details, DetailsFr, StartDate, EndDate, IsActive,
                  CreatedAt, UpdatedOn, CanSelectMultipleEnrollmentGroups,
                  PolicyHyperLink, IsCourseCompleted, IsRegistrationOpened,
-                 RegistrationStartDate, RegistrationEndDate, CourseSession, RegistrationFee, OfferDaycare)
+                 RegistrationStartDate, RegistrationEndDate, CourseSession, RegistrationFee, OfferDaycare,
+                 IsManualEnrollment, IsCourseHasPrequisite)
                 VALUES
                 (@CourseId, @InstituteId, @Name, @NameFr, @Description, @DescriptionFr,
                  @Details, @DetailsFr, @StartDate, @EndDate, @IsActive,
                  @CreatedAt, @UpdatedOn, @CanSelectMultipleEnrollmentGroups,
                  @PolicyHyperLink, @IsCourseCompleted, @IsRegistrationOpened,
-                 @RegistrationStartDate, @RegistrationEndDate, @CourseSession, @RegistrationFee,@OfferDaycare)";
+                 @RegistrationStartDate, @RegistrationEndDate, @CourseSession, @RegistrationFee,@OfferDaycare,
+                 @IsManualEnrollment, @IsCourseHasPrequisite)";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
             cmd.AddParameter("@InstituteId", course.InstituteId.ToByteArray());
@@ -58,6 +60,8 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@IsCourseCompleted", course.IsCourseCompleted);
             cmd.AddParameter("@IsRegistrationOpened", course.IsRegistrationOpened);
             cmd.AddParameter("@OfferDaycare", course.OfferDaycare);
+            cmd.AddParameter("@IsManualEnrollment", course.IsManualEnrollment);
+            cmd.AddParameter("@IsCourseHasPrequisite", course.IsCourseHasPrequisite);
 
             // ✅ FIX: DBNull-safe nullable DateTime parameters
             cmd.AddParameter("@RegistrationStartDate", (object?)course.RegistrationStartDate ?? DBNull.Value);
@@ -82,6 +86,35 @@ namespace Courses.Repository.Implementation
             if (!await reader.ReadAsync()) return null;
 
             return await MapToCourseResponse(reader);
+        }
+
+        public async Task<int?> GetHelcimTerminalId(Guid courseId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT i.TerminalId
+                FROM courses c
+                INNER JOIN institutes i ON i.InstituteId = c.InstituteId
+                WHERE c.CourseId = @CourseId";
+            cmd.AddParameter("@CourseId", courseId.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+            {
+                return null;
+            }
+
+            var terminalIdColumn = FindColumn(reader, "TerminalId");
+            if (terminalIdColumn == null || reader.IsDBNull(terminalIdColumn.Value))
+            {
+                return null;
+            }
+
+            var rawValue = Convert.ToString(reader.GetValue(terminalIdColumn.Value));
+            return int.TryParse(rawValue, out var terminalId)
+                ? terminalId
+                : null;
         }
 
         // Get all courses with options
@@ -165,7 +198,8 @@ namespace Courses.Repository.Implementation
                     IsActive=@IsActive, UpdatedOn=@UpdatedOn, CanSelectMultipleEnrollmentGroups=@CanSelectMultipleEnrollmentGroups,
                     PolicyHyperLink=@PolicyHyperLink, IsCourseCompleted=@IsCourseCompleted, IsRegistrationOpened=@IsRegistrationOpened,
                     RegistrationStartDate=@RegistrationStartDate, RegistrationEndDate=@RegistrationEndDate, CourseSession=@CourseSession, 
-                    RegistrationFee=@RegistrationFee, OfferDaycare =@OfferDaycare
+                    RegistrationFee=@RegistrationFee, OfferDaycare =@OfferDaycare,
+                    IsManualEnrollment=@IsManualEnrollment, IsCourseHasPrequisite=@IsCourseHasPrequisite
                 WHERE CourseId=@CourseId";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
@@ -190,7 +224,9 @@ namespace Courses.Repository.Implementation
 
             cmd.AddParameter("@CourseSession", (int)course.CourseSession);
             cmd.AddParameter("@RegistrationFee", (int)course.RegistrationFee);
-            cmd.AddParameter("@OfferDaycare", course.OfferDaycare); 
+            cmd.AddParameter("@OfferDaycare", course.OfferDaycare);
+            cmd.AddParameter("@IsManualEnrollment", course.IsManualEnrollment);
+            cmd.AddParameter("@IsCourseHasPrequisite", course.IsCourseHasPrequisite);
 
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
@@ -261,6 +297,8 @@ namespace Courses.Repository.Implementation
                 UpdatedOn = reader.GetDateTimeUtc("UpdatedOn"),
                 PolicyHyperLink = reader.IsDBNull("PolicyHyperLink") ? string.Empty : reader.GetString("PolicyHyperLink"),
                 IsCourseCompleted = reader.GetBoolean("IsCourseCompleted"),
+                IsCourseHasPrequisite = ReadBooleanColumn(reader, "IsCourseHasPrequisite"),
+                IsManualEnrollment = ReadBooleanColumn(reader, "IsManualEnrollment"),
                 IsRegistrationOpened = reader.GetBoolean("IsRegistrationOpened"),
                 RegistrationStartDate = registrationStart,
                 RegistrationEndDate = registrationEnd,
@@ -281,6 +319,25 @@ namespace Courses.Repository.Implementation
                                           .Distinct()
                                           .ToList();
             return course;
+        }
+
+        private static int? FindColumn(DbDataReader reader, string columnName)
+        {
+            for (var index = 0; index < reader.FieldCount; index++)
+            {
+                if (string.Equals(reader.GetName(index), columnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return index;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool ReadBooleanColumn(DbDataReader reader, string columnName)
+        {
+            var ordinal = FindColumn(reader, columnName);
+            return ordinal.HasValue && !reader.IsDBNull(ordinal.Value) && reader.GetBoolean(ordinal.Value);
         }
 
         // ✅ FIXED: prevents duplicates + returns deterministic EnrollmentGroupActive

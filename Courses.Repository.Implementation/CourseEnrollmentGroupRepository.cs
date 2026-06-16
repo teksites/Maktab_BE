@@ -20,11 +20,13 @@ namespace Courses.Repository.Implementation
                 INSERT INTO course_enrollment_groups 
                 (CourseEnrollmentGroupId, CourseId, InstituteId, GroupTitle, GroupTitleFr, 
                  Details, DetailsFr, IsActive, CreatedAt, UpdatedOn, MaxStudents, 
-                 AcedemicGroup, Fee, IfRegistrationOpen, DayCareFee, GroupIndex)
+                 AcedemicGroup, Fee, IfRegistrationOpen, DayCareFee, GroupIndex,
+                 MinAge, MaxAge, IsCourseGroupHasPrequisite)
                 VALUES 
                 (@CourseEnrollmentGroupId, @CourseId, @InstituteId, @GroupTitle, @GroupTitleFr,
                  @Details, @DetailsFr, @IsActive, @CreatedAt, @UpdatedOn, @MaxStudents,
-                 @AcedemicGroup, @Fee, @IfRegistrationOpen, @DayCareFee, @GroupIndex)";
+                 @AcedemicGroup, @Fee, @IfRegistrationOpen, @DayCareFee, @GroupIndex,
+                 @MinAge, @MaxAge, @IsCourseGroupHasPrequisite)";
 
             var groupId = Guid.NewGuid();
 
@@ -44,6 +46,9 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@DayCareFee", group.DayCareFee);
             cmd.AddParameter("@IfRegistrationOpen", group.IfRegistrationOpen);
             cmd.AddParameter("@GroupIndex", group.GroupIndex);
+            cmd.AddParameter("@MinAge", group.MinAge <= 0 ? DBNull.Value : group.MinAge);
+            cmd.AddParameter("@MaxAge", group.MaxAge <= 0 ? DBNull.Value : group.MaxAge);
+            cmd.AddParameter("@IsCourseGroupHasPrequisite", group.IsCourseGroupHasPrequisite);
 
             await cmd.ExecuteNonQueryAsync();
             return await GetGroup(groupId);
@@ -104,7 +109,10 @@ namespace Courses.Repository.Implementation
                     Fee = @Fee,
                     DayCareFee = @DayCareFee,
                     IfRegistrationOpen = @IfRegistrationOpen,
-                    GroupIndex = @GroupIndex
+                    GroupIndex = @GroupIndex,
+                    MinAge = @MinAge,
+                    MaxAge = @MaxAge,
+                    IsCourseGroupHasPrequisite = @IsCourseGroupHasPrequisite
                 WHERE CourseEnrollmentGroupId = @CourseEnrollmentGroupId";
 
             cmd.AddParameter("@CourseEnrollmentGroupId", groupId.ToByteArray());
@@ -119,6 +127,9 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@DayCareFee", group.DayCareFee);
             cmd.AddParameter("@IfRegistrationOpen", group.IfRegistrationOpen);
             cmd.AddParameter("@GroupIndex", group.GroupIndex);
+            cmd.AddParameter("@MinAge", group.MinAge <= 0 ? DBNull.Value : group.MinAge);
+            cmd.AddParameter("@MaxAge", group.MaxAge <= 0 ? DBNull.Value : group.MaxAge);
+            cmd.AddParameter("@IsCourseGroupHasPrequisite", group.IsCourseGroupHasPrequisite);
 
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
@@ -226,7 +237,10 @@ namespace Courses.Repository.Implementation
                 Fee = reader.GetInt32("Fee"),
                 DayCareFee = reader.GetInt32("DayCareFee"),
                 IfRegistrationOpen = reader.GetBoolean("IfRegistrationOpen"),
-                GroupIndex = reader.GetInt32("GroupIndex")
+                GroupIndex = reader.GetInt32("GroupIndex"),
+                MinAge = reader.GetNullableInt("MinAge") ?? 0,
+                MaxAge = reader.GetNullableInt("MaxAge") ?? 0,
+                IsCourseGroupHasPrequisite = reader.GetBooleanOrDefault("IsCourseGroupHasPrequisite")
             };
         }
     }

@@ -33,6 +33,7 @@ namespace Helcim.Implementation.Services
         private readonly IHelcimTransactionRepository _repository;
         private readonly IHelcimClientConfiguration _clientConfiguration;
         private readonly IWebMsgSenderService _senderService;
+        private readonly ICourseService _courseService;
         private readonly IStudentCourseTransactionService _studentCourseTransactionService;
         private readonly IStudentCourseEnrollmentService _studentCourseEnrollmentService;
         private readonly ICoursePaymentService _coursePaymentService;
@@ -41,6 +42,7 @@ namespace Helcim.Implementation.Services
             IHelcimTransactionRepository repository,
             IHelcimClientConfiguration clientConfiguration,
             IWebMsgSenderService senderService,
+            ICourseService courseService,
             IStudentCourseTransactionService studentCourseTransactionService,
             IStudentCourseEnrollmentService studentCourseEnrollmentService,
             ICoursePaymentService coursePaymentService)
@@ -48,6 +50,7 @@ namespace Helcim.Implementation.Services
             _repository = repository;
             _clientConfiguration = clientConfiguration;
             _senderService = senderService;
+            _courseService = courseService;
             _studentCourseTransactionService = studentCourseTransactionService;
             _studentCourseEnrollmentService = studentCourseEnrollmentService;
             _coursePaymentService = coursePaymentService;
@@ -59,8 +62,10 @@ namespace Helcim.Implementation.Services
 
             var invoiceNumber = await BuildInvoiceNumber(request).ConfigureAwait(false);
             var amount = Convert.ToDecimal(request.Amount);
+            var terminalId = await ResolveTerminalId(request).ConfigureAwait(false);
+            ValidateTerminalId(terminalId);
 
-            var helcimRequestPayload = BuildInitializePaymentPayload(request, invoiceNumber, amount);
+            var helcimRequestPayload = BuildInitializePaymentPayload(request, invoiceNumber, amount, terminalId);
 
             var payload = new JsonMessageData
             {
@@ -314,6 +319,7 @@ namespace Helcim.Implementation.Services
                 ExternalPaymentId = cardTransaction.TransactionId.ToString(),
                 FamilyId = transaction.FamilyId,
                 IsActive = true,
+                PaymentType = MapPaymentType(cardTransaction.Type),
                 PaymentMode = PaymentMode.Helcim,
                 StudentCourseTransactionId = transaction.StudentCourseTransactionId
             };
@@ -373,6 +379,53 @@ namespace Helcim.Implementation.Services
             return $"INV-{normalizedPaymentCode}-{timestamp}-{latestSequence + 1}";
         }
 
+        private async Task<int?> ResolveTerminalId(InitiatePaymentRequest request)
+        {
+            var transaction = await ResolveTransaction(request).ConfigureAwait(false);
+            if (transaction?.Enrollments == null || transaction.Enrollments.Count == 0)
+            {
+                return null;
+            }
+
+            var courseIds = transaction.Enrollments
+                .Select(enrollment => enrollment.CourseId)
+                .Where(courseId => courseId != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            if (courseIds.Count == 0)
+            {
+                return null;
+            }
+
+            if (courseIds.Count > 1)
+            {
+                throw new InvalidOperationException(
+                    $"Unable to resolve Helcim terminal for transaction {transaction.StudentCourseTransactionId} because it spans multiple courses.");
+            }
+
+            return await _courseService.GetHelcimTerminalId(courseIds[0]).ConfigureAwait(false);
+        }
+
+        private async Task<StudentCourseTransactionResponse?> ResolveTransaction(InitiatePaymentRequest request)
+        {
+            if (!string.IsNullOrWhiteSpace(request.PaymentCode))
+            {
+                var transactionByPaymentCode = await _studentCourseTransactionService
+                    .GetTransactionByPaymentCode(request.PaymentCode)
+                    .ConfigureAwait(false);
+
+                if (transactionByPaymentCode != null)
+                {
+                    return transactionByPaymentCode;
+                }
+            }
+
+            return await _studentCourseTransactionService
+                .GetTransaction(request.TransactionId)
+                .ConfigureAwait(false);
+        }
+
         private static int ParseInvoiceSequence(string? invoiceNumber)
         {
             if (string.IsNullOrWhiteSpace(invoiceNumber))
@@ -394,7 +447,8 @@ namespace Helcim.Implementation.Services
         private static JObject BuildInitializePaymentPayload(
             InitiatePaymentRequest request,
             string invoiceNumber,
-            decimal amount)
+            decimal amount,
+            int? terminalId)
         {
             var lineItem = new JObject
             {
@@ -425,7 +479,20 @@ namespace Helcim.Implementation.Services
                 ["invoiceRequest"] = invoiceRequest
             };
 
+            if (terminalId.HasValue)
+            {
+                payload["terminalId"] = JToken.FromObject(terminalId.Value, HelcimJsonSerializer);
+            }
+
             return payload;
+        }
+
+        private static void ValidateTerminalId(int? terminalId)
+        {
+            if (terminalId is <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(terminalId), "TerminalId must be a positive Helcim terminal identifier.");
+            }
         }
 
         private static void AddStringProperty(JObject target, string propertyName, string? value)
@@ -508,6 +575,11 @@ namespace Helcim.Implementation.Services
 
         private static string BuildHelcimPaymentMarker(int transactionId)
             => $"Helcim payment applied for transactionId: {transactionId}";
+
+        private static PaymentType MapPaymentType(HelcimCardTransactionType cardTransactionType)
+            => cardTransactionType == HelcimCardTransactionType.Refund
+                ? PaymentType.Refund
+                : PaymentType.Credit;
 
         private Task UpdateWebhookProcessing(
             string webhookId,

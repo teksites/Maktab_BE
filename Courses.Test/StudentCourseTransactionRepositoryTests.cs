@@ -27,6 +27,7 @@ public class StudentCourseTransactionRepositoryTests
 
         Assert.NotNull(transaction);
         Assert.Equal(30m, transaction.MinimumPayable);
+        Assert.Equal(12.5d, transaction.Surcharge);
     }
 
     [Fact]
@@ -118,6 +119,7 @@ public class StudentCourseTransactionRepositoryTests
         table.Columns.Add("DayCareFee", typeof(decimal));
         table.Columns.Add("DayCareDiscount", typeof(int));
         table.Columns.Add("FeeAmountDiscount", typeof(int));
+        table.Columns.Add("Surcharge", typeof(double));
         table.Columns.Add("TotalPayable", typeof(decimal));
         table.Columns.Add("TotalAmountPaid", typeof(decimal));
         table.Columns.Add("Comments", typeof(string));
@@ -137,6 +139,7 @@ public class StudentCourseTransactionRepositoryTests
             0m,
             0,
             0,
+            12.5d,
             150m,
             totalAmountPaid,
             "Test transaction",
