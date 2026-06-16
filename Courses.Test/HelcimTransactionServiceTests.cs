@@ -378,6 +378,7 @@ public class HelcimTransactionServiceTests
             PaymentType = HelcimPaymentType.Purchase,
             Amount = 99,
             Currency = HelcimCurrency.Cad,
+            TerminalId = 54181,
             PaymentMethod = HelcimPaymentMethod.CreditCardOrAch,
             InvoiceNumber = "INV-PAY001-202605051210-1",
             InvoiceRequest = new HelcimInvoiceRequest
@@ -403,6 +404,7 @@ public class HelcimTransactionServiceTests
 
         Assert.Null(payload["paymentType"]);
         Assert.Null(payload["currency"]);
+        Assert.Equal(54181, payload["terminalId"]!.Value<int>());
         Assert.Equal("cc-ach", payload["paymentMethod"]!.Value<string>());
         Assert.Equal("INV-PAY001-202605051210-1", payload["invoiceNumber"]!.Value<string>());
         Assert.Null(payload["invoiceRequest"]!["notes"]);

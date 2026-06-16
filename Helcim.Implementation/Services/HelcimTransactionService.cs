@@ -450,38 +450,111 @@ namespace Helcim.Implementation.Services
             decimal amount,
             int? terminalId)
         {
-            var lineItem = new JObject
+            var initializeRequest = new HelcimPayInitializeRequest
             {
-                ["sku"] = JToken.FromObject(request.TransactionId, HelcimJsonSerializer),
-                ["quantity"] = JToken.FromObject(1m, HelcimJsonSerializer),
-                ["price"] = JToken.FromObject(amount, HelcimJsonSerializer),
-                ["total"] = JToken.FromObject(amount, HelcimJsonSerializer)
+                Amount = amount,
+                PaymentType = HelcimPaymentType.Purchase,
+                Currency = HelcimCurrency.Cad,
+                PaymentMethod = HelcimPaymentMethod.CreditCardOrAch,
+                InvoiceRequest = new HelcimInvoiceRequest
+                {
+                    InvoiceNumber = invoiceNumber,
+                    PaymentCode = string.IsNullOrWhiteSpace(request.PaymentCode) ? null : request.PaymentCode,
+                    Type = HelcimInvoiceType.Invoice,
+                    LineItems = new List<HelcimInvoiceLineItemRequest>
+                    {
+                        new()
+                        {
+                            MaktabTransactionId = request.TransactionId,
+                            UserIp = string.IsNullOrWhiteSpace(request.UserIp) ? null : request.UserIp,
+                            Quantity = 1m,
+                            Price = amount,
+                            Total = amount
+                        }
+                    }
+                }
             };
 
-            AddStringProperty(lineItem, "description", request.UserIp);
-
-            var invoiceRequest = new JObject
+            if (terminalId.HasValue)
             {
-                ["type"] = JToken.FromObject(HelcimInvoiceType.Invoice, HelcimJsonSerializer),
-                ["lineItems"] = new JArray(lineItem)
-            };
+                initializeRequest.TerminalId = terminalId.Value;
+            }
 
-            AddStringProperty(invoiceRequest, "invoiceNumber", invoiceNumber);
-            AddStringProperty(invoiceRequest, "notes", request.PaymentCode);
-
+            var serializedRequest = JObject.FromObject(initializeRequest, HelcimJsonSerializer);
             var payload = new JObject
             {
                 ["paymentType"] = JToken.FromObject(HelcimPaymentType.Purchase, HelcimJsonSerializer),
                 ["amount"] = JToken.FromObject(amount, HelcimJsonSerializer),
                 ["currency"] = JToken.FromObject(HelcimCurrency.Cad, HelcimJsonSerializer),
-                ["paymentMethod"] = JToken.FromObject(HelcimPaymentMethod.CreditCardOrAch, HelcimJsonSerializer),//changed on faisal request 15 05 2026
-                ["HelcimDigitalWalletRequest"] = JToken.FromObject(1, HelcimJsonSerializer),
-                ["invoiceRequest"] = invoiceRequest
+                ["paymentMethod"] = JToken.FromObject(HelcimPaymentMethod.CreditCardOrAch, HelcimJsonSerializer),
+                ["HelcimDigitalWalletRequest"] = JToken.FromObject(1, HelcimJsonSerializer)
             };
 
-            if (terminalId.HasValue)
+            if (serializedRequest.TryGetValue("terminalId", out var terminalIdToken))
             {
-                payload["terminalId"] = JToken.FromObject(terminalId.Value, HelcimJsonSerializer);
+                payload["terminalId"] = terminalIdToken;
+            }
+
+            if (serializedRequest.TryGetValue("invoiceRequest", out var invoiceRequestToken)
+                && invoiceRequestToken is JObject serializedInvoiceRequest)
+            {
+                var orderedInvoiceRequest = new JObject();
+
+                if (serializedInvoiceRequest.TryGetValue("type", out var typeToken))
+                {
+                    orderedInvoiceRequest["type"] = typeToken;
+                }
+
+                if (serializedInvoiceRequest.TryGetValue("lineItems", out var lineItemsToken)
+                    && lineItemsToken is JArray serializedLineItems)
+                {
+                    var orderedLineItems = new JArray();
+                    foreach (var lineItemToken in serializedLineItems.OfType<JObject>())
+                    {
+                        var orderedLineItem = new JObject();
+
+                        if (lineItemToken.TryGetValue("sku", out var skuToken))
+                        {
+                            orderedLineItem["sku"] = skuToken;
+                        }
+
+                        if (lineItemToken.TryGetValue("quantity", out var quantityToken))
+                        {
+                            orderedLineItem["quantity"] = quantityToken;
+                        }
+
+                        if (lineItemToken.TryGetValue("price", out var priceToken))
+                        {
+                            orderedLineItem["price"] = priceToken;
+                        }
+
+                        if (lineItemToken.TryGetValue("total", out var totalToken))
+                        {
+                            orderedLineItem["total"] = totalToken;
+                        }
+
+                        if (lineItemToken.TryGetValue("description", out var descriptionToken))
+                        {
+                            orderedLineItem["description"] = descriptionToken;
+                        }
+
+                        orderedLineItems.Add(orderedLineItem);
+                    }
+
+                    orderedInvoiceRequest["lineItems"] = orderedLineItems;
+                }
+
+                if (serializedInvoiceRequest.TryGetValue("invoiceNumber", out var invoiceNumberToken))
+                {
+                    orderedInvoiceRequest["invoiceNumber"] = invoiceNumberToken;
+                }
+
+                if (serializedInvoiceRequest.TryGetValue("notes", out var notesToken))
+                {
+                    orderedInvoiceRequest["notes"] = notesToken;
+                }
+
+                payload["invoiceRequest"] = orderedInvoiceRequest;
             }
 
             return payload;
@@ -492,14 +565,6 @@ namespace Helcim.Implementation.Services
             if (terminalId is <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(terminalId), "TerminalId must be a positive Helcim terminal identifier.");
-            }
-        }
-
-        private static void AddStringProperty(JObject target, string propertyName, string? value)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                target[propertyName] = value;
             }
         }
 

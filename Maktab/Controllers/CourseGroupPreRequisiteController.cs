@@ -29,10 +29,19 @@ public class CourseGroupPreRequisiteController : ControllerBase
     public Task<IEnumerable<CourseGroupPreRequisiteResponse>> GetByCourseGroup(Guid courseGroupId, bool onlyActive = true)
         => _service.GetByCourseGroup(courseGroupId, onlyActive);
 
+    [HttpGet("enrollments/{enrollmentId:guid}")]
+    public Task<IEnumerable<CourseGroupPreRequisiteResponse>> GetByEnrollment(Guid enrollmentId, bool onlyActive = true)
+        => _service.GetByEnrollment(enrollmentId, onlyActive);
+
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
     [HttpPost]
     public Task<CourseGroupPreRequisiteResponse> Add(AddCourseGroupPreRequisite preRequisite)
         => _service.Add(preRequisite);
+
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
+    [HttpPut("{courseGroupPreRequisiteId:guid}")]
+    public Task<bool> Update(Guid courseGroupPreRequisiteId, AddCourseGroupPreRequisite preRequisite)
+        => _service.Update(courseGroupPreRequisiteId, preRequisite);
 
     [ApiAuthorize(false, false, UserRoleType.Admin)]
     [HttpDelete("{courseGroupPreRequisiteId:guid}")]

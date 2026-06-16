@@ -66,4 +66,56 @@ public class CourseGroupPreRequisiteControllerTests
 
         Assert.Equal(expected, result);
     }
+
+    [Fact]
+    public async Task GetByEnrollment_DelegatesToService()
+    {
+        var enrollmentId = Guid.NewGuid();
+        var expected = new[]
+        {
+            new CourseGroupPreRequisiteResponse
+            {
+                CourseGroupPreRequisiteId = Guid.NewGuid(),
+                CourseGroupId = Guid.NewGuid(),
+                PreRequisiteCourseGroupId = Guid.NewGuid(),
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedOn = DateTime.UtcNow
+            }
+        };
+
+        var service = new Mock<ICourseGroupPreRequisiteService>();
+        service
+            .Setup(instance => instance.GetByEnrollment(enrollmentId, false))
+            .ReturnsAsync(expected);
+
+        var controller = new CourseGroupPreRequisiteController(service.Object);
+
+        var result = await controller.GetByEnrollment(enrollmentId, false);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public async Task Update_DelegatesToService()
+    {
+        var prerequisiteId = Guid.NewGuid();
+        var request = new AddCourseGroupPreRequisite
+        {
+            CourseGroupPreRequisiteId = prerequisiteId,
+            CourseGroupId = Guid.NewGuid(),
+            PreRequisiteCourseGroupId = Guid.NewGuid()
+        };
+
+        var service = new Mock<ICourseGroupPreRequisiteService>();
+        service
+            .Setup(instance => instance.Update(prerequisiteId, request))
+            .ReturnsAsync(true);
+
+        var controller = new CourseGroupPreRequisiteController(service.Object);
+
+        var result = await controller.Update(prerequisiteId, request);
+
+        Assert.True(result);
+    }
 }
