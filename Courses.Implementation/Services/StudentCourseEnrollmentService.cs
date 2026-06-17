@@ -148,7 +148,7 @@ namespace Courses.Implementation.Services
                     await _studentCourseTransactionService.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
                     await _repository.DeleteEnrollment(addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
                 }
-                else if (course.IsManualEnrollment)
+                else if (course.IsManualEnrollment && enrollment.ShouldTriggerEmail)
                 {
                     await SendManualEnrollmentAwaitingEmailAsync(
                         addedEnrollment,
@@ -208,7 +208,7 @@ namespace Courses.Implementation.Services
                     var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(addedTransaction.StudentCourseTransactionId,
                               addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
 
-                    if (course.IsManualEnrollment)
+                    if (course.IsManualEnrollment && enrollment.ShouldTriggerEmail)
                     {
                         await SendManualEnrollmentAwaitingEmailAsync(
                             addedEnrollment,
@@ -811,7 +811,8 @@ namespace Courses.Implementation.Services
                 enrollment,
                 ifUpdatedByAdmin,
                 shouldRecalculate: true,
-                shouldSendEmail: true).ConfigureAwait(false);
+                shouldQueueEmailNotification: enrollment.ShouldTriggerEmail,
+                shouldSendEmailImmediately: enrollment.ShouldTriggerEmail).ConfigureAwait(false);
 
             return result.Success;
         }
@@ -837,7 +838,8 @@ namespace Courses.Implementation.Services
                     item.Enrollment,
                     ifUpdatedByAdmin,
                     shouldRecalculate: false,
-                    shouldSendEmail: false).ConfigureAwait(false);
+                    shouldQueueEmailNotification: item.Enrollment.ShouldTriggerEmail,
+                    shouldSendEmailImmediately: false).ConfigureAwait(false);
 
                 if (!updateResult.Success)
                 {
@@ -876,7 +878,8 @@ namespace Courses.Implementation.Services
             AddStudentCourseEnrollment enrollment,
             bool ifUpdatedByAdmin,
             bool shouldRecalculate,
-            bool shouldSendEmail)
+            bool shouldQueueEmailNotification,
+            bool shouldSendEmailImmediately)
         {
             var enrollmentDetails = await _repository.GetEnrollment(enrollmentId).ConfigureAwait(false);
 
@@ -954,12 +957,14 @@ namespace Courses.Implementation.Services
                 FamilyId = enrollmentDetails.FamilyId,
                 CourseId = enrollmentDetails.CourseId,
                 RequiresRecalculation = statusChanged && enrollment.EnrollmentStatus != EnrollmentStatus.Refunded,
-                EmailNotification = CreateEnrollmentEmailNotification(
-                    statusChanged,
-                    enrollment.EnrollmentStatus,
-                    enrollmentDetails,
-                    courseDetails,
-                    enrollmentGroup)
+                EmailNotification = shouldQueueEmailNotification
+                    ? CreateEnrollmentEmailNotification(
+                        statusChanged,
+                        enrollment.EnrollmentStatus,
+                        enrollmentDetails,
+                        courseDetails,
+                        enrollmentGroup)
+                    : null
             };
 
             if (shouldRecalculate && result.RequiresRecalculation)
@@ -967,7 +972,7 @@ namespace Courses.Implementation.Services
                 await RecalculateCourseFee(enrollmentDetails.CourseId, enrollmentDetails.FamilyId).ConfigureAwait(false);
             }
 
-            if (shouldSendEmail && result.EmailNotification != null)
+            if (shouldSendEmailImmediately && result.EmailNotification != null)
             {
                 await SendEnrollmentStatusEmailsAsync(new[] { result.EmailNotification }).ConfigureAwait(false);
             }
