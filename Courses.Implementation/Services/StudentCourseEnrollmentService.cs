@@ -83,6 +83,11 @@ namespace Courses.Implementation.Services
                 occupiedSeatCount < enrollmentGroupState.MaxStudents;
             enrollment.EnrollmentStatus = canRegister ? EnrollmentStatus.Enrolled : EnrollmentStatus.Awaiting;
 
+            if (ifAddedByAdmin)
+            {
+                canRegister = true;
+            }
+
             if (canRegister && enrollmentGroupState.IfRegistrationOpen && occupiedSeatCount + 1 >= enrollmentGroupState.MaxStudents)
             {
                 await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroupState.CourseEnrollmentGroupId, false).ConfigureAwait(false);
