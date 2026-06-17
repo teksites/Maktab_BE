@@ -82,7 +82,7 @@ namespace Courses.Implementation.Services
                 enrollmentGroupState.IfRegistrationOpen &&
                 occupiedSeatCount < enrollmentGroupState.MaxStudents;
             enrollment.EnrollmentStatus = canRegister ? EnrollmentStatus.Enrolled : EnrollmentStatus.Awaiting;
-
+            
             if (ifAddedByAdmin)
             {
                 canRegister = true;
