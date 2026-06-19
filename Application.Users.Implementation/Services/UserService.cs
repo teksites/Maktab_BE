@@ -21,10 +21,11 @@ namespace Application.Users.Implementation
         private readonly IAddressService _addressService;
         private readonly IOtherContactsService _otherContactsService;
         private readonly IUserChildrenService _userChildsService;
+        private readonly IUserChildrenRepository _userChildrenRepository;
         private readonly ISendEmailService _sendEmailService;
 
         public UserService(IConfiguration configuration, IUserRepository repository, ITempUserRepository tempUserRepository, IAddressService addressService, 
-            IOtherContactsService otherContactsService, IUserChildrenService userChildsService, ISendEmailService sendEmailService) 
+            IOtherContactsService otherContactsService, IUserChildrenService userChildsService, IUserChildrenRepository userChildrenRepository, ISendEmailService sendEmailService) 
         {
             _configuration = configuration;
             _repository = repository;
@@ -32,7 +33,8 @@ namespace Application.Users.Implementation
             _addressService = addressService;
             _otherContactsService = otherContactsService;
             _userChildsService = userChildsService;
-           _sendEmailService = sendEmailService;
+            _userChildrenRepository = userChildrenRepository;
+            _sendEmailService = sendEmailService;
         }
 
         public async Task<UserInformationResponse> AddTemporaryUser(AddUserInformation userInformation)
@@ -73,6 +75,12 @@ namespace Application.Users.Implementation
                
                 if (result != null)
                 {
+                    if (!await CreateLinkedChildIfRequired(tempUser).ConfigureAwait(false))
+                    {
+                        await _repository.DeleteUser(result.UserId, true).ConfigureAwait(false);
+                        return false;
+                    }
+
                     return await _tempUserRepository.DeleteTempUser(userVerification.UserId).ConfigureAwait(false);
                 }
                 return false;
@@ -382,6 +390,69 @@ namespace Application.Users.Implementation
         public async Task<Guid> GetUserFamilyInformation(UserFamilyInformationRequest userInformation)
         {
             return await _repository.GetUserFamilyInformation(userInformation).ConfigureAwait(false);
+        }
+
+        private async Task<bool> CreateLinkedChildIfRequired(UserInformation userInformation)
+        {
+            if (!TryMapRelationshipToUserType(userInformation.Relationship, out var userType))
+            {
+                return true;
+            }
+
+            try
+            {
+                var linkedChild = await _userChildrenRepository.AddChild(new Child
+                {
+                    ChildId = userInformation.UserId,
+                    FamilyId = userInformation.FamilyId,
+                    FirstName = userInformation.FirstName,
+                    LastName = userInformation.LastName,
+                    DateOfBirth = GetLinkedUserPlaceholderDate(),
+                    Gender = Gender.Unknown,
+                    RAMQNumber = string.Empty,
+                    RAMQExpiry = GetLinkedUserPlaceholderDate(),
+                    RAMQSequenceNumber = 0,
+                    Allergies = string.Empty,
+                    OtherHealthConditions = string.Empty,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedOn = DateTime.UtcNow,
+                    AcedemicGroup = AcedemicGroupType.None,
+                    HasAllergy = false,
+                    Consent = string.Empty,
+                    UserType = userType
+                }).ConfigureAwait(false);
+
+                return linkedChild != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryMapRelationshipToUserType(Relationship relationship, out UserType userType)
+        {
+            switch (relationship)
+            {
+                case Relationship.Mother:
+                    userType = UserType.Mother;
+                    return true;
+                case Relationship.Father:
+                    userType = UserType.Father;
+                    return true;
+                case Relationship.Guardian:
+                    userType = UserType.Guardian;
+                    return true;
+                default:
+                    userType = UserType.Child;
+                    return false;
+            }
+        }
+
+        private static DateTime GetLinkedUserPlaceholderDate()
+        {
+            return new DateTime(1900, 1, 1);
         }
 
         /*public async Task<MaktabApiResult<UserTransactionsDetails>> CreateUserTransaction(AddUserTransaction addUserTransactions)

@@ -10,6 +10,7 @@ namespace Courses.Services
         Task<CourseResponseDetailed> SetCourseRegistrationStatus(Guid courseId, bool ifRegistrationOpen);
         Task<bool> DeleteCourse(Guid courseId, bool ifHardDelete);
         Task<CourseResponseDetailed> GetCourse(Guid courseId);
+        Task<int?> GetHelcimTerminalId(Guid courseId);
 
         // Use GetCourseOptions which already has IsActive
         Task<IEnumerable<CourseResponseDetailed>> GetAllCourses(GetCourseOptions options);

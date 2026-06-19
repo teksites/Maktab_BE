@@ -13,6 +13,8 @@ namespace Courses.Registry
         {
             services.AddScoped<ICourseEnrollmentGroupService, CourseEnrollmentGroupService>();
             services.AddScoped<ICourseEnrollmentGroupRepository, CourseEnrollmentGroupRepository>();
+            services.AddScoped<ICourseGroupPreRequisiteService, CourseGroupPreRequisiteService>();
+            services.AddScoped<ICourseGroupPreRequisiteRepository, CourseGroupPreRequisiteRepository>();
           
             services.AddScoped<ICoursePaymentService, CoursePaymentService>();
             services.AddScoped<ICoursePaymentRepository, CoursePaymentRepository>();

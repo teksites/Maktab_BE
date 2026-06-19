@@ -1,4 +1,5 @@
-﻿using Courses.Services;
+using Courses.Services;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Requests.Zeffy;
 using MaktabDataContracts.Responses.Zeffy;
@@ -28,7 +29,7 @@ namespace Zeffy.Implementation.Services
             if (zeffy == null || string.IsNullOrWhiteSpace(zeffy.Email))
                 return;
 
-            var paymentCode = GetCustomFieldValue (zeffy.CustomFields, "Payment Code");
+            var paymentCode = GetCustomFieldValue(zeffy.CustomFields, "Payment Code");
 
             if (!string.IsNullOrWhiteSpace(paymentCode))
             {
@@ -43,11 +44,12 @@ namespace Zeffy.Implementation.Services
                     Comments = $"Payment from: {zeffy.Firstname} {zeffy.Lastname}, {zeffy.Email}",
                     FamilyId = transaction.FamilyId,
                     IsActive = true,
-                    PaymentMode = MaktabDataContracts.Enums.PaymentMode.Zeffy,
+                    PaymentType = ResolvePaymentType(zeffy),
+                    PaymentMode = PaymentMode.Zeffy,
                     StudentCourseTransactionId = transaction.StudentCourseTransactionId,
                 };
 
-                var response = await _coursePaymentService.AddPayment(addPayment).ConfigureAwait(false);
+                await _coursePaymentService.AddPayment(addPayment).ConfigureAwait(false);
                 await _repository.Add(MapToAddRequest(zeffy, paymentCode, Guid.NewGuid(), transaction.FamilyId, transaction.StudentCourseTransactionId)).ConfigureAwait(false);
             }
         }
@@ -56,8 +58,6 @@ namespace Zeffy.Implementation.Services
         {
             return _repository.GetAllZeffyDonations();
         }
-
-        // -------- extra methods wired to repo (if you add them to the interface) --------
 
         public Task<IEnumerable<ZeffyResponse>> GetByStudentCourseTransactionId(Guid studentCourseTransactionId)
         {
@@ -138,6 +138,7 @@ namespace Zeffy.Implementation.Services
                 IsActive = true
             };
         }
+
         private static string GetCustomFieldValue(List<CustomField> fields, string question)
         {
             if (fields == null || string.IsNullOrWhiteSpace(question))
@@ -150,5 +151,19 @@ namespace Zeffy.Implementation.Services
             return item?.Answer;
         }
 
+        private static PaymentType ResolvePaymentType(ZeffyRequest zeffy)
+        {
+            if (zeffy == null)
+            {
+                return PaymentType.Credit;
+            }
+
+            if (decimal.TryParse(zeffy.Amount, out var amount) && amount < 0)
+            {
+                return PaymentType.Refund;
+            }
+
+            return PaymentType.Credit;
+        }
     }
 }

@@ -9,18 +9,20 @@ internal sealed class FakeDatabase : IDatabase
 {
     private readonly Func<DbDataReader> _readerFactory;
     private readonly Action<DbCommand>? _onExecute;
+    private readonly int _executeNonQueryResult;
 
-    public FakeDatabase(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute = null)
+    public FakeDatabase(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute = null, int executeNonQueryResult = 0)
     {
         _readerFactory = readerFactory;
         _onExecute = onExecute;
+        _executeNonQueryResult = executeNonQueryResult;
     }
 
     public string ConnectionString => "Fake";
 
     public DbConnection CreateAndOpenConnection()
     {
-        var connection = new FakeDbConnection(_readerFactory, _onExecute);
+        var connection = new FakeDbConnection(_readerFactory, _onExecute, _executeNonQueryResult);
         connection.Open();
         return connection;
     }
@@ -29,7 +31,7 @@ internal sealed class FakeDatabase : IDatabase
         => Task.FromResult<DbConnection>(CreateAndOpenConnection());
 
     public DbCommand CreateCommand()
-        => new FakeDbCommand(_readerFactory, _onExecute);
+        => new FakeDbCommand(_readerFactory, _onExecute, _executeNonQueryResult);
 
     public DbCommand CreateCommand(string cmdText)
     {
@@ -67,12 +69,14 @@ internal sealed class FakeDbConnection : DbConnection
 {
     private readonly Func<DbDataReader> _readerFactory;
     private readonly Action<DbCommand>? _onExecute;
+    private readonly int _executeNonQueryResult;
     private ConnectionState _state;
 
-    public FakeDbConnection(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute)
+    public FakeDbConnection(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute, int executeNonQueryResult)
     {
         _readerFactory = readerFactory;
         _onExecute = onExecute;
+        _executeNonQueryResult = executeNonQueryResult;
     }
 
     public override string? ConnectionString { get; set; } = "Fake";
@@ -110,7 +114,7 @@ internal sealed class FakeDbConnection : DbConnection
 
     protected override DbCommand CreateDbCommand()
     {
-        var command = new FakeDbCommand(_readerFactory, _onExecute)
+        var command = new FakeDbCommand(_readerFactory, _onExecute, _executeNonQueryResult)
         {
             Connection = this
         };
@@ -123,12 +127,14 @@ internal sealed class FakeDbCommand : DbCommand
 {
     private readonly Func<DbDataReader> _readerFactory;
     private readonly Action<DbCommand>? _onExecute;
+    private readonly int _executeNonQueryResult;
     private readonly FakeDbParameterCollection _parameters = new();
 
-    public FakeDbCommand(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute)
+    public FakeDbCommand(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute, int executeNonQueryResult)
     {
         _readerFactory = readerFactory;
         _onExecute = onExecute;
+        _executeNonQueryResult = executeNonQueryResult;
     }
 
     public override string? CommandText { get; set; } = string.Empty;
@@ -151,7 +157,11 @@ internal sealed class FakeDbCommand : DbCommand
     {
     }
 
-    public override int ExecuteNonQuery() => 0;
+    public override int ExecuteNonQuery()
+    {
+        _onExecute?.Invoke(this);
+        return _executeNonQueryResult;
+    }
 
     public override object? ExecuteScalar() => null;
 

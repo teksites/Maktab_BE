@@ -55,6 +55,8 @@ namespace Courses.Implementation.Services
             public string CourseGroupDetailsFr { get; init; } = string.Empty;
         }
 
+        private const string EnrollmentConfirmationSubject = "Confirmation de l'inscription / Confirmation of enrollment";
+
         public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment, bool ifAddedByAdmin = false)
         {
 
@@ -76,10 +78,17 @@ namespace Courses.Implementation.Services
 
             var occupiedSeatCount = GetOccupiedSeatCount(enrollmentGroupState.EnrollmentStatusCount);
 
-            var canRegister = enrollmentGroupState.IfRegistrationOpen && occupiedSeatCount < enrollmentGroupState.MaxStudents;
+            var canRegister = !course.IsManualEnrollment &&
+                enrollmentGroupState.IfRegistrationOpen &&
+                occupiedSeatCount < enrollmentGroupState.MaxStudents;
             enrollment.EnrollmentStatus = canRegister ? EnrollmentStatus.Enrolled : EnrollmentStatus.Awaiting;
+            
+            if (ifAddedByAdmin)
+            {
+                canRegister = true;
+            }
 
-            if (enrollmentGroupState.IfRegistrationOpen && occupiedSeatCount + 1 >= enrollmentGroupState.MaxStudents)
+            if (canRegister && enrollmentGroupState.IfRegistrationOpen && occupiedSeatCount + 1 >= enrollmentGroupState.MaxStudents)
             {
                 await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroupState.CourseEnrollmentGroupId, false).ConfigureAwait(false);
             }
@@ -139,6 +148,13 @@ namespace Courses.Implementation.Services
                     await _studentCourseTransactionService.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
                     await _repository.DeleteEnrollment(addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
                 }
+                else if (course.IsManualEnrollment && enrollment.ShouldTriggerEmail)
+                {
+                    await SendManualEnrollmentAwaitingEmailAsync(
+                        addedEnrollment,
+                        course,
+                        selectedCourseEnrollmentGroup).ConfigureAwait(false);
+                }
 
                 return addedEnrollment;
             }
@@ -169,8 +185,10 @@ namespace Courses.Implementation.Services
                 }
                 addStudentCourseTransaction.FeeAmountDiscount = 0;
                 addStudentCourseTransaction.DayCareDiscount = 0;
+                addStudentCourseTransaction.Surcharge = 0;
                 addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
-                    (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
+                    (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount) +
+                    Convert.ToDecimal(addStudentCourseTransaction.Surcharge);
                 var activePolicies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
                 var activeFeePaymentPolicy = activePolicies.FirstOrDefault(p => p.IsActive && p.PolicyType == PolicyType.CourseFeePayment);
                 var (feePolicy, feePaymentPolicyFound) = ParseValidatedFeePaymentPolicy(activeFeePaymentPolicy?.Details);
@@ -189,6 +207,14 @@ namespace Courses.Implementation.Services
                     var addedTransaction = await _studentCourseTransactionService.AddTransaction(addStudentCourseTransaction).ConfigureAwait(false);
                     var studenEnrollmentTransaction = await _studentCourseTransactionService.AddEnrollmentsToTransaction(addedTransaction.StudentCourseTransactionId,
                               addedEnrollment.StudentCourseEnrollmentId).ConfigureAwait(false);
+
+                    if (course.IsManualEnrollment && enrollment.ShouldTriggerEmail)
+                    {
+                        await SendManualEnrollmentAwaitingEmailAsync(
+                            addedEnrollment,
+                            course,
+                            selectedCourseEnrollmentGroup).ConfigureAwait(false);
+                    }
                 }
                 catch(Exception e)
                 {
@@ -376,14 +402,16 @@ namespace Courses.Implementation.Services
             addStudentCourseTransaction.IsActive = familyTransaction.IsActive;
             addStudentCourseTransaction.FeeAmountDiscount = familyTransaction.FeeAmountDiscount;
             addStudentCourseTransaction.DayCareDiscount = familyTransaction.DayCareDiscount;
+            addStudentCourseTransaction.Surcharge = familyTransaction.Surcharge;
             addStudentCourseTransaction.DayCareFee = dayCareFee;
             addStudentCourseTransaction.PayableFee = courseFee;
             addStudentCourseTransaction.TotalAmountPaid = familyTransaction.TotalAmountPaid;
             var recalculatedTotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
-                (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
-            addStudentCourseTransaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable + (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount);
+                (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount) +
+                Convert.ToDecimal(addStudentCourseTransaction.Surcharge);
+            addStudentCourseTransaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable;
             addStudentCourseTransaction.FeeInstallments = BuildFeeInstallments(
-                recalculatedTotalPayable - course.RegistrationFee,
+                addStudentCourseTransaction.TotalPayable - course.RegistrationFee,
                 course.RegistrationFee,
                 feePaymentPolicyFound,
                 feePolicy,
@@ -744,9 +772,11 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.PayableFee = enrollmentGroup.Fee; // get from course
                 addStudentCourseTransaction.FeeAmountDiscount = 0;
                 addStudentCourseTransaction.DayCareDiscount = 0;
+                addStudentCourseTransaction.Surcharge = 0;
                 addStudentCourseTransaction.DayCareFee = enrollmentGroup.DayCareFee;//add day care fee in course group
                 addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) - 
-                    (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount) ;
+                    (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount) +
+                    Convert.ToDecimal(addStudentCourseTransaction.Surcharge);
                 addStudentCourseTransaction.Comments = $"New Enrollment on {DateTime.UtcNow.ToString()}";
                 addStudentCourseTransaction.IsCompletelyPaid = false;
             }
@@ -758,7 +788,9 @@ namespace Courses.Implementation.Services
                 addStudentCourseTransaction.FeeAmountDiscount += 0;
                 addStudentCourseTransaction.DayCareFee += enrollmentGroup.DayCareFee;
                 addStudentCourseTransaction.DayCareDiscount += 0;//Get discount on fee
-                addStudentCourseTransaction.TotalPayable += (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee);
+                addStudentCourseTransaction.TotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
+                    (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount) +
+                    Convert.ToDecimal(addStudentCourseTransaction.Surcharge);
                 addStudentCourseTransaction.IsCompletelyPaid = false;
             }
 
@@ -779,7 +811,8 @@ namespace Courses.Implementation.Services
                 enrollment,
                 ifUpdatedByAdmin,
                 shouldRecalculate: true,
-                shouldSendEmail: true).ConfigureAwait(false);
+                shouldQueueEmailNotification: enrollment.ShouldTriggerEmail,
+                shouldSendEmailImmediately: enrollment.ShouldTriggerEmail).ConfigureAwait(false);
 
             return result.Success;
         }
@@ -805,7 +838,8 @@ namespace Courses.Implementation.Services
                     item.Enrollment,
                     ifUpdatedByAdmin,
                     shouldRecalculate: false,
-                    shouldSendEmail: false).ConfigureAwait(false);
+                    shouldQueueEmailNotification: item.Enrollment.ShouldTriggerEmail,
+                    shouldSendEmailImmediately: false).ConfigureAwait(false);
 
                 if (!updateResult.Success)
                 {
@@ -844,7 +878,8 @@ namespace Courses.Implementation.Services
             AddStudentCourseEnrollment enrollment,
             bool ifUpdatedByAdmin,
             bool shouldRecalculate,
-            bool shouldSendEmail)
+            bool shouldQueueEmailNotification,
+            bool shouldSendEmailImmediately)
         {
             var enrollmentDetails = await _repository.GetEnrollment(enrollmentId).ConfigureAwait(false);
 
@@ -922,12 +957,14 @@ namespace Courses.Implementation.Services
                 FamilyId = enrollmentDetails.FamilyId,
                 CourseId = enrollmentDetails.CourseId,
                 RequiresRecalculation = statusChanged && enrollment.EnrollmentStatus != EnrollmentStatus.Refunded,
-                EmailNotification = CreateEnrollmentEmailNotification(
-                    statusChanged,
-                    enrollment.EnrollmentStatus,
-                    enrollmentDetails,
-                    courseDetails,
-                    enrollmentGroup)
+                EmailNotification = shouldQueueEmailNotification
+                    ? CreateEnrollmentEmailNotification(
+                        statusChanged,
+                        enrollment.EnrollmentStatus,
+                        enrollmentDetails,
+                        courseDetails,
+                        enrollmentGroup)
+                    : null
             };
 
             if (shouldRecalculate && result.RequiresRecalculation)
@@ -935,7 +972,7 @@ namespace Courses.Implementation.Services
                 await RecalculateCourseFee(enrollmentDetails.CourseId, enrollmentDetails.FamilyId).ConfigureAwait(false);
             }
 
-            if (shouldSendEmail && result.EmailNotification != null)
+            if (shouldSendEmailImmediately && result.EmailNotification != null)
             {
                 await SendEnrollmentStatusEmailsAsync(new[] { result.EmailNotification }).ConfigureAwait(false);
             }
@@ -981,15 +1018,7 @@ namespace Courses.Implementation.Services
                     continue;
                 }
 
-                var familyUsers = await _userService.GetAllFamilyUsersInformation(familyNotifications.Key).ConfigureAwait(false);
-                var targetEmails = familyUsers
-                    .Where(x => x.Relationship == Relationship.Mother ||
-                                x.Relationship == Relationship.Father ||
-                                x.Relationship == Relationship.Guardian)
-                    .Select(x => x.Email)
-                    .Where(emailAddress => !string.IsNullOrWhiteSpace(emailAddress))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                var targetEmails = await GetFamilyNotificationEmailAddressesAsync(familyNotifications.Key).ConfigureAwait(false);
 
                 if (!targetEmails.Any())
                 {
@@ -1003,6 +1032,39 @@ namespace Courses.Implementation.Services
                     Body = email.Value.Body
                 }).ConfigureAwait(false);
             }
+        }
+
+        private async Task SendManualEnrollmentAwaitingEmailAsync(
+            StudentCourseEnrollmentResponse enrollment,
+            CourseResponseDetailed courseDetails,
+            CourseEnrollmentGroupResponse? enrollmentGroup)
+        {
+            var targetEmails = await GetFamilyNotificationEmailAddressesAsync(enrollment.FamilyId).ConfigureAwait(false);
+            if (!targetEmails.Any())
+            {
+                return;
+            }
+
+            var email = BuildManualEnrollmentAwaitingEmail(enrollment, courseDetails, enrollmentGroup);
+            await _sendEmailService.SendBulkEmail(new MultiUserEmailData
+            {
+                To = targetEmails,
+                Subject = email.Subject,
+                Body = email.Body
+            }).ConfigureAwait(false);
+        }
+
+        private async Task<List<string>> GetFamilyNotificationEmailAddressesAsync(Guid familyId)
+        {
+            var familyUsers = await _userService.GetAllFamilyUsersInformation(familyId, true).ConfigureAwait(false);
+            return familyUsers
+                .Where(x => x.Relationship == Relationship.Mother ||
+                            x.Relationship == Relationship.Father ||
+                            x.Relationship == Relationship.Guardian)
+                .Select(x => x.Email)
+                .Where(emailAddress => !string.IsNullOrWhiteSpace(emailAddress))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         private static (string Subject, string Body)? BuildEnrollmentStatusEmail(IReadOnlyList<EnrollmentEmailNotification> notifications)
@@ -1038,7 +1100,7 @@ namespace Courses.Implementation.Services
             return notification.Status switch
             {
                 EnrollmentStatus.Enrolled => (
-                    "Confirmation de l'inscription / Confirmation of enrollment",
+                    EnrollmentConfirmationSubject,
                     $"<p><strong>Chèr parent,</strong></p>" +
                     $"<p>Merci d'avoir inscrit votre enfant au <strong>{notification.CourseNameFr}-</strong><strong>{notification.CourseGroupDetailsFr}</strong>. L'inscription sera complétée seulement après réception du paiement, conformément à la politique du {{school / camp}}. Veuillez vous connecter au portail et payer les frais d'inscription.</p>" +
                     $"<div>&nbsp;</div>" +
@@ -1069,6 +1131,39 @@ namespace Courses.Implementation.Services
                     $"<div><strong>ICC Brossard School Registration Portal</strong></div>"),
                 _ => null
             };
+        }
+
+        private static (string Subject, string Body) BuildManualEnrollmentAwaitingEmail(
+            StudentCourseEnrollmentResponse enrollment,
+            CourseResponseDetailed courseDetails,
+            CourseEnrollmentGroupResponse? enrollmentGroup)
+        {
+            var childName = System.Net.WebUtility.HtmlEncode(enrollment.ChildName ?? string.Empty);
+            var courseName = System.Net.WebUtility.HtmlEncode(courseDetails.Name ?? string.Empty);
+            var courseNameFr = System.Net.WebUtility.HtmlEncode(courseDetails.NameFr ?? string.Empty);
+            var courseGroupDetails = System.Net.WebUtility.HtmlEncode(enrollmentGroup?.Details ?? string.Empty);
+            var courseGroupDetailsFr = System.Net.WebUtility.HtmlEncode(enrollmentGroup?.DetailsFr ?? string.Empty);
+            var formattedCourseName = string.IsNullOrWhiteSpace(courseGroupDetails)
+                ? courseName
+                : $"{courseName} ({courseGroupDetails})";
+            var formattedCourseNameFr = string.IsNullOrWhiteSpace(courseGroupDetailsFr)
+                ? courseNameFr
+                : $"{courseNameFr} ({courseGroupDetailsFr})";
+
+            var body =
+                $"<p>Votre enfant {childName} est inscrit au cours coranique de l'ecole <strong>{formattedCourseNameFr}</strong> et son statut est actuellement <strong>Inscrit</strong> et <strong>En attente</strong>.</p>" +
+                $"<p>Si votre enfant a deja frequente l'ecole, l'administration l'affectera au cours du meme jour que precedemment. Si le paiement complet a ete effectue, son inscription sera confirmee et son statut changera a <strong>Enregistre</strong>. Cela sera fait au cours des prochains jours.</p>" +
+                $"<p>Si vous souhaitez modifier le jour de cours de votre enfant, veuillez envoyer un courriel a l'administration de l'ecole a l'adresse <strong>rattel.ecole@gmail.com</strong>. Sous reserve des places disponibles, l'ecole fera de son mieux pour effectuer ce changement.</p>" +
+                $"<p>S'il s'agit de la premiere inscription de votre enfant a l'ecole, l'administration communiquera avec vous afin de finaliser le processus d'inscription et d'enregistrement.</p>" +
+                $"<div>&nbsp;</div>" +
+                $"<p>Your child {childName} has been enrolled in the <strong>{formattedCourseName}</strong> and is currently in <strong>Enrolled</strong> and <strong>Waiting</strong> status.</p>" +
+                $"<p>If your child has previously attended the school, the administration will assign your child to the class on the same day as before. If full payment has been made, your child's registration will then be confirmed and the status will change to <strong>Registered</strong>. This will be done within the next few days.</p>" +
+                $"<p>If you would like to change your child's class day, please email the school administration at <strong>rattel.ecole@gmail.com</strong>. Subject to availability, the school will do its best to make the change.</p>" +
+                $"<p>If this is your child's first time enrolling at the school, the administration will contact you to finalize the enrollment and registration process.</p>" +
+                $"<div>&nbsp;</div>" +
+                $"<div><strong>ICC Brossard School Registration Portal</strong></div>";
+
+            return (EnrollmentConfirmationSubject, body);
         }
 
         private static string BuildFrenchEnrollmentStatusListItem(EnrollmentEmailNotification notification)

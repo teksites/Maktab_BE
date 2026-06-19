@@ -5,6 +5,7 @@ using Users.Repository;
 using Users.Services;
 using MaktabDataContracts.Responses.Children;
 using MaktabDataContracts.Requests.Children;
+using MaktabDataContracts.Enums;
 
 namespace Application.Users.Implementation
 {
@@ -80,10 +81,17 @@ namespace Application.Users.Implementation
             return MapToChildResponse(await _repository.GetChild(childId).ConfigureAwait(false));
         }
 
-        public async Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid userId)
+        public async Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid userId, bool fetchAdults = false)
         {
-            return (await _repository.GetFamilyChildren(userId).ConfigureAwait(false)).
-                Select(MapToChildResponse).ToList();
+            var children = await _repository.GetFamilyChildren(userId).ConfigureAwait(false);
+            if (!fetchAdults)
+            {
+                children = children
+                    .Where(child => child.UserType == UserType.Child)
+                    .ToList();
+            }
+
+            return children.Select(MapToChildResponse).ToList();
         }
 
         public async Task<MaktabApiResult<ChildResponse>> UpdateChild(UpdateChildRequest child)
@@ -115,6 +123,7 @@ namespace Application.Users.Implementation
                 IsActive = true,
                 AcedemicGroup = child.AcedemicGroup,
                 Consent = GetConsent(child),
+                UserType = GetUserType(child),
             };
         }
 
@@ -157,6 +166,12 @@ namespace Application.Users.Implementation
                 consentProperty.SetValue(response, child.Consent);
             }
 
+            var userTypeProperty = typeof(ChildResponse).GetProperty("UserType");
+            if (userTypeProperty?.CanWrite == true)
+            {
+                userTypeProperty.SetValue(response, child.UserType);
+            }
+
             return new MaktabApiResult<ChildResponse>
             {
                 Result = response,
@@ -169,6 +184,11 @@ namespace Application.Users.Implementation
             var consentProperty = child.GetType().GetProperty("Consent");
             var consentValue = consentProperty?.GetValue(child) as string;
             return consentValue ?? string.Empty;
+        }
+
+        private static UserType GetUserType(AddChildRequest child)
+        {
+            return child.UserType == default ? UserType.Child : child.UserType;
         }
     }
 }

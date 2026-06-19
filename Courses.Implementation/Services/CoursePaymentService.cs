@@ -23,6 +23,7 @@ namespace Courses.Services.Implementation
 
         public async Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment)
         {
+            NormalizePayment(payment);
             var transaction = await _studentCourseTransactionService.GetTransaction(payment.StudentCourseTransactionId).ConfigureAwait(false);
             
             if (transaction == null)
@@ -36,6 +37,7 @@ namespace Courses.Services.Implementation
 
         public async Task<(CoursePaymentResponse Payment, bool Created)> TryAddPayment(AddCoursePayment payment)
         {
+            NormalizePayment(payment);
             var transaction = await _studentCourseTransactionService.GetTransaction(payment.StudentCourseTransactionId).ConfigureAwait(false);
 
             if (transaction == null)
@@ -49,38 +51,14 @@ namespace Courses.Services.Implementation
                 return result;
             }
 
-            var allPayments = await _repository.GetAllPayments(payment.StudentCourseTransactionId).ConfigureAwait(false);
-            decimal totalPaid = allPayments.Sum(p => p.AmountPaid);
-
-            //update the transaction for the paid amount
-
-            //transaction.TotalAmountPaid = totalPaid;
-            AddStudentCourseTransaction updatedTransaction = new AddStudentCourseTransaction
-            {
-                FamilyId = transaction.FamilyId,
-                FeeAmountDiscount = transaction.FeeAmountDiscount,
-                StudentCourseTransactionId = transaction.StudentCourseTransactionId,
-                Comments = transaction.Comments + $"\n added payment: {payment.AmountPaid} via payment mode: {payment.PaymentMode.ToString()} on date: {DateTime.UtcNow}",
-                DayCareDiscount = transaction.DayCareDiscount,
-                DayCareFee = transaction.DayCareFee,
-                TotalAmountPaid = totalPaid,
-                PayableFee = transaction.PayableFee,
-                TotalPayable = transaction.TotalPayable,
-                PaymentCode = transaction.PaymentCode,
-                StudentCourseEnrollmentIds = new List<Guid>(),
-                FeeInstallments = transaction.FeeInstallments,
-                TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.PartiallyPaid,
-                RegistrationStatus = transaction.RegistrationStatus,
-                IsActive = transaction.IsActive,
-            };
-            
-            updatedTransaction.IsCompletelyPaid = updatedTransaction.TotalPayable <= updatedTransaction.TotalAmountPaid;
-            if (updatedTransaction.IsCompletelyPaid)
-            {
-                updatedTransaction.TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.FullyPaid;
-            }
-
-            await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, updatedTransaction).ConfigureAwait(false);
+            var allPayments = (await _repository.GetAllPayments(payment.StudentCourseTransactionId).ConfigureAwait(false)).ToList();
+            await _studentCourseTransactionService.UpdateTransaction(
+                transaction.StudentCourseTransactionId,
+                BuildUpdatedTransaction(
+                    transaction,
+                    allPayments,
+                    transaction.Comments + $"\n added payment: {payment.AmountPaid} via payment mode: {payment.PaymentMode.ToString()} on date: {DateTime.UtcNow}"))
+                .ConfigureAwait(false);
             await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
 
             return result;
@@ -94,6 +72,7 @@ namespace Courses.Services.Implementation
 
         public async Task<bool> UpdatePayment(Guid paymentId, AddCoursePayment payment)
         {
+            NormalizePayment(payment);
             var transaction = await _studentCourseTransactionService.GetTransaction(payment.StudentCourseTransactionId).ConfigureAwait(false);
 
             if (transaction == null)
@@ -103,39 +82,14 @@ namespace Courses.Services.Implementation
 
             var paymentResponse = await _repository.UpdatePayment(paymentId, payment).ConfigureAwait(false); 
 
-            var allPayments = await _repository.GetAllPayments(payment.StudentCourseTransactionId).ConfigureAwait(false);
-            decimal totalPaid = allPayments.Sum(p => p.AmountPaid);
-
-            //update the transaction for the paid amount
-
-            transaction.TotalAmountPaid += payment.AmountPaid;
-
-            AddStudentCourseTransaction updatedTransaction = new AddStudentCourseTransaction
-            {
-                FamilyId = transaction.FamilyId,
-                FeeAmountDiscount = transaction.FeeAmountDiscount,
-                StudentCourseTransactionId = transaction.StudentCourseTransactionId,
-                Comments = transaction.Comments + $"\n added payment: {payment.AmountPaid} via payment mode: {payment.PaymentMode.ToString()}",
-                DayCareDiscount = transaction.DayCareDiscount,
-                DayCareFee = transaction.DayCareFee,
-                TotalAmountPaid = totalPaid,
-                PayableFee = transaction.PayableFee,
-                TotalPayable = transaction.TotalPayable,
-                PaymentCode = transaction.PaymentCode,
-                StudentCourseEnrollmentIds = new List<Guid>(),
-                FeeInstallments = transaction.FeeInstallments,
-                TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.PartiallyPaid,
-                RegistrationStatus = transaction.RegistrationStatus,
-                IsActive = transaction.IsActive,
-            };
-
-            updatedTransaction.IsCompletelyPaid = updatedTransaction.TotalPayable <= updatedTransaction.TotalAmountPaid;
-            if (updatedTransaction.IsCompletelyPaid)
-            {
-                updatedTransaction.TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.FullyPaid;
-            }
-
-            await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, updatedTransaction).ConfigureAwait(false);
+            var allPayments = (await _repository.GetAllPayments(payment.StudentCourseTransactionId).ConfigureAwait(false)).ToList();
+            await _studentCourseTransactionService.UpdateTransaction(
+                transaction.StudentCourseTransactionId,
+                BuildUpdatedTransaction(
+                    transaction,
+                    allPayments,
+                    transaction.Comments + $"\n added payment: {payment.AmountPaid} via payment mode: {payment.PaymentMode.ToString()}"))
+                .ConfigureAwait(false);
             await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
 
             return paymentResponse;
@@ -159,35 +113,14 @@ namespace Courses.Services.Implementation
 
             var paymentResponse = await _repository.DeletePayment(paymentId, hardDelete).ConfigureAwait(false);
 
-            var allPayments = await _repository.GetAllPayments(paymentDetails.StudentCourseTransactionId).ConfigureAwait(false);
-            decimal totalPaid = allPayments.Sum(p => p.AmountPaid);
-
-            AddStudentCourseTransaction updatedTransaction = new AddStudentCourseTransaction
-            {
-                FamilyId = transaction.FamilyId,
-                FeeAmountDiscount = transaction.FeeAmountDiscount,
-                StudentCourseTransactionId = transaction.StudentCourseTransactionId,
-                Comments = transaction.Comments + $"\n Removed payment: {paymentId.ToString()}",
-                DayCareDiscount = transaction.DayCareDiscount,
-                DayCareFee = transaction.DayCareFee,
-                TotalAmountPaid = totalPaid,
-                PayableFee = transaction.PayableFee,
-                TotalPayable = transaction.TotalPayable,
-                PaymentCode = transaction.PaymentCode,
-                StudentCourseEnrollmentIds = new List<Guid>(),
-                FeeInstallments = transaction.FeeInstallments,
-                TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.PartiallyPaid,
-                RegistrationStatus = transaction.RegistrationStatus, 
-                IsActive = transaction.IsActive,
-            };
-
-            updatedTransaction.IsCompletelyPaid = updatedTransaction.TotalPayable <= updatedTransaction.TotalAmountPaid;
-            if (updatedTransaction.IsCompletelyPaid)
-            {
-                updatedTransaction.TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.FullyPaid;
-            }
-
-            await _studentCourseTransactionService.UpdateTransaction(transaction.StudentCourseTransactionId, updatedTransaction).ConfigureAwait(false);
+            var allPayments = (await _repository.GetAllPayments(paymentDetails.StudentCourseTransactionId).ConfigureAwait(false)).ToList();
+            await _studentCourseTransactionService.UpdateTransaction(
+                transaction.StudentCourseTransactionId,
+                BuildUpdatedTransaction(
+                    transaction,
+                    allPayments,
+                    transaction.Comments + $"\n Removed payment: {paymentId.ToString()}"))
+                .ConfigureAwait(false);
             await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
 
             return paymentResponse;
@@ -210,6 +143,61 @@ namespace Courses.Services.Implementation
             await _studentCourseEnrollmentService
                 .RecalculateCourseFee(courseId, transaction.FamilyId)
                 .ConfigureAwait(false);
+        }
+
+        private static void NormalizePayment(AddCoursePayment payment)
+        {
+            ArgumentNullException.ThrowIfNull(payment);
+
+            if (!Enum.IsDefined(typeof(MaktabDataContracts.Enums.PaymentType), payment.PaymentType))
+            {
+                payment.PaymentType = MaktabDataContracts.Enums.PaymentType.Credit;
+            }
+        }
+
+        private static AddStudentCourseTransaction BuildUpdatedTransaction(
+            StudentCourseTransactionResponse transaction,
+            IReadOnlyCollection<CoursePaymentResponse> currentPayments,
+            string comments)
+        {
+            var updatedTransaction = new AddStudentCourseTransaction
+            {
+                FamilyId = transaction.FamilyId,
+                FeeAmountDiscount = transaction.FeeAmountDiscount,
+                StudentCourseTransactionId = transaction.StudentCourseTransactionId,
+                Comments = comments,
+                DayCareDiscount = transaction.DayCareDiscount,
+                DayCareFee = transaction.DayCareFee,
+                TotalAmountPaid = CalculateTotalAmountPaid(currentPayments),
+                PayableFee = transaction.PayableFee,
+                TotalPayable = transaction.TotalPayable,
+                PaymentCode = transaction.PaymentCode,
+                StudentCourseEnrollmentIds = new List<Guid>(),
+                FeeInstallments = transaction.FeeInstallments,
+                TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.PartiallyPaid,
+                RegistrationStatus = transaction.RegistrationStatus,
+                IsActive = transaction.IsActive,
+                Surcharge = transaction.Surcharge,
+            };
+
+            updatedTransaction.IsCompletelyPaid = updatedTransaction.TotalPayable <= updatedTransaction.TotalAmountPaid;
+            if (updatedTransaction.IsCompletelyPaid)
+            {
+                updatedTransaction.TransactionStatus = MaktabDataContracts.Enums.TransactionStatus.FullyPaid;
+            }
+
+            return updatedTransaction;
+        }
+
+        private static decimal CalculateTotalAmountPaid(IEnumerable<CoursePaymentResponse> payments)
+        {
+            return payments.Sum(payment => payment.PaymentType switch
+            {
+                MaktabDataContracts.Enums.PaymentType.Refund => -payment.AmountPaid,
+                MaktabDataContracts.Enums.PaymentType.Debit => -payment.AmountPaid,
+                MaktabDataContracts.Enums.PaymentType.Surcharge => 0m,
+                _ => payment.AmountPaid
+            });
         }
     }
 }

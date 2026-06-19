@@ -14,6 +14,7 @@ namespace Courses.Repository
         /// Retrieves a course by its ID. Returns null if not found.
         /// </summary>
         Task<CourseResponseDetailed?> GetCourse(Guid courseId);
+        Task<int?> GetHelcimTerminalId(Guid courseId);
 
         /// <summary>
         /// Retrieves all courses with filtering options.
