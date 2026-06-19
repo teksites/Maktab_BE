@@ -43,9 +43,9 @@ namespace Maktab.Controllers
         [Authorize]
         [HttpGet("families/{familyId:guid}/children")]
         [EnableCors("corspolicy")]
-        public async Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid familyId)
+        public async Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid familyId, bool fetchAdults = false)
         {
-            return await _childrenService.GetUserChilds(familyId).ConfigureAwait(false);
+            return await _childrenService.GetUserChilds(familyId, fetchAdults).ConfigureAwait(false);
         }
 
         [Authorize]

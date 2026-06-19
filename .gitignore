@@ -211,3 +211,7 @@
 /.tmp-host7-out.log
 /.tmp-host8-err.log
 /.tmp-host8-out.log
+/.tmp-cloudflared-new-err.log
+/.tmp-cloudflared-new-out.log
+/.tmp-host-fetchAdults-err.log
+/.tmp-host-fetchAdults-out.log

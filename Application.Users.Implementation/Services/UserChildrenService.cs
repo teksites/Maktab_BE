@@ -81,10 +81,17 @@ namespace Application.Users.Implementation
             return MapToChildResponse(await _repository.GetChild(childId).ConfigureAwait(false));
         }
 
-        public async Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid userId)
+        public async Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid userId, bool fetchAdults = false)
         {
-            return (await _repository.GetFamilyChildren(userId).ConfigureAwait(false)).
-                Select(MapToChildResponse).ToList();
+            var children = await _repository.GetFamilyChildren(userId).ConfigureAwait(false);
+            if (!fetchAdults)
+            {
+                children = children
+                    .Where(child => child.UserType == UserType.Child)
+                    .ToList();
+            }
+
+            return children.Select(MapToChildResponse).ToList();
         }
 
         public async Task<MaktabApiResult<ChildResponse>> UpdateChild(UpdateChildRequest child)
