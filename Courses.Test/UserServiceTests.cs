@@ -4,8 +4,11 @@ using Email;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using MaktabDataContracts.Enums;
+using MaktabDataContracts.Requests.Users;
+using Users.Contracts;
 using Users.Repository;
 using Users.Services;
+using Users.Utils.Implementation;
 
 namespace Courses.Test;
 
@@ -189,10 +192,244 @@ public class UserServiceTests
         tempUserRepository.Verify(repo => repo.DeleteTempUser(It.IsAny<Guid>()), Times.Never);
     }
 
+    [Fact]
+    public async Task ForgotPassword_SetsTemporaryPasswordFlagAndSendsEmail()
+    {
+        var userId = Guid.NewGuid();
+        var user = new UserInformation
+        {
+            UserId = userId,
+            FirstName = "Test",
+            LastName = "User",
+            Email = "test@example.com",
+            UserName = "test-user",
+            Phone = "1234567890",
+            IsActive = true
+        };
+
+        UpdateUserPassword? capturedPasswordUpdate = null;
+        bool? capturedTempPasswordFlag = null;
+        EmailData? capturedEmail = null;
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetUserInformation(user.UserName, null, true))
+            .ReturnsAsync(user);
+        userRepository
+            .Setup(repo => repo.UpdateUser(It.IsAny<UpdateUserPassword>(), It.IsAny<bool>()))
+            .Callback<UpdateUserPassword, bool>((request, flag) =>
+            {
+                capturedPasswordUpdate = request;
+                capturedTempPasswordFlag = flag;
+            })
+            .ReturnsAsync(user);
+
+        var sendEmailService = new Mock<ISendEmailService>();
+        sendEmailService
+            .Setup(service => service.SendEmail(It.IsAny<EmailData>()))
+            .Callback<EmailData>(email => capturedEmail = email)
+            .ReturnsAsync(true);
+
+        var service = CreateUserService(
+            userRepository: userRepository,
+            sendEmailService: sendEmailService);
+
+        var result = await service.ForgotPassword(user.UserName, null);
+
+        Assert.True(result);
+        Assert.NotNull(capturedPasswordUpdate);
+        Assert.Equal(userId, capturedPasswordUpdate!.UserId);
+        Assert.Equal(string.Empty, capturedPasswordUpdate.OldPassword);
+        Assert.False(string.IsNullOrWhiteSpace(capturedPasswordUpdate.NewPassword));
+        Assert.True(capturedTempPasswordFlag);
+        Assert.NotNull(capturedEmail);
+        Assert.Equal(user.Email, capturedEmail!.To);
+        Assert.Contains(capturedPasswordUpdate.NewPassword, capturedEmail.Body);
+    }
+
+    [Fact]
+    public async Task ResetUserPassword_WithMatchingOldPassword_ClearsTemporaryPasswordFlag()
+    {
+        var userId = Guid.NewGuid();
+        const string tempPassword = "TempPassword123";
+        const string newPassword = "NewPassword456";
+
+        UpdateUserPassword? capturedPasswordUpdate = null;
+        bool? capturedTempPasswordFlag = null;
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetUserInformation(userId))
+            .ReturnsAsync(new UserInformation
+            {
+                UserId = userId,
+                Password = PasswordHelper.HashPassword(tempPassword),
+                IsTempPassword = true,
+                IsActive = true
+            });
+        userRepository
+            .Setup(repo => repo.UpdateUser(It.IsAny<UpdateUserPassword>(), It.IsAny<bool>()))
+            .Callback<UpdateUserPassword, bool>((request, flag) =>
+            {
+                capturedPasswordUpdate = request;
+                capturedTempPasswordFlag = flag;
+            })
+            .ReturnsAsync(new UserInformation
+            {
+                UserId = userId,
+                Password = PasswordHelper.HashPassword(newPassword),
+                IsTempPassword = false,
+                IsActive = true
+            });
+
+        var service = CreateUserService(userRepository: userRepository);
+
+        var result = await service.ResetUserPassword(new UpdateUserPassword
+        {
+            UserId = userId,
+            OldPassword = tempPassword,
+            NewPassword = newPassword
+        });
+
+        Assert.True(result);
+        Assert.NotNull(capturedPasswordUpdate);
+        Assert.Equal(userId, capturedPasswordUpdate!.UserId);
+        Assert.Equal(tempPassword, capturedPasswordUpdate.OldPassword);
+        Assert.Equal(newPassword, capturedPasswordUpdate.NewPassword);
+        Assert.False(capturedTempPasswordFlag);
+    }
+
+    [Fact]
+    public async Task ResetUserPassword_WithWrongOldPassword_DoesNotUpdatePassword()
+    {
+        var userId = Guid.NewGuid();
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetUserInformation(userId))
+            .ReturnsAsync(new UserInformation
+            {
+                UserId = userId,
+                Password = PasswordHelper.HashPassword("ExpectedTempPassword"),
+                IsTempPassword = true,
+                IsActive = true
+            });
+
+        var service = CreateUserService(userRepository: userRepository);
+
+        var result = await service.ResetUserPassword(new UpdateUserPassword
+        {
+            UserId = userId,
+            OldPassword = "WrongPassword",
+            NewPassword = "NewPassword456"
+        });
+
+        Assert.False(result);
+        userRepository.Verify(repo => repo.UpdateUser(It.IsAny<UpdateUserPassword>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AddTemporaryUser_SendsBilingualActivationEmail()
+    {
+        var addUser = new AddUserInformation
+        {
+            UserName = "test-user",
+            Email = "test@example.com",
+            Phone = "1234567890",
+            FirstName = "Test",
+            LastName = "User",
+            Password = "Password123",
+            Relationship = Relationship.Mother,
+            UserRoles = new List<string> { UserRoleType.Normal.ToString() }
+        };
+
+        EmailData? capturedEmail = null;
+        var tempUserRepository = new Mock<ITempUserRepository>();
+        tempUserRepository
+            .Setup(repo => repo.AddTemporaryUser(It.IsAny<UserRegistrationInformation>()))
+            .ReturnsAsync((UserRegistrationInformation request) => new UserInformation
+            {
+                UserId = request.UserId,
+                FamilyId = request.FamilyId,
+                UserName = request.UserName,
+                Email = request.Email,
+                Phone = request.Phone,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Password = request.Password,
+                IsActive = true,
+                Relationship = request.Relationship,
+                UserRole = request.UserRole
+            });
+
+        var sendEmailService = new Mock<ISendEmailService>();
+        sendEmailService
+            .Setup(service => service.SendEmail(It.IsAny<EmailData>()))
+            .Callback<EmailData>(email => capturedEmail = email)
+            .ReturnsAsync(true);
+
+        var service = CreateUserService(
+            tempUserRepository: tempUserRepository,
+            sendEmailService: sendEmailService);
+
+        var result = await service.AddTemporaryUser(addUser);
+
+        Assert.NotNull(result);
+        Assert.NotNull(capturedEmail);
+        Assert.Equal(addUser.Email, capturedEmail!.To);
+        Assert.Equal("ICC Maktab account registration activation code - code d’activation d’inscription ICC Maktab", capturedEmail.Subject);
+        Assert.Contains("Greetings Test User", capturedEmail.Body);
+        Assert.Contains("Activation code for the registration of your ICC Brossard Schools and Activities portal account (Maktab).", capturedEmail.Body);
+        Assert.Contains("Bonjour Test User", capturedEmail.Body);
+        Assert.Contains("Code d'activation pour l'inscription a votre compte sur le portail des ecoles et activites ICC Brossard (Maktab).", capturedEmail.Body);
+    }
+
+    [Fact]
+    public async Task SendActivationCode_SendsBilingualActivationEmail()
+    {
+        var userId = Guid.NewGuid();
+        EmailData? capturedEmail = null;
+
+        var tempUserRepository = new Mock<ITempUserRepository>();
+        tempUserRepository
+            .Setup(repo => repo.UpdateRegistrationActivationCodes(It.IsAny<UpdateUserRegistrationInformation>()))
+            .ReturnsAsync((UpdateUserRegistrationInformation request) => new UserInformation
+            {
+                UserId = request.UserId,
+                FirstName = "Test",
+                LastName = "User",
+                Email = "test@example.com",
+                UserName = "test-user",
+                Phone = "1234567890",
+                IsActive = true
+            });
+
+        var sendEmailService = new Mock<ISendEmailService>();
+        sendEmailService
+            .Setup(service => service.SendEmail(It.IsAny<EmailData>()))
+            .Callback<EmailData>(email => capturedEmail = email)
+            .ReturnsAsync(true);
+
+        var service = CreateUserService(
+            tempUserRepository: tempUserRepository,
+            sendEmailService: sendEmailService);
+
+        var result = await service.SendActivationCode(userId);
+
+        Assert.True(result);
+        Assert.NotNull(capturedEmail);
+        Assert.Equal("test@example.com", capturedEmail!.To);
+        Assert.Equal("ICC Maktab account registration activation code - code d’activation d’inscription ICC Maktab", capturedEmail.Subject);
+        Assert.Contains("Greetings Test User", capturedEmail.Body);
+        Assert.Contains("Bonjour Test User", capturedEmail.Body);
+        Assert.Contains("Veuillez saisir ce code pour activer votre compte sur le portail des ecoles et activites ICC Brossard.", capturedEmail.Body);
+    }
+
     private static UserService CreateUserService(
         Mock<IUserRepository>? userRepository = null,
         Mock<ITempUserRepository>? tempUserRepository = null,
-        Mock<IUserChildrenRepository>? userChildrenRepository = null)
+        Mock<IUserChildrenRepository>? userChildrenRepository = null,
+        Mock<ISendEmailService>? sendEmailService = null)
     {
         return new UserService(
             Mock.Of<IConfiguration>(),
@@ -202,6 +439,6 @@ public class UserServiceTests
             new Mock<IOtherContactsService>().Object,
             new Mock<IUserChildrenService>().Object,
             (userChildrenRepository ?? new Mock<IUserChildrenRepository>()).Object,
-            new Mock<ISendEmailService>().Object);
+            (sendEmailService ?? new Mock<ISendEmailService>()).Object);
     }
 }
