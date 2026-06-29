@@ -117,6 +117,7 @@ namespace Courses.Implementation.Services
                     PolicyHyperLink = course.PolicyHyperLink,
                     IsCourseCompleted = course.IsCourseCompleted,
                     IsCourseHasPrequisite = course.IsCourseHasPrequisite,
+                    IsCourseAnEvent = course.IsCourseAnEvent,
                     IsRegistrationOpened = ifRegistrationOpen,
                     IsManualEnrollment = course.IsManualEnrollment,
                     OfferDaycare = course.OfferDaycare,

@@ -15,6 +15,7 @@ namespace Application.Users.Implementation
 {
     public class UserService : IUserService
     {
+        private const string ActivationCodeEmailSubject = "ICC Maktab account registration activation code - code d’activation d’inscription ICC Maktab";
         private readonly IConfiguration _configuration;
         private readonly IUserRepository _repository;
         private readonly ITempUserRepository _tempUserRepository;
@@ -45,15 +46,11 @@ namespace Application.Users.Implementation
             var success = _sendEmailService.SendEmail(new EmailData
             {
                 To = userInformation.Email,
-                 Subject = "ICC Brossard School Registration registration account activation code",
-                 Body = $"<p><strong>Greetings {userInformation.FirstName} {userInformation.LastName}</strong>,</p>"+
-                       "<p>Activation code for the regisration of your ICC Brossard School account portal.</p>"+
-                       $"<div>Your activation code is : <strong>{ userInforationToStore.EmailVerificationCode} </strong>.</div>" +
-                       "<div></div>" +
-                       "<div>Please activate your account by entering the code inside your ICC Brossard School account portal.</div>" +
-                       "<div>&nbsp;</div>" +
-                       "<div>&nbsp;</div>" +
-                       "<div><strong>ICC Brossard School Registration Portal</strong></div>"
+                 Subject = ActivationCodeEmailSubject,
+                 Body = BuildActivationCodeEmailBody(
+                     userInformation.FirstName,
+                     userInformation.LastName,
+                     userInforationToStore.EmailVerificationCode)
             });
 
             return MapToUserInformationResponse(tempuser, true); 
@@ -189,15 +186,11 @@ namespace Application.Users.Implementation
                 {
                     To = user.Email,
 
-                    Subject = "ICC Brossard School Registration registration account activation code",
-                    Body = $"<p><strong>Greetings {user.FirstName} {user.LastName}</strong>,</p>" +
-                       "<p>Activation code for the regisration of your ICC Brossard School account portal.</p>" +
-                       $"<div>Your activation code is : <strong>{updateData.EmailVerificationCode} </strong>.</div>" +
-                       "<div></div>" +
-                       "<div>Please activate your account by entering the code inside your ICC Brossard School account portal.</div>" +
-                       "<div>&nbsp;</div>" +
-                       "<div>&nbsp;</div>" +
-                       "<div><strong>ICC Brossard School Registration Portal</strong></div>"
+                    Subject = ActivationCodeEmailSubject,
+                    Body = BuildActivationCodeEmailBody(
+                        user.FirstName,
+                        user.LastName,
+                        updateData.EmailVerificationCode)
                 }).ConfigureAwait(false);
                 
             }
@@ -247,6 +240,28 @@ namespace Application.Users.Implementation
                 res.Append(valid[rnd.Next(valid.Length)]);
             }
             return res.ToString();
+        }
+
+        private static string BuildActivationCodeEmailBody(string firstName, string lastName, string activationCode)
+        {
+            return $"<p><strong>Greetings {firstName} {lastName}</strong>,</p>" +
+                   "<p>Activation code for the registration of your ICC Brossard Schools and Activities portal account (Maktab).</p>" +
+                   $"<div>Your activation code is : <strong>{activationCode}</strong>.</div>" +
+                   "<div></div>" +
+                   "<div>Please activate your account by entering this code inside your ICC Brossard Schools and Activities portal.</div>" +
+                   "<div>&nbsp;</div>" +
+                   "<div>&nbsp;</div>" +
+                   "<div><strong>ICC Brossard Schools and Activities Registration Portal (Maktab)</strong></div>" +
+                   "<div>&nbsp;</div>" +
+                   "<hr />" +
+                   $"<p><strong>Bonjour {firstName} {lastName},</strong></p>" +
+                   "<p>Code d'activation pour l'inscription a votre compte sur le portail des ecoles et activites ICC Brossard (Maktab).</p>" +
+                   $"<div>Votre code d'activation est : <strong>{activationCode}</strong>.</div>" +
+                   "<div></div>" +
+                   "<div>Veuillez saisir ce code pour activer votre compte sur le portail des ecoles et activites ICC Brossard.</div>" +
+                   "<div>&nbsp;</div>" +
+                   "<div>&nbsp;</div>" +
+                   "<div><strong>Portail d'inscription des ecoles et activites ICC Brossard (Maktab)</strong></div>";
         }
 
         private UserInformation MapToUserInformation(AddUserInformation addUserInformation)

@@ -33,14 +33,14 @@ namespace Courses.Repository.Implementation
                  CreatedAt, UpdatedOn, CanSelectMultipleEnrollmentGroups,
                  PolicyHyperLink, IsCourseCompleted, IsRegistrationOpened,
                  RegistrationStartDate, RegistrationEndDate, CourseSession, RegistrationFee, OfferDaycare,
-                 IsManualEnrollment, IsCourseHasPrequisite)
+                 IsManualEnrollment, IsCourseHasPrequisite, IsCourseAnEvent)
                 VALUES
                 (@CourseId, @InstituteId, @Name, @NameFr, @Description, @DescriptionFr,
                  @Details, @DetailsFr, @StartDate, @EndDate, @IsActive,
                  @CreatedAt, @UpdatedOn, @CanSelectMultipleEnrollmentGroups,
                  @PolicyHyperLink, @IsCourseCompleted, @IsRegistrationOpened,
                  @RegistrationStartDate, @RegistrationEndDate, @CourseSession, @RegistrationFee,@OfferDaycare,
-                 @IsManualEnrollment, @IsCourseHasPrequisite)";
+                 @IsManualEnrollment, @IsCourseHasPrequisite, @IsCourseAnEvent)";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
             cmd.AddParameter("@InstituteId", course.InstituteId.ToByteArray());
@@ -62,6 +62,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@OfferDaycare", course.OfferDaycare);
             cmd.AddParameter("@IsManualEnrollment", course.IsManualEnrollment);
             cmd.AddParameter("@IsCourseHasPrequisite", course.IsCourseHasPrequisite);
+            cmd.AddParameter("@IsCourseAnEvent", course.IsCourseAnEvent);
 
             // ✅ FIX: DBNull-safe nullable DateTime parameters
             cmd.AddParameter("@RegistrationStartDate", (object?)course.RegistrationStartDate ?? DBNull.Value);
@@ -125,11 +126,25 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             var sql = new StringBuilder("SELECT * FROM courses WHERE 1=1");
+            var loadCourseType = NormalizeLoadCourseType(options);
 
             if (options.IsActive.HasValue)
             {
                 sql.Append(" AND IsActive=@IsActive");
                 cmd.AddParameter("@IsActive", options.IsActive.Value);
+            }
+
+            if (IncludesLoadCourseType(loadCourseType, NormalCourseTypeFlag) &&
+                !IncludesLoadCourseType(loadCourseType, EventCourseTypeFlag))
+            {
+                sql.Append(" AND IsCourseAnEvent=@IsCourseAnEvent");
+                cmd.AddParameter("@IsCourseAnEvent", false);
+            }
+            else if (!IncludesLoadCourseType(loadCourseType, NormalCourseTypeFlag) &&
+                     IncludesLoadCourseType(loadCourseType, EventCourseTypeFlag))
+            {
+                sql.Append(" AND IsCourseAnEvent=@IsCourseAnEvent");
+                cmd.AddParameter("@IsCourseAnEvent", true);
             }
 
             if (options.InstituteIds?.Any() == true)
@@ -199,7 +214,8 @@ namespace Courses.Repository.Implementation
                     PolicyHyperLink=@PolicyHyperLink, IsCourseCompleted=@IsCourseCompleted, IsRegistrationOpened=@IsRegistrationOpened,
                     RegistrationStartDate=@RegistrationStartDate, RegistrationEndDate=@RegistrationEndDate, CourseSession=@CourseSession, 
                     RegistrationFee=@RegistrationFee, OfferDaycare =@OfferDaycare,
-                    IsManualEnrollment=@IsManualEnrollment, IsCourseHasPrequisite=@IsCourseHasPrequisite
+                    IsManualEnrollment=@IsManualEnrollment, IsCourseHasPrequisite=@IsCourseHasPrequisite,
+                    IsCourseAnEvent=@IsCourseAnEvent
                 WHERE CourseId=@CourseId";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
@@ -227,6 +243,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@OfferDaycare", course.OfferDaycare);
             cmd.AddParameter("@IsManualEnrollment", course.IsManualEnrollment);
             cmd.AddParameter("@IsCourseHasPrequisite", course.IsCourseHasPrequisite);
+            cmd.AddParameter("@IsCourseAnEvent", course.IsCourseAnEvent);
 
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
@@ -299,6 +316,7 @@ namespace Courses.Repository.Implementation
                 IsCourseCompleted = reader.GetBoolean("IsCourseCompleted"),
                 IsCourseHasPrequisite = ReadBooleanColumn(reader, "IsCourseHasPrequisite"),
                 IsManualEnrollment = ReadBooleanColumn(reader, "IsManualEnrollment"),
+                IsCourseAnEvent = ReadBooleanColumn(reader, "IsCourseAnEvent"),
                 IsRegistrationOpened = reader.GetBoolean("IsRegistrationOpened"),
                 RegistrationStartDate = registrationStart,
                 RegistrationEndDate = registrationEnd,
@@ -320,6 +338,20 @@ namespace Courses.Repository.Implementation
                                           .ToList();
             return course;
         }
+
+        private const int NormalCourseTypeFlag = 1;
+        private const int EventCourseTypeFlag = 2;
+
+        private static int NormalizeLoadCourseType(GetCourseOptions options)
+        {
+            var loadCourseType = Convert.ToInt32(options.LoadCourseType);
+            return loadCourseType == 0
+                ? NormalCourseTypeFlag
+                : loadCourseType;
+        }
+
+        private static bool IncludesLoadCourseType(int value, int flag)
+            => (value & flag) == flag;
 
         private static int? FindColumn(DbDataReader reader, string columnName)
         {

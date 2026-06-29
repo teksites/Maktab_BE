@@ -59,7 +59,7 @@ public class CourseServiceTests
     }
 
     [Fact]
-    public async Task SetCourseRegistrationOpenStatus_PreservesManualEnrollmentAndPrerequisiteFlags()
+    public async Task SetCourseRegistrationOpenStatus_PreservesManualEnrollmentPrerequisiteAndEventFlags()
     {
         var courseId = Guid.NewGuid();
         AddCourse? capturedRequest = null;
@@ -86,6 +86,7 @@ public class CourseServiceTests
                 PolicyHyperLink = string.Empty,
                 IsCourseCompleted = false,
                 IsCourseHasPrequisite = true,
+                IsCourseAnEvent = true,
                 IsManualEnrollment = true,
                 IsRegistrationOpened = true,
                 OfferDaycare = true,
@@ -107,6 +108,7 @@ public class CourseServiceTests
         Assert.NotNull(capturedRequest);
         Assert.True(capturedRequest!.IsManualEnrollment);
         Assert.True(capturedRequest.IsCourseHasPrequisite);
+        Assert.True(capturedRequest.IsCourseAnEvent);
         Assert.False(capturedRequest.IsRegistrationOpened);
     }
 }

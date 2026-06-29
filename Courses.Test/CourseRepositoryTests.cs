@@ -1,6 +1,7 @@
 using Courses.Repository;
 using Courses.Repository.Implementation;
 using Courses.Test.Infrastructure;
+using MaktabDataContracts.Enums;
 using Moq;
 using System.Data;
 using System.Data.Common;
@@ -26,6 +27,7 @@ public class CourseRepositoryTests
         Assert.NotNull(course);
         Assert.True(course!.IsManualEnrollment);
         Assert.True(course.IsCourseHasPrequisite);
+        Assert.True(course.IsCourseAnEvent);
     }
 
     [Fact]
@@ -37,6 +39,51 @@ public class CourseRepositoryTests
         var terminalId = await repository.GetHelcimTerminalId(Guid.NewGuid());
 
         Assert.Equal(54181, terminalId);
+    }
+
+    [Fact]
+    public async Task GetAllCourses_DefaultLoadCourseType_FiltersToNormalCourses()
+    {
+        DbCommand? executedCommand = null;
+        var database = new FakeDatabase(CreateEmptyReader, command => executedCommand = command);
+        var repository = new CourseRepository(database, Mock.Of<ICourseEnrollmentGroupRepository>());
+        await repository.GetAllCourses(new MaktabDataContracts.Requests.Course.GetCourseOptions());
+
+        Assert.NotNull(executedCommand);
+        Assert.Contains("IsCourseAnEvent=@IsCourseAnEvent", executedCommand!.CommandText);
+        Assert.False(GetBooleanParameter(executedCommand, "@IsCourseAnEvent"));
+    }
+
+    [Fact]
+    public async Task GetAllCourses_WhenLoadingOnlyEvents_FiltersToEventCourses()
+    {
+        DbCommand? executedCommand = null;
+        var database = new FakeDatabase(CreateEmptyReader, command => executedCommand = command);
+        var repository = new CourseRepository(database, Mock.Of<ICourseEnrollmentGroupRepository>());
+        await repository.GetAllCourses(new MaktabDataContracts.Requests.Course.GetCourseOptions
+        {
+            LoadCourseType = LoadCourseType.Events
+        });
+
+        Assert.NotNull(executedCommand);
+        Assert.Contains("IsCourseAnEvent=@IsCourseAnEvent", executedCommand!.CommandText);
+        Assert.True(GetBooleanParameter(executedCommand, "@IsCourseAnEvent"));
+    }
+
+    [Fact]
+    public async Task GetAllCourses_WhenLoadingNormalAndEvents_DoesNotFilterByEventType()
+    {
+        DbCommand? executedCommand = null;
+        var database = new FakeDatabase(CreateEmptyReader, command => executedCommand = command);
+        var repository = new CourseRepository(database, Mock.Of<ICourseEnrollmentGroupRepository>());
+        await repository.GetAllCourses(new MaktabDataContracts.Requests.Course.GetCourseOptions
+        {
+            LoadCourseType = LoadCourseType.Normal | LoadCourseType.Events
+        });
+
+        Assert.NotNull(executedCommand);
+        Assert.DoesNotContain("IsCourseAnEvent=@IsCourseAnEvent", executedCommand!.CommandText);
+        Assert.DoesNotContain(executedCommand.Parameters.Cast<DbParameter>(), parameter => parameter.ParameterName == "@IsCourseAnEvent");
     }
 
     private static DbDataReader CreateCourseReader(Guid courseId, string terminalId)
@@ -60,6 +107,7 @@ public class CourseRepositoryTests
         table.Columns.Add("IsCourseCompleted", typeof(bool));
         table.Columns.Add("IsCourseHasPrequisite", typeof(bool));
         table.Columns.Add("IsManualEnrollment", typeof(bool));
+        table.Columns.Add("IsCourseAnEvent", typeof(bool));
         table.Columns.Add("IsRegistrationOpened", typeof(bool));
         table.Columns.Add("RegistrationStartDate", typeof(DateTime));
         table.Columns.Add("RegistrationEndDate", typeof(DateTime));
@@ -88,6 +136,7 @@ public class CourseRepositoryTests
             true,
             true,
             true,
+            true,
             DateTime.UtcNow.AddDays(-1),
             DateTime.UtcNow.AddDays(5),
             (byte)0,
@@ -104,5 +153,18 @@ public class CourseRepositoryTests
         table.Columns.Add("TerminalId", typeof(string));
         table.Rows.Add("54181");
         return table.CreateDataReader();
+    }
+
+    private static DbDataReader CreateEmptyReader()
+    {
+        var table = new DataTable();
+        table.Columns.Add("CourseId", typeof(byte[]));
+        return table.CreateDataReader();
+    }
+
+    private static bool GetBooleanParameter(DbCommand command, string parameterName)
+    {
+        var parameter = command.Parameters.Cast<DbParameter>().Single(p => p.ParameterName == parameterName);
+        return Convert.ToBoolean(parameter.Value);
     }
 }
