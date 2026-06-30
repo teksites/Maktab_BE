@@ -323,6 +323,97 @@ public class StudentCourseEnrollmentServiceTests
     }
 
     [Fact]
+    public async Task AddEnrollment_WhenReAddingDifferentChild_DoesNotReuseExistingEnrollmentIndex()
+    {
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var returningChildId = Guid.NewGuid();
+        var activeSiblingChildId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        AddStudentCourseEnrollment? capturedEnrollment = null;
+
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetCourseEnrollmentGroupInformation(groupId))
+            .ReturnsAsync(new CourseEnrollmentGroupInformationResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                MaxStudents = 10,
+                IfRegistrationOpen = true,
+                EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>()
+            });
+        repository
+            .Setup(repo => repo.AddEnrollment(It.IsAny<AddStudentCourseEnrollment>()))
+            .Callback<AddStudentCourseEnrollment>(enrollment => capturedEnrollment = enrollment)
+            .ReturnsAsync(() => new StudentCourseEnrollmentResponse
+            {
+                StudentCourseEnrollmentId = Guid.NewGuid(),
+                ChildId = returningChildId,
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                FamilyId = familyId,
+                EnrollmentIndex = capturedEnrollment!.EnrollmentIndex,
+                EnrollmentStatus = capturedEnrollment.EnrollmentStatus,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedOn = DateTime.UtcNow
+            });
+
+        var existingActiveEnrollment = CreateEnrollment(
+            activeSiblingChildId,
+            groupId,
+            courseId,
+            familyId,
+            EnrollmentStatus.Awaiting,
+            "Existing Child",
+            enrollmentIndex: 2);
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[]
+            {
+                CreateFamilyTransaction(courseId, familyId, new[] { existingActiveEnrollment })
+            });
+        transactionService
+            .Setup(service => service.AddEnrollmentsToTransaction(It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .ReturnsAsync(true);
+        transactionService
+            .Setup(service => service.UpdateTransaction(It.IsAny<Guid>(), It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 120));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService);
+
+        var response = await service.AddEnrollment(new AddStudentCourseEnrollment
+        {
+            CourseId = courseId,
+            FamilyId = familyId,
+            ChildId = returningChildId,
+            CourseEnrollmentGroupId = groupId,
+            DayCareDays = 0,
+            WillUseDayCare = false,
+            ShouldTriggerEmail = false
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal(3, capturedEnrollment!.EnrollmentIndex);
+    }
+
+    [Fact]
     public async Task RecalculateCourseFee_UsesDefaultSingleInstallmentWhenPolicyFallbackApplies()
     {
         var courseId = Guid.NewGuid();
@@ -651,6 +742,58 @@ public class StudentCourseEnrollmentServiceTests
         Assert.NotNull(capturedUpdate);
         Assert.Equal(15d, capturedUpdate!.Surcharge);
         Assert.Equal(115m, capturedUpdate.TotalPayable);
+    }
+
+    [Fact]
+    public async Task RecalculateCourseFee_WhenDifferentChildrenShareEnrollmentIndex_CalculatesFeeForBothChildren()
+    {
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var firstChildId = Guid.NewGuid();
+        var secondChildId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var capturedUpdate = default(AddStudentCourseTransaction);
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[]
+            {
+                CreateFamilyTransaction(
+                    courseId,
+                    familyId,
+                    new[]
+                    {
+                        CreateEnrollment(firstChildId, groupId, courseId, familyId, EnrollmentStatus.Awaiting, "First Child", enrollmentIndex: 2),
+                        CreateEnrollment(secondChildId, groupId, courseId, familyId, EnrollmentStatus.Awaiting, "Second Child", enrollmentIndex: 2)
+                    })
+            });
+        transactionService
+            .Setup(service => service.UpdateTransaction(It.IsAny<Guid>(), It.IsAny<AddStudentCourseTransaction>()))
+            .Callback<Guid, AddStudentCourseTransaction>((_, transaction) => capturedUpdate = transaction)
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 100));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
+
+        var service = CreateEnrollmentService(
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService);
+
+        var result = await service.RecalculateCourseFee(courseId, familyId);
+
+        Assert.True(result);
+        Assert.NotNull(capturedUpdate);
+        Assert.Equal(200m, capturedUpdate!.PayableFee);
+        Assert.Equal(200m, capturedUpdate.TotalPayable);
     }
 
     [Fact]
@@ -2003,7 +2146,8 @@ public class StudentCourseEnrollmentServiceTests
         Guid courseId,
         Guid? familyId = null,
         EnrollmentStatus status = EnrollmentStatus.Registered,
-        string childName = "Child")
+        string childName = "Child",
+        int enrollmentIndex = 1)
     {
         return new StudentCourseEnrollmentResponse
         {
@@ -2016,7 +2160,8 @@ public class StudentCourseEnrollmentServiceTests
             ChildName = childName,
             WillUseDayCare = false,
             CreatedAt = DateTime.UtcNow.AddMinutes(-5),
-            UpdatedOn = DateTime.UtcNow
+            UpdatedOn = DateTime.UtcNow,
+            EnrollmentIndex = enrollmentIndex
         };
     }
 
