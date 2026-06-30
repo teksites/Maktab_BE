@@ -127,13 +127,11 @@ namespace Courses.Implementation.Services
                     //var discountPolicy = policies.Where(p => p.IsActive && p.PolicyType == MaktabDataContracts.Enums.PolicyType.SiblingDiscount).First().Details;
                     //SiblingDiscountPolicy policy = JsonConvert.DeserializeObject<SiblingDiscountPolicy>(discountPolicy);
 
-                    var distinctChildIds = familyTransactions
+                    enrollment.EnrollmentIndex = familyTransactions
                         .SelectMany(t => t.Enrollments)
-                        .Select(e => e.ChildId)
-                        .Distinct()
-                        .ToList();
-                    
-                    enrollment.EnrollmentIndex = distinctChildIds.Count + 1;
+                        .Select(e => e.EnrollmentIndex)
+                        .DefaultIfEmpty(0)
+                        .Max() + 1;
 
                 }
 
@@ -246,7 +244,7 @@ namespace Courses.Implementation.Services
             decimal courseFee = 0m;
 
             var effectiveEnrollments = familyTransaction.Enrollments
-            .GroupBy(e => new { e.EnrollmentIndex, e.CourseEnrollmentGroupId })
+            .GroupBy(e => new { e.ChildId, e.CourseEnrollmentGroupId })
             .Select(g => g
                 .OrderByDescending(e => e.UpdatedOn)
                 .ThenByDescending(e => e.CreatedAt)
@@ -260,7 +258,7 @@ namespace Courses.Implementation.Services
             .ToList();
 
             var groupedByChild = feeApplicableEnrollments
-            .GroupBy(e => e.EnrollmentIndex)
+            .GroupBy(e => e.ChildId)
             .Select(g =>
             {
                 var orderedEnrollments = g
@@ -270,13 +268,16 @@ namespace Courses.Implementation.Services
 
                 return new
                 {
-                    EnrollmentIndex = g.Key,
-                    ChildId = orderedEnrollments[0].ChildId,
+                    ChildId = g.Key,
+                    EnrollmentIndex = orderedEnrollments.Min(e => e.EnrollmentIndex),
+                    FirstEnrollmentCreatedAt = orderedEnrollments.Min(e => e.CreatedAt),
                     Enrollments = orderedEnrollments
                 };
             })
             .OrderByDescending(g => g.Enrollments.Count(e => IsFeeBearingEnrollmentStatus(e.EnrollmentStatus)))
             .ThenBy(g => g.EnrollmentIndex)
+            .ThenBy(g => g.FirstEnrollmentCreatedAt)
+            .ThenBy(g => g.ChildId)
             .ToList();
             
             var enrollmentGroupCountsByChild = groupedByChild.Select(g => g.Enrollments.Count).ToList();
