@@ -9,6 +9,88 @@ namespace Courses.Repository.Implementation
 {
     public class StudentCourseEnrollmentRepository : DbRepository, IStudentCourseEnrollmentRepository
     {
+        private const int MotherRelationship = (int)Relationship.Mother;
+        private const int FatherRelationship = (int)Relationship.Father;
+        private const int GuardianRelationship = (int)Relationship.Guardian;
+
+        private static readonly string FamilyMemberJoinSql = $@"
+        LEFT JOIN (
+            SELECT
+                ui.UserId,
+                ui.FamilyId,
+                ui.FirstName,
+                ui.LastName,
+                ui.Email,
+                ui.Phone,
+                ui.Relationship
+            FROM user_info ui
+            WHERE ui.IsActive = b'1'
+              AND (
+                ui.Relationship NOT IN ({MotherRelationship}, {FatherRelationship})
+                OR NOT EXISTS (
+                    SELECT 1
+                    FROM user_info ui2
+                    WHERE ui2.IsActive = b'1'
+                      AND ui2.FamilyId = ui.FamilyId
+                      AND ui2.Relationship = ui.Relationship
+                      AND ui2.Relationship IN ({MotherRelationship}, {FatherRelationship})
+                      AND (
+                        ui2.UpdatedOn > ui.UpdatedOn
+                        OR (ui2.UpdatedOn = ui.UpdatedOn AND ui2.CreatedAt > ui.CreatedAt)
+                        OR (ui2.UpdatedOn = ui.UpdatedOn AND ui2.CreatedAt = ui.CreatedAt AND ui2.UserId > ui.UserId)
+                      )
+                )
+              )
+
+            UNION ALL
+
+            SELECT
+                tui.UserId,
+                tui.FamilyId,
+                tui.FirstName,
+                tui.LastName,
+                tui.Email,
+                tui.Phone,
+                tui.Relationship
+            FROM temp_user_info tui
+            WHERE tui.IsActive = b'1'
+              AND (
+                tui.Relationship NOT IN ({MotherRelationship}, {FatherRelationship}, {GuardianRelationship})
+                OR (
+                    tui.Relationship = {GuardianRelationship}
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM user_info ui2
+                        WHERE ui2.IsActive = b'1'
+                          AND ui2.FamilyId = tui.FamilyId
+                          AND ui2.Relationship = tui.Relationship
+                    )
+                )
+                OR (
+                    tui.Relationship IN ({MotherRelationship}, {FatherRelationship})
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM user_info ui2
+                        WHERE ui2.IsActive = b'1'
+                          AND ui2.FamilyId = tui.FamilyId
+                          AND ui2.Relationship = tui.Relationship
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM temp_user_info tui2
+                        WHERE tui2.IsActive = b'1'
+                          AND tui2.FamilyId = tui.FamilyId
+                          AND tui2.Relationship = tui.Relationship
+                          AND (
+                            tui2.UpdatedOn > tui.UpdatedOn
+                            OR (tui2.UpdatedOn = tui.UpdatedOn AND tui2.CreatedAt > tui.CreatedAt)
+                            OR (tui2.UpdatedOn = tui.UpdatedOn AND tui2.CreatedAt = tui.CreatedAt AND tui2.UserId > tui.UserId)
+                          )
+                    )
+                )
+              )
+        ) ui ON ui.FamilyId = sce.FamilyId";
+
         public StudentCourseEnrollmentRepository(IDatabase database) : base(database) { }
 
         // Add a new enrollment
@@ -59,7 +141,7 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
         SELECT
             sce.StudentCourseEnrollmentId,
             sce.CourseEnrollmentGroupId,
@@ -86,7 +168,7 @@ namespace Courses.Repository.Implementation
         FROM student_course_enrollment sce
         LEFT JOIN course_enrollment_groups ceg ON ceg.CourseEnrollmentGroupId = sce.CourseEnrollmentGroupId
         INNER JOIN child_information ci ON ci.ChildId = sce.ChildId
-        LEFT JOIN user_info ui ON ui.FamilyId = sce.FamilyId AND ui.IsActive = b'1'
+        {FamilyMemberJoinSql}
         WHERE sce.ChildId = @ChildId AND sce.CourseId = @CourseId AND sce.IsActive = TRUE";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
@@ -292,7 +374,7 @@ namespace Courses.Repository.Implementation
         FROM student_course_enrollment sce
         LEFT JOIN course_enrollment_groups ceg ON ceg.CourseEnrollmentGroupId = sce.CourseEnrollmentGroupId
         INNER JOIN child_information ci ON ci.ChildId = sce.ChildId
-        LEFT JOIN user_info ui ON ui.FamilyId = sce.FamilyId AND ui.IsActive = b'1'
+        {FamilyMemberJoinSql}
         WHERE sce.{columnName} = @Value AND sce.IsActive = TRUE";
 
             cmd.AddParameter("@Value", value.ToByteArray());

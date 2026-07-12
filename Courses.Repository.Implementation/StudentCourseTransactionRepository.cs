@@ -16,6 +16,106 @@ namespace Courses.Repository.Implementation
 {
     public class StudentCourseTransactionRepository : DbRepository, IStudentCourseTransactionRepository
     {
+        private const int MotherRelationship = (int)Relationship.Mother;
+        private const int FatherRelationship = (int)Relationship.Father;
+        private const int GuardianRelationship = (int)Relationship.Guardian;
+
+        private static readonly string FamilyInformationJoinSql = $@"
+                LEFT JOIN (
+                    SELECT
+                        ui.UserId AS ContactId,
+                        ui.FamilyId,
+                        ui.FirstName,
+                        ui.LastName,
+                        ui.Email,
+                        ui.Phone,
+                        ui.Relationship,
+                        0 AS ContactType
+                    FROM user_info ui
+                    WHERE ui.IsActive = b'1'
+                      AND (
+                        ui.Relationship NOT IN ({MotherRelationship}, {FatherRelationship})
+                        OR NOT EXISTS (
+                            SELECT 1
+                            FROM user_info ui2
+                            WHERE ui2.IsActive = b'1'
+                              AND ui2.FamilyId = ui.FamilyId
+                              AND ui2.Relationship = ui.Relationship
+                              AND ui2.Relationship IN ({MotherRelationship}, {FatherRelationship})
+                              AND (
+                                ui2.UpdatedOn > ui.UpdatedOn
+                                OR (ui2.UpdatedOn = ui.UpdatedOn AND ui2.CreatedAt > ui.CreatedAt)
+                                OR (ui2.UpdatedOn = ui.UpdatedOn AND ui2.CreatedAt = ui.CreatedAt AND ui2.UserId > ui.UserId)
+                              )
+                        )
+                      )
+
+                    UNION ALL
+
+                    SELECT
+                        tui.UserId AS ContactId,
+                        tui.FamilyId,
+                        tui.FirstName,
+                        tui.LastName,
+                        tui.Email,
+                        tui.Phone,
+                        tui.Relationship,
+                        0 AS ContactType
+                    FROM temp_user_info tui
+                    WHERE tui.IsActive = b'1'
+                      AND (
+                        tui.Relationship NOT IN ({MotherRelationship}, {FatherRelationship}, {GuardianRelationship})
+                        OR (
+                            tui.Relationship = {GuardianRelationship}
+                            AND NOT EXISTS (
+                                SELECT 1
+                                FROM user_info ui2
+                                WHERE ui2.IsActive = b'1'
+                                  AND ui2.FamilyId = tui.FamilyId
+                                  AND ui2.Relationship = tui.Relationship
+                            )
+                        )
+                        OR (
+                            tui.Relationship IN ({MotherRelationship}, {FatherRelationship})
+                            AND NOT EXISTS (
+                                SELECT 1
+                                FROM user_info ui2
+                                WHERE ui2.IsActive = b'1'
+                                  AND ui2.FamilyId = tui.FamilyId
+                                  AND ui2.Relationship = tui.Relationship
+                            )
+                            AND NOT EXISTS (
+                                SELECT 1
+                                FROM temp_user_info tui2
+                                WHERE tui2.IsActive = b'1'
+                                  AND tui2.FamilyId = tui.FamilyId
+                                  AND tui2.Relationship = tui.Relationship
+                                  AND (
+                                    tui2.UpdatedOn > tui.UpdatedOn
+                                    OR (tui2.UpdatedOn = tui.UpdatedOn AND tui2.CreatedAt > tui.CreatedAt)
+                                    OR (tui2.UpdatedOn = tui.UpdatedOn AND tui2.CreatedAt = tui.CreatedAt AND tui2.UserId > tui.UserId)
+                                  )
+                            )
+                        )
+                      )
+
+                    UNION ALL
+
+                    SELECT
+                        oci.ContactId AS ContactId,
+                        oci.FamilyId,
+                        oci.FirstName,
+                        oci.LastName,
+                        NULL AS Email,
+                        oci.Phone,
+                        oci.Relationship,
+                        oci.ContactType
+                    FROM other_contacts_information oci
+                    WHERE oci.IsActive = 1
+                      AND oci.Relationship NOT IN ({MotherRelationship}, {FatherRelationship}, {GuardianRelationship})
+                ) fi
+                    ON fi.FamilyId = sct.FamilyId";
+
         public StudentCourseTransactionRepository(IDatabase database) : base(database) { }
 
         public async Task<IEnumerable<StudentCourseTransactionResponse>> GetTransactionsPerCourseAsync(Guid courseId)
@@ -104,7 +204,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@StudentCourseTransactionId", studentCourseTransactionId.ToByteArray());
             cmd.AddParameter("@StudentCourseEnrollmentId", studentCourseEnrollmentId.ToByteArray());
 
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 INSERT INTO student_course_transaction_enrollment
                 (Id, StudentCourseTransactionId, StudentCourseEnrollmentId)
                 VALUES
@@ -123,7 +223,7 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 SELECT
                     sct.StudentCourseTransactionId,
                     sct.FamilyId,
@@ -180,48 +280,7 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                                LEFT JOIN (
-                    SELECT
-                        ui.UserId AS ContactId,
-                        ui.FamilyId,
-                        ui.FirstName,
-                        ui.LastName,
-                        ui.Email,
-                        ui.Phone,
-                        ui.Relationship,
-                        0 AS ContactType
-                    FROM user_info ui
-                    WHERE ui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        tui.UserId AS ContactId,
-                        tui.FamilyId,
-                        tui.FirstName,
-                        tui.LastName,
-                        tui.Email,
-                        tui.Phone,
-                        tui.Relationship,
-                        0 AS ContactType
-                    FROM temp_user_info tui
-                    WHERE tui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        oci.ContactId AS ContactId,
-                        oci.FamilyId,
-                        oci.FirstName,
-                        oci.LastName,
-                        NULL AS Email,
-                        oci.Phone,
-                        oci.Relationship,
-                        oci.ContactType
-                    FROM other_contacts_information oci
-                    WHERE oci.IsActive = 1
-                ) fi
-                    ON fi.FamilyId = sct.FamilyId
+                {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -246,7 +305,7 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 SELECT
                     sct.StudentCourseTransactionId,
                     sct.FamilyId,
@@ -303,48 +362,7 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                                LEFT JOIN (
-                    SELECT
-                        ui.UserId AS ContactId,
-                        ui.FamilyId,
-                        ui.FirstName,
-                        ui.LastName,
-                        ui.Email,
-                        ui.Phone,
-                        ui.Relationship,
-                        0 AS ContactType
-                    FROM user_info ui
-                    WHERE ui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        tui.UserId AS ContactId,
-                        tui.FamilyId,
-                        tui.FirstName,
-                        tui.LastName,
-                        tui.Email,
-                        tui.Phone,
-                        tui.Relationship,
-                        0 AS ContactType
-                    FROM temp_user_info tui
-                    WHERE tui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        oci.ContactId AS ContactId,
-                        oci.FamilyId,
-                        oci.FirstName,
-                        oci.LastName,
-                        NULL AS Email,
-                        oci.Phone,
-                        oci.Relationship,
-                        oci.ContactType
-                    FROM other_contacts_information oci
-                    WHERE oci.IsActive = 1
-                ) fi
-                    ON fi.FamilyId = sct.FamilyId
+                {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -414,7 +432,7 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 UPDATE student_course_transaction
                 SET FamilyId = @FamilyId,
                     PayableFee = @PayableFee,
@@ -503,7 +521,7 @@ namespace Courses.Repository.Implementation
 
             // �Current session� is ambiguous; safest interpretation:
             // return most recent transaction for this family where enrollments belong to courses under this institute.
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 SELECT
                     sct.StudentCourseTransactionId,
                     sct.FamilyId,
@@ -560,48 +578,7 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                                LEFT JOIN (
-                    SELECT
-                        ui.UserId AS ContactId,
-                        ui.FamilyId,
-                        ui.FirstName,
-                        ui.LastName,
-                        ui.Email,
-                        ui.Phone,
-                        ui.Relationship,
-                        0 AS ContactType
-                    FROM user_info ui
-                    WHERE ui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        tui.UserId AS ContactId,
-                        tui.FamilyId,
-                        tui.FirstName,
-                        tui.LastName,
-                        tui.Email,
-                        tui.Phone,
-                        tui.Relationship,
-                        0 AS ContactType
-                    FROM temp_user_info tui
-                    WHERE tui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        oci.ContactId AS ContactId,
-                        oci.FamilyId,
-                        oci.FirstName,
-                        oci.LastName,
-                        NULL AS Email,
-                        oci.Phone,
-                        oci.Relationship,
-                        oci.ContactType
-                    FROM other_contacts_information oci
-                    WHERE oci.IsActive = 1
-                ) fi
-                    ON fi.FamilyId = sct.FamilyId
+                {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
                 WHERE
@@ -627,7 +604,7 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 SELECT
                     sct.StudentCourseTransactionId,
                     sct.FamilyId,
@@ -684,48 +661,7 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                                LEFT JOIN (
-                    SELECT
-                        ui.UserId AS ContactId,
-                        ui.FamilyId,
-                        ui.FirstName,
-                        ui.LastName,
-                        ui.Email,
-                        ui.Phone,
-                        ui.Relationship,
-                        0 AS ContactType
-                    FROM user_info ui
-                    WHERE ui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        tui.UserId AS ContactId,
-                        tui.FamilyId,
-                        tui.FirstName,
-                        tui.LastName,
-                        tui.Email,
-                        tui.Phone,
-                        tui.Relationship,
-                        0 AS ContactType
-                    FROM temp_user_info tui
-                    WHERE tui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        oci.ContactId AS ContactId,
-                        oci.FamilyId,
-                        oci.FirstName,
-                        oci.LastName,
-                        NULL AS Email,
-                        oci.Phone,
-                        oci.Relationship,
-                        oci.ContactType
-                    FROM other_contacts_information oci
-                    WHERE oci.IsActive = 1
-                ) fi
-                    ON fi.FamilyId = sct.FamilyId
+                {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -744,7 +680,7 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 SELECT
                     sct.StudentCourseTransactionId,
                     sct.FamilyId,
@@ -801,48 +737,7 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                                LEFT JOIN (
-                    SELECT
-                        ui.UserId AS ContactId,
-                        ui.FamilyId,
-                        ui.FirstName,
-                        ui.LastName,
-                        ui.Email,
-                        ui.Phone,
-                        ui.Relationship,
-                        0 AS ContactType
-                    FROM user_info ui
-                    WHERE ui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        tui.UserId AS ContactId,
-                        tui.FamilyId,
-                        tui.FirstName,
-                        tui.LastName,
-                        tui.Email,
-                        tui.Phone,
-                        tui.Relationship,
-                        0 AS ContactType
-                    FROM temp_user_info tui
-                    WHERE tui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        oci.ContactId AS ContactId,
-                        oci.FamilyId,
-                        oci.FirstName,
-                        oci.LastName,
-                        NULL AS Email,
-                        oci.Phone,
-                        oci.Relationship,
-                        oci.ContactType
-                    FROM other_contacts_information oci
-                    WHERE oci.IsActive = 1
-                ) fi
-                    ON fi.FamilyId = sct.FamilyId
+                {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -863,7 +758,7 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 SELECT
                     sct.StudentCourseTransactionId,
                     sct.FamilyId,
@@ -920,48 +815,7 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                                LEFT JOIN (
-                    SELECT
-                        ui.UserId AS ContactId,
-                        ui.FamilyId,
-                        ui.FirstName,
-                        ui.LastName,
-                        ui.Email,
-                        ui.Phone,
-                        ui.Relationship,
-                        0 AS ContactType
-                    FROM user_info ui
-                    WHERE ui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        tui.UserId AS ContactId,
-                        tui.FamilyId,
-                        tui.FirstName,
-                        tui.LastName,
-                        tui.Email,
-                        tui.Phone,
-                        tui.Relationship,
-                        0 AS ContactType
-                    FROM temp_user_info tui
-                    WHERE tui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        oci.ContactId AS ContactId,
-                        oci.FamilyId,
-                        oci.FirstName,
-                        oci.LastName,
-                        NULL AS Email,
-                        oci.Phone,
-                        oci.Relationship,
-                        oci.ContactType
-                    FROM other_contacts_information oci
-                    WHERE oci.IsActive = 1
-                ) fi
-                    ON fi.FamilyId = sct.FamilyId
+                {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -982,7 +836,7 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 SELECT
                     sct.StudentCourseTransactionId,
                     sct.FamilyId,
@@ -1039,48 +893,7 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                                LEFT JOIN (
-                    SELECT
-                        ui.UserId AS ContactId,
-                        ui.FamilyId,
-                        ui.FirstName,
-                        ui.LastName,
-                        ui.Email,
-                        ui.Phone,
-                        ui.Relationship,
-                        0 AS ContactType
-                    FROM user_info ui
-                    WHERE ui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        tui.UserId AS ContactId,
-                        tui.FamilyId,
-                        tui.FirstName,
-                        tui.LastName,
-                        tui.Email,
-                        tui.Phone,
-                        tui.Relationship,
-                        0 AS ContactType
-                    FROM temp_user_info tui
-                    WHERE tui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        oci.ContactId AS ContactId,
-                        oci.FamilyId,
-                        oci.FirstName,
-                        oci.LastName,
-                        NULL AS Email,
-                        oci.Phone,
-                        oci.Relationship,
-                        oci.ContactType
-                    FROM other_contacts_information oci
-                    WHERE oci.IsActive = 1
-                ) fi
-                    ON fi.FamilyId = sct.FamilyId
+                {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 
@@ -1099,7 +912,7 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = @"
+            cmd.CommandText = $@"
                 SELECT
                     sct.StudentCourseTransactionId,
                     sct.FamilyId,
@@ -1156,48 +969,7 @@ namespace Courses.Repository.Implementation
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
                 JOIN child_information ci
                     ON ci.ChildId = sce.ChildId
-                                LEFT JOIN (
-                    SELECT
-                        ui.UserId AS ContactId,
-                        ui.FamilyId,
-                        ui.FirstName,
-                        ui.LastName,
-                        ui.Email,
-                        ui.Phone,
-                        ui.Relationship,
-                        0 AS ContactType
-                    FROM user_info ui
-                    WHERE ui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        tui.UserId AS ContactId,
-                        tui.FamilyId,
-                        tui.FirstName,
-                        tui.LastName,
-                        tui.Email,
-                        tui.Phone,
-                        tui.Relationship,
-                        0 AS ContactType
-                    FROM temp_user_info tui
-                    WHERE tui.IsActive = b'1'
-
-                    UNION ALL
-
-                    SELECT
-                        oci.ContactId AS ContactId,
-                        oci.FamilyId,
-                        oci.FirstName,
-                        oci.LastName,
-                        NULL AS Email,
-                        oci.Phone,
-                        oci.Relationship,
-                        oci.ContactType
-                    FROM other_contacts_information oci
-                    WHERE oci.IsActive = 1
-                ) fi
-                    ON fi.FamilyId = sct.FamilyId
+                {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
 

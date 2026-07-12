@@ -1,11 +1,14 @@
 using Courses.Repository;
 using Courses.Services;
 using Courses.Services.Implementation;
+using Email;
 using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
+using MaktabDataContracts.Responses.Users;
 using Moq;
+using Users.Services;
 
 namespace Courses.Test;
 
@@ -77,10 +80,10 @@ public class CoursePaymentServiceTests
             .Setup(service => service.RecalculateCourseFee(courseId, familyId))
             .ReturnsAsync(true);
 
-        var service = new CoursePaymentService(
-            repository.Object,
-            studentCourseTransactionService.Object,
-            studentCourseEnrollmentService.Object);
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService,
+            studentCourseEnrollmentService);
 
         var response = await service.AddPayment(new AddCoursePayment
         {
@@ -142,10 +145,9 @@ public class CoursePaymentServiceTests
                 TotalPayable = 100m
             });
 
-        var service = new CoursePaymentService(
-            repository.Object,
-            studentCourseTransactionService.Object,
-            Mock.Of<IStudentCourseEnrollmentService>());
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService);
 
         var result = await service.TryAddPayment(new AddCoursePayment
         {
@@ -219,10 +221,9 @@ public class CoursePaymentServiceTests
             .Setup(service => service.UpdateTransaction(studentTransactionId, It.IsAny<AddStudentCourseTransaction>()))
             .ReturnsAsync(true);
 
-        var service = new CoursePaymentService(
-            repository.Object,
-            studentCourseTransactionService.Object,
-            Mock.Of<IStudentCourseEnrollmentService>());
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService);
 
         await service.AddPayment(new AddCoursePayment
         {
@@ -304,10 +305,9 @@ public class CoursePaymentServiceTests
             .Callback<Guid, AddStudentCourseTransaction>((_, transaction) => updatedTransactions.Add(transaction))
             .ReturnsAsync(true);
 
-        var service = new CoursePaymentService(
-            repository.Object,
-            studentCourseTransactionService.Object,
-            Mock.Of<IStudentCourseEnrollmentService>());
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService);
 
         await service.AddPayment(new AddCoursePayment
         {
@@ -384,10 +384,9 @@ public class CoursePaymentServiceTests
             .Callback<Guid, AddStudentCourseTransaction>((_, transaction) => updatedTransactions.Add(transaction))
             .ReturnsAsync(true);
 
-        var service = new CoursePaymentService(
-            repository.Object,
-            studentCourseTransactionService.Object,
-            Mock.Of<IStudentCourseEnrollmentService>());
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService);
 
         var updated = await service.UpdatePayment(paymentId, new AddCoursePayment
         {
@@ -473,10 +472,9 @@ public class CoursePaymentServiceTests
             .Callback<Guid, AddStudentCourseTransaction>((_, transaction) => updatedTransactions.Add(transaction))
             .ReturnsAsync(true);
 
-        var service = new CoursePaymentService(
-            repository.Object,
-            studentCourseTransactionService.Object,
-            Mock.Of<IStudentCourseEnrollmentService>());
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService);
 
         await service.AddPayment(new AddCoursePayment
         {
@@ -563,10 +561,9 @@ public class CoursePaymentServiceTests
             .Callback<Guid, AddStudentCourseTransaction>((_, transaction) => updatedTransactions.Add(transaction))
             .ReturnsAsync(true);
 
-        var service = new CoursePaymentService(
-            repository.Object,
-            studentCourseTransactionService.Object,
-            Mock.Of<IStudentCourseEnrollmentService>());
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService);
 
         await service.AddPayment(new AddCoursePayment
         {
@@ -585,5 +582,274 @@ public class CoursePaymentServiceTests
         Assert.Equal(5d, updated.Surcharge);
         Assert.False(updated.IsCompletelyPaid);
         Assert.Equal(TransactionStatus.PartiallyPaid, updated.TransactionStatus);
+    }
+
+    [Fact]
+    public async Task AddPayment_Credit_SendsPaymentConfirmationEmail()
+    {
+        var studentTransactionId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var courseId = Guid.NewGuid();
+        MultiUserEmailData? sentEmail = null;
+
+        var repository = new Mock<ICoursePaymentRepository>();
+        repository
+            .Setup(repo => repo.TryAddPayment(It.IsAny<AddCoursePayment>()))
+            .ReturnsAsync((new CoursePaymentResponse
+            {
+                PaymentId = Guid.NewGuid(),
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                AmountPaid = 75m,
+                PaymentType = PaymentType.Credit,
+                PaymentMode = PaymentMode.CashOnCounter,
+                IsActive = true
+            }, true));
+        repository
+            .Setup(repo => repo.GetAllPayments(studentTransactionId))
+            .ReturnsAsync(new[]
+            {
+                new CoursePaymentResponse
+                {
+                    StudentCourseTransactionId = studentTransactionId,
+                    FamilyId = familyId,
+                    AmountPaid = 75m,
+                    PaymentType = PaymentType.Credit,
+                    PaymentMode = PaymentMode.CashOnCounter,
+                    IsActive = true
+                }
+            });
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransaction(studentTransactionId))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                PaymentCode = "PAYMENT1",
+                Comments = "existing",
+                FeeInstallments = new List<FeeInstallment>(),
+                RegistrationStatus = RegistrationStatus.Pending,
+                TransactionStatus = TransactionStatus.AwaitingPayment,
+                IsActive = true,
+                TotalPayable = 100m,
+                Enrollments = new List<StudentCourseEnrollmentResponse>
+                {
+                    new()
+                    {
+                        CourseId = courseId
+                    }
+                }
+            });
+        studentCourseTransactionService
+            .Setup(service => service.UpdateTransaction(studentTransactionId, It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(true);
+
+        var studentCourseEnrollmentService = new Mock<IStudentCourseEnrollmentService>();
+        studentCourseEnrollmentService
+            .Setup(service => service.RecalculateCourseFee(courseId, familyId))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(new CourseResponseDetailed
+            {
+                CourseId = courseId,
+                Name = "Rattel School Quran Class (Wednesday / Friday)",
+                NameFr = "l'ecole coranique Rattel (mercredi / vendredi)"
+            });
+
+        var userService = new Mock<IUserService>();
+        userService
+            .Setup(service => service.GetAllFamilyUsersInformation(familyId, true))
+            .ReturnsAsync(new[]
+            {
+                new UserInformationResponse
+                {
+                    Email = "parent@example.com",
+                    Relationship = Relationship.Mother
+                }
+            });
+
+        var sendEmailService = new Mock<ISendEmailService>();
+        sendEmailService
+            .Setup(service => service.SendBulkEmail(It.IsAny<MultiUserEmailData>()))
+            .Callback<MultiUserEmailData>(email => sentEmail = email)
+            .ReturnsAsync(true);
+
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService,
+            studentCourseEnrollmentService,
+            courseService,
+            userService,
+            sendEmailService);
+
+        await service.AddPayment(new AddCoursePayment
+        {
+            StudentCourseTransactionId = studentTransactionId,
+            FamilyId = familyId,
+            AmountPaid = 75m,
+            Comments = "cash payment",
+            PaymentMode = PaymentMode.CashOnCounter,
+            PaymentType = PaymentType.Credit,
+            IsActive = true
+        });
+
+        Assert.NotNull(sentEmail);
+        Assert.Equal("ICC Maktab payment confirmation - confirmation de paiement ICC Maktab", sentEmail!.Subject);
+        Assert.Contains("75.00", sentEmail.Body);
+        Assert.Contains("Rattel School Quran Class (Wednesday / Friday)", sentEmail.Body);
+        Assert.Contains("Votre paiement", sentEmail.Body);
+    }
+
+    [Fact]
+    public async Task AddPayment_Refund_SendsRefundConfirmationEmail()
+    {
+        var studentTransactionId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var courseId = Guid.NewGuid();
+        MultiUserEmailData? sentEmail = null;
+
+        var repository = new Mock<ICoursePaymentRepository>();
+        repository
+            .Setup(repo => repo.TryAddPayment(It.IsAny<AddCoursePayment>()))
+            .ReturnsAsync((new CoursePaymentResponse
+            {
+                PaymentId = Guid.NewGuid(),
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                AmountPaid = 20m,
+                PaymentType = PaymentType.Refund,
+                PaymentMode = PaymentMode.CashOnCounter,
+                IsActive = true
+            }, true));
+        repository
+            .Setup(repo => repo.GetAllPayments(studentTransactionId))
+            .ReturnsAsync(new[]
+            {
+                new CoursePaymentResponse
+                {
+                    StudentCourseTransactionId = studentTransactionId,
+                    FamilyId = familyId,
+                    AmountPaid = 80m,
+                    PaymentType = PaymentType.Credit,
+                    PaymentMode = PaymentMode.CashOnCounter,
+                    IsActive = true
+                },
+                new CoursePaymentResponse
+                {
+                    StudentCourseTransactionId = studentTransactionId,
+                    FamilyId = familyId,
+                    AmountPaid = 20m,
+                    PaymentType = PaymentType.Refund,
+                    PaymentMode = PaymentMode.CashOnCounter,
+                    IsActive = true
+                }
+            });
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransaction(studentTransactionId))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                PaymentCode = "REFUNDMAIL1",
+                Comments = "existing",
+                FeeInstallments = new List<FeeInstallment>(),
+                RegistrationStatus = RegistrationStatus.Pending,
+                TransactionStatus = TransactionStatus.PartiallyPaid,
+                IsActive = true,
+                TotalPayable = 100m,
+                TotalAmountPaid = 80m,
+                Enrollments = new List<StudentCourseEnrollmentResponse>
+                {
+                    new()
+                    {
+                        CourseId = courseId
+                    }
+                }
+            });
+        studentCourseTransactionService
+            .Setup(service => service.UpdateTransaction(studentTransactionId, It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(true);
+
+        var studentCourseEnrollmentService = new Mock<IStudentCourseEnrollmentService>();
+        studentCourseEnrollmentService
+            .Setup(service => service.RecalculateCourseFee(courseId, familyId))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(new CourseResponseDetailed
+            {
+                CourseId = courseId,
+                Name = "Rattel School Quran Class (Wednesday / Friday)",
+                NameFr = "l'ecole coranique Rattel (mercredi / vendredi)"
+            });
+
+        var userService = new Mock<IUserService>();
+        userService
+            .Setup(service => service.GetAllFamilyUsersInformation(familyId, true))
+            .ReturnsAsync(new[]
+            {
+                new UserInformationResponse
+                {
+                    Email = "parent@example.com",
+                    Relationship = Relationship.Father
+                }
+            });
+
+        var sendEmailService = new Mock<ISendEmailService>();
+        sendEmailService
+            .Setup(service => service.SendBulkEmail(It.IsAny<MultiUserEmailData>()))
+            .Callback<MultiUserEmailData>(email => sentEmail = email)
+            .ReturnsAsync(true);
+
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService,
+            studentCourseEnrollmentService,
+            courseService,
+            userService,
+            sendEmailService);
+
+        await service.AddPayment(new AddCoursePayment
+        {
+            StudentCourseTransactionId = studentTransactionId,
+            FamilyId = familyId,
+            AmountPaid = 20m,
+            Comments = "refund",
+            PaymentMode = PaymentMode.CashOnCounter,
+            PaymentType = PaymentType.Refund,
+            IsActive = true
+        });
+
+        Assert.NotNull(sentEmail);
+        Assert.Equal("ICC Maktab refund confirmation - confirmation de remboursement ICC Maktab", sentEmail!.Subject);
+        Assert.Contains("Your refund", sentEmail.Body);
+        Assert.Contains("20.00", sentEmail.Body);
+        Assert.Contains("Votre remboursement", sentEmail.Body);
+    }
+
+    private static CoursePaymentService CreateService(
+        Mock<ICoursePaymentRepository> repository,
+        Mock<IStudentCourseTransactionService> studentCourseTransactionService,
+        Mock<IStudentCourseEnrollmentService>? studentCourseEnrollmentService = null,
+        Mock<ICourseService>? courseService = null,
+        Mock<IUserService>? userService = null,
+        Mock<ISendEmailService>? sendEmailService = null)
+    {
+        return new CoursePaymentService(
+            repository.Object,
+            studentCourseTransactionService.Object,
+            (studentCourseEnrollmentService ?? new Mock<IStudentCourseEnrollmentService>()).Object,
+            (courseService ?? new Mock<ICourseService>()).Object,
+            (userService ?? new Mock<IUserService>()).Object,
+            (sendEmailService ?? new Mock<ISendEmailService>()).Object);
     }
 }

@@ -69,6 +69,27 @@ public class StudentCourseTransactionRepositoryTests
     }
 
     [Fact]
+    public async Task GetAllTransactionsByCourse_PrefersRegisteredParentSourcesOverOtherContacts()
+    {
+        string? commandText = null;
+
+        var database = new FakeDatabase(
+            CreateEmptyReader,
+            command => commandText = command.CommandText);
+
+        var repository = new StudentCourseTransactionRepository(database);
+
+        var result = await repository.GetAllTransactionsByCourse(Guid.NewGuid());
+
+        Assert.Empty(result);
+        Assert.NotNull(commandText);
+        Assert.DoesNotContain("{FamilyInformationJoinSql}", commandText);
+        Assert.Contains("tui.Relationship NOT IN (1, 2, 3)", commandText);
+        Assert.Contains("NOT EXISTS", commandText);
+        Assert.Contains("oci.Relationship NOT IN (1, 2, 3)", commandText);
+    }
+
+    [Fact]
     public async Task GetCourseEnrollmentGroupInformation_MapsGroupedStatusesForSpecificGroup()
     {
         var groupId = Guid.Parse("c517c470-6478-4caa-8f02-d8886371277d");
@@ -108,6 +129,26 @@ public class StudentCourseTransactionRepositoryTests
         Assert.Single(result);
         Assert.NotNull(commandText);
         Assert.Contains("CAST(sce.EnrollmentStatus AS SIGNED) AS EnrollmentStatus", commandText);
+    }
+
+    [Fact]
+    public async Task GetAllEnrollmentsByCourse_PrefersRegisteredFamilyMembersOverTempDuplicates()
+    {
+        string? commandText = null;
+
+        var database = new FakeDatabase(
+            CreateEnrollmentListReader,
+            command => commandText = command.CommandText);
+
+        var repository = new StudentCourseEnrollmentRepository(database);
+
+        var result = await repository.GetAllEnrollmentsByCourse(Guid.NewGuid());
+
+        Assert.Single(result);
+        Assert.NotNull(commandText);
+        Assert.Contains("FROM temp_user_info tui", commandText);
+        Assert.Contains("tui.Relationship NOT IN (1, 2, 3)", commandText);
+        Assert.Contains("NOT EXISTS", commandText);
     }
 
     private static DbDataReader CreateSingleTransactionReader(string feeInstallmentsJson, decimal totalAmountPaid)
@@ -260,6 +301,12 @@ public class StudentCourseTransactionRepositoryTests
             "5551112222",
             1);
 
+        return table.CreateDataReader();
+    }
+
+    private static DbDataReader CreateEmptyReader()
+    {
+        var table = new DataTable();
         return table.CreateDataReader();
     }
 }
