@@ -40,6 +40,8 @@ namespace Application.Users.Implementation
 
         public async Task<UserInformationResponse> AddTemporaryUser(AddUserInformation userInformation)
         {
+            await EnsureParentRelationshipIsAvailableAsync(userInformation.FamilyId, userInformation.Relationship).ConfigureAwait(false);
+
             var userInforationToStore = MapToUserRegistrationInformation(userInformation);
             var tempuser = await _tempUserRepository.AddTemporaryUser(userInforationToStore).ConfigureAwait(false);
            
@@ -66,6 +68,13 @@ namespace Application.Users.Implementation
                     // valid family id with which second user will be connected to
                 {
                     tempUser.FamilyId = Guid.NewGuid();
+                }
+                else
+                {
+                    await EnsureParentRelationshipIsAvailableAsync(
+                        tempUser.FamilyId,
+                        tempUser.Relationship,
+                        tempUser.UserId).ConfigureAwait(false);
                 }
 
                 var result = await _repository.AddUser(tempUser).ConfigureAwait(false);
@@ -392,7 +401,9 @@ namespace Application.Users.Implementation
 
         public async Task<IEnumerable<UserInformationResponse>> GetAllFamilyUsersInformation(Guid familyId, bool ifOnlyActive = true)
         {
-            return (await _repository.GetAllFamilyUsersInformation(familyId, ifOnlyActive).ConfigureAwait(false))
+            var familyUsers = await _repository.GetAllFamilyUsersInformation(familyId, ifOnlyActive).ConfigureAwait(false);
+
+            return ApplyParentRelationshipPrecedence(familyUsers ?? Enumerable.Empty<UserInformation>())
                 .Select(user => MapToUserInformationResponse(user, user.IfTempUser))
                 .ToList();
         }
@@ -468,6 +479,86 @@ namespace Application.Users.Implementation
         private static DateTime GetLinkedUserPlaceholderDate()
         {
             return new DateTime(1900, 1, 1);
+        }
+
+        private async Task EnsureParentRelationshipIsAvailableAsync(Guid familyId, Relationship relationship, Guid? excludedUserId = null)
+        {
+            if (familyId == Guid.Empty || !IsSingleParentRelationship(relationship))
+            {
+                return;
+            }
+
+            var familyUsers = await _repository.GetAllFamilyUsersInformation(familyId, true).ConfigureAwait(false)
+                ?? Enumerable.Empty<UserInformation>();
+
+            var duplicateParentExists = familyUsers.Any(user =>
+                user.Relationship == relationship &&
+                user.UserId != excludedUserId);
+
+            if (duplicateParentExists)
+            {
+                throw new InvalidOperationException(
+                    $"{GetParentRelationshipDisplayName(relationship)} is already added and multiple same parents can't be added");
+            }
+        }
+
+        private static IEnumerable<UserInformation> ApplyParentRelationshipPrecedence(IEnumerable<UserInformation> familyUsers)
+        {
+            var users = familyUsers.ToList();
+            var prioritizedParents = new List<UserInformation>();
+
+            foreach (var relationship in new[] { Relationship.Mother, Relationship.Father })
+            {
+                var latestVerifiedParent = users
+                    .Where(user => user.Relationship == relationship && !user.IfTempUser)
+                    .OrderByDescending(user => user.UpdatedOn)
+                    .ThenByDescending(user => user.CreatedAt)
+                    .ThenByDescending(user => user.UserId)
+                    .FirstOrDefault();
+
+                if (latestVerifiedParent != null)
+                {
+                    prioritizedParents.Add(latestVerifiedParent);
+                    continue;
+                }
+
+                var latestPendingParent = users
+                    .Where(user => user.Relationship == relationship && user.IfTempUser)
+                    .OrderByDescending(user => user.UpdatedOn)
+                    .ThenByDescending(user => user.CreatedAt)
+                    .ThenByDescending(user => user.UserId)
+                    .FirstOrDefault();
+
+                if (latestPendingParent != null)
+                {
+                    prioritizedParents.Add(latestPendingParent);
+                }
+            }
+
+            return users
+                .Where(user => !IsSingleParentRelationship(user.Relationship))
+                .Concat(prioritizedParents)
+                .OrderBy(user => user.Relationship)
+                .ThenBy(user => user.IfTempUser)
+                .ThenByDescending(user => user.UpdatedOn)
+                .ThenByDescending(user => user.CreatedAt)
+                .ThenByDescending(user => user.UserId)
+                .ToList();
+        }
+
+        private static bool IsSingleParentRelationship(Relationship relationship)
+        {
+            return relationship == Relationship.Mother || relationship == Relationship.Father;
+        }
+
+        private static string GetParentRelationshipDisplayName(Relationship relationship)
+        {
+            return relationship switch
+            {
+                Relationship.Mother => "Mother",
+                Relationship.Father => "Father",
+                _ => relationship.ToString()
+            };
         }
 
         /*public async Task<MaktabApiResult<UserTransactionsDetails>> CreateUserTransaction(AddUserTransaction addUserTransactions)

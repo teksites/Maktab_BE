@@ -1,18 +1,34 @@
-﻿using Courses.Repository;
+using Courses.Repository;
 using Courses.Services;
+using Email;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Responses.Course;
 using MaktabDataContracts.Responses.Transactions;
+using System.Net;
+using Users.Services;
 
 namespace Courses.Implementation.Services
 {
     public class StudentCourseTransactionService : IStudentCourseTransactionService
     {
-        private readonly IStudentCourseTransactionRepository _repository;
+        private const string DiscountConfirmationSubject = "ICC Maktab discount confirmation - confirmation de rabais ICC Maktab";
 
-        public StudentCourseTransactionService(IStudentCourseTransactionRepository repository)
+        private readonly IStudentCourseTransactionRepository _repository;
+        private readonly ICourseService _courseService;
+        private readonly IUserService _userService;
+        private readonly ISendEmailService _sendEmailService;
+
+        public StudentCourseTransactionService(
+            IStudentCourseTransactionRepository repository,
+            ICourseService courseService,
+            IUserService userService,
+            ISendEmailService sendEmailService)
         {
             _repository = repository;
+            _courseService = courseService;
+            _userService = userService;
+            _sendEmailService = sendEmailService;
         }
 
         // ----------------------------
@@ -24,8 +40,24 @@ namespace Courses.Implementation.Services
         public Task<StudentCourseTransactionResponse?> GetTransaction(Guid transactionId)
             => _repository.GetTransaction(transactionId);
 
-        public Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction)
-            => _repository.UpdateTransaction(transactionId, transaction);
+        public async Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction)
+        {
+            var existingTransaction = await _repository.GetTransaction(transactionId).ConfigureAwait(false);
+            var updated = await _repository.UpdateTransaction(transactionId, transaction).ConfigureAwait(false);
+
+            if (!updated || existingTransaction == null)
+            {
+                return updated;
+            }
+
+            var discountIncrease = CalculateDiscountAmount(transaction) - CalculateDiscountAmount(existingTransaction);
+            if (discountIncrease > 0m)
+            {
+                await SendDiscountNotificationIfApplicableAsync(existingTransaction, discountIncrease).ConfigureAwait(false);
+            }
+
+            return true;
+        }
 
         public Task<bool> DeleteTransaction(Guid transactionId, bool hardDelete = false)
             => _repository.DeleteTransaction(transactionId, hardDelete);
@@ -108,5 +140,74 @@ namespace Courses.Implementation.Services
 
         public Task<bool> DeleteStudentCourseTransactionEnrollmentById(Guid id)
            => _repository.DeleteStudentCourseTransactionEnrollmentById(id);
+
+        private async Task SendDiscountNotificationIfApplicableAsync(
+            StudentCourseTransactionResponse existingTransaction,
+            decimal discountIncrease)
+        {
+            var courseId = existingTransaction.Enrollments.FirstOrDefault()?.CourseId ?? Guid.Empty;
+            if (courseId == Guid.Empty)
+            {
+                return;
+            }
+
+            var course = await _courseService.GetCourse(courseId).ConfigureAwait(false);
+            if (course == null)
+            {
+                return;
+            }
+
+            var targetEmails = await GetFamilyNotificationEmailAddressesAsync(existingTransaction.FamilyId).ConfigureAwait(false);
+            if (!targetEmails.Any())
+            {
+                return;
+            }
+
+            var email = BuildDiscountConfirmationEmail(discountIncrease, course);
+            await _sendEmailService.SendBulkEmail(new MultiUserEmailData
+            {
+                To = targetEmails,
+                Subject = email.Subject,
+                Body = email.Body
+            }).ConfigureAwait(false);
+        }
+
+        private async Task<List<string>> GetFamilyNotificationEmailAddressesAsync(Guid familyId)
+        {
+            var familyUsers = await _userService.GetAllFamilyUsersInformation(familyId, true).ConfigureAwait(false)
+                ?? Enumerable.Empty<MaktabDataContracts.Responses.Users.UserInformationResponse>();
+
+            return familyUsers
+                .Where(x => x.Relationship == Relationship.Mother ||
+                            x.Relationship == Relationship.Father ||
+                            x.Relationship == Relationship.Guardian)
+                .Select(x => x.Email?.Trim() ?? string.Empty)
+                .Where(emailAddress => !string.IsNullOrWhiteSpace(emailAddress))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static decimal CalculateDiscountAmount(AddStudentCourseTransaction transaction)
+            => transaction.FeeAmountDiscount + transaction.DayCareDiscount;
+
+        private static decimal CalculateDiscountAmount(StudentCourseTransactionResponse transaction)
+            => transaction.FeeAmountDiscount + transaction.DayCareDiscount;
+
+        private static DiscountEmailContent BuildDiscountConfirmationEmail(decimal amount, CourseResponseDetailed course)
+        {
+            var amountText = amount.ToString("0.00");
+            var courseName = WebUtility.HtmlEncode(course.Name ?? string.Empty);
+            var courseNameFr = WebUtility.HtmlEncode(course.NameFr ?? course.Name ?? string.Empty);
+
+            return new DiscountEmailContent(
+                DiscountConfirmationSubject,
+                $"<p>A discount of <strong>{amountText}</strong> has been applied to the <strong>{courseName}</strong>.</p>" +
+                "<p>Please review your parent portal to see your payment schedule and amount remaining (if any).</p>" +
+                "<div>&nbsp;</div>" +
+                $"<p>Un rabais de <strong>{amountText}</strong> a ete applique pour <strong>{courseNameFr}</strong>.</p>" +
+                "<p>Veuillez svp verifier votre portail pour voir votre cedule de paiement et le montant restant, s'il y a lieu.</p>");
+        }
+
+        private sealed record DiscountEmailContent(string Subject, string Body);
     }
 }
