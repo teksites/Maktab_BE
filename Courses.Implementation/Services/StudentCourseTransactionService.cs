@@ -43,6 +43,7 @@ namespace Courses.Implementation.Services
         public async Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction)
         {
             var existingTransaction = await _repository.GetTransaction(transactionId).ConfigureAwait(false);
+            await NormalizeTransactionTotalsAsync(existingTransaction, transaction).ConfigureAwait(false);
             var updated = await _repository.UpdateTransaction(transactionId, transaction).ConfigureAwait(false);
 
             if (!updated || existingTransaction == null)
@@ -192,6 +193,36 @@ namespace Courses.Implementation.Services
 
         private static decimal CalculateDiscountAmount(StudentCourseTransactionResponse transaction)
             => transaction.FeeAmountDiscount + transaction.DayCareDiscount;
+
+        private async Task NormalizeTransactionTotalsAsync(
+            StudentCourseTransactionResponse? existingTransaction,
+            AddStudentCourseTransaction transaction)
+        {
+            ArgumentNullException.ThrowIfNull(transaction);
+
+            var registrationFee = await GetCourseRegistrationFeeAsync(existingTransaction).ConfigureAwait(false);
+            var recalculatedTotalPayable =
+                transaction.PayableFee +
+                transaction.DayCareFee +
+                registrationFee -
+                (transaction.FeeAmountDiscount + transaction.DayCareDiscount) +
+                Convert.ToDecimal(transaction.Surcharge);
+
+            transaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable;
+            transaction.IsCompletelyPaid = transaction.TotalPayable <= transaction.TotalAmountPaid;
+        }
+
+        private async Task<decimal> GetCourseRegistrationFeeAsync(StudentCourseTransactionResponse? existingTransaction)
+        {
+            var courseId = existingTransaction?.Enrollments?.FirstOrDefault()?.CourseId ?? Guid.Empty;
+            if (courseId == Guid.Empty)
+            {
+                return 0m;
+            }
+
+            var course = await _courseService.GetCourse(courseId).ConfigureAwait(false);
+            return course?.RegistrationFee ?? 0m;
+        }
 
         private static DiscountEmailContent BuildDiscountConfirmationEmail(decimal amount, CourseResponseDetailed course)
         {
