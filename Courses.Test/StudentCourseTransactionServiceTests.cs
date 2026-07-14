@@ -151,6 +151,17 @@ public class StudentCourseTransactionServiceTests
                 FeeAmountDiscount = 0m,
                 DayCareDiscount = 0m,
                 TotalAmountPaid = 200m,
+                FeeInstallments = new List<FeeInstallment>
+                {
+                    new()
+                    {
+                        Description = "Registration",
+                        DescriptionFr = "Registration",
+                        DueDate = DateTime.UtcNow.Date.AddDays(1),
+                        Amount = 20m,
+                        PaymentStatus = PaymentStatus.Unpaid
+                    }
+                },
                 Enrollments = new List<StudentCourseEnrollmentResponse>
                 {
                     new()
@@ -196,6 +207,7 @@ public class StudentCourseTransactionServiceTests
         Assert.True(updated);
         Assert.NotNull(capturedTransaction);
         Assert.Equal(0m, capturedTransaction!.TotalPayable);
+        Assert.Empty(capturedTransaction.FeeInstallments);
         Assert.True(capturedTransaction.IsCompletelyPaid);
     }
 }

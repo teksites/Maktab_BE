@@ -209,6 +209,10 @@ namespace Courses.Implementation.Services
                 Convert.ToDecimal(transaction.Surcharge);
 
             transaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable;
+            transaction.FeeInstallments = NormalizeFeeInstallments(
+                transaction.FeeInstallments,
+                existingTransaction?.FeeInstallments,
+                transaction.TotalPayable);
             transaction.IsCompletelyPaid = transaction.TotalPayable <= transaction.TotalAmountPaid;
         }
 
@@ -222,6 +226,76 @@ namespace Courses.Implementation.Services
 
             var course = await _courseService.GetCourse(courseId).ConfigureAwait(false);
             return course?.RegistrationFee ?? 0m;
+        }
+
+        private static List<FeeInstallment> NormalizeFeeInstallments(
+            IReadOnlyCollection<FeeInstallment>? requestedInstallments,
+            IReadOnlyCollection<FeeInstallment>? existingInstallments,
+            decimal totalPayable)
+        {
+            if (totalPayable <= 0m)
+            {
+                return new List<FeeInstallment>();
+            }
+
+            var sourceInstallments = (requestedInstallments != null && requestedInstallments.Count > 0
+                    ? requestedInstallments
+                    : existingInstallments)
+                ?.OrderBy(installment => installment.DueDate)
+                .ToList();
+
+            if (sourceInstallments == null || sourceInstallments.Count == 0)
+            {
+                return new List<FeeInstallment>();
+            }
+
+            var normalized = new List<FeeInstallment>(sourceInstallments.Count);
+            var remainingAmount = totalPayable;
+
+            foreach (var installment in sourceInstallments)
+            {
+                if (remainingAmount <= 0m)
+                {
+                    break;
+                }
+
+                var amount = installment.Amount <= remainingAmount
+                    ? installment.Amount
+                    : remainingAmount;
+
+                if (amount <= 0m)
+                {
+                    continue;
+                }
+
+                normalized.Add(new FeeInstallment
+                {
+                    Description = installment.Description,
+                    DescriptionFr = installment.DescriptionFr,
+                    DueDate = installment.DueDate,
+                    Amount = amount,
+                    PaymentStatus = installment.PaymentStatus
+                });
+
+                remainingAmount -= amount;
+            }
+
+            if (remainingAmount > 0m && normalized.Count > 0)
+            {
+                normalized[^1].Amount += remainingAmount;
+            }
+            else if (remainingAmount > 0m)
+            {
+                normalized.Add(new FeeInstallment
+                {
+                    Description = "Paiement complet de l'inscription/Complete Registration Payment",
+                    DescriptionFr = "Paiement complet de l'inscription",
+                    DueDate = DateTime.UtcNow.Date.AddDays(1),
+                    Amount = remainingAmount
+                });
+            }
+
+            return normalized;
         }
 
         private static DiscountEmailContent BuildDiscountConfirmationEmail(decimal amount, CourseResponseDetailed course)
