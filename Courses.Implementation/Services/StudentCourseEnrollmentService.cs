@@ -65,6 +65,8 @@ namespace Courses.Implementation.Services
             var familyCourseTransaction = familyTransactions.Where(x => x.Enrollments.All(y => y.CourseId == enrollment.CourseId));
             var course = await _courseService.GetCourse(enrollment.CourseId).ConfigureAwait(false);
 
+            await EnsureFamilyHasRequiredParentsForEnrollmentAsync(enrollment.FamilyId, course).ConfigureAwait(false);
+
             if (!course.IsRegistrationOpened && !ifAddedByAdmin)
             {
                 throw new Exception("The registration is closed. Contact Admin please");
@@ -740,6 +742,27 @@ namespace Courses.Implementation.Services
                 : 0;
 
             return enrolledCount + registeredCount;
+        }
+
+        private async Task EnsureFamilyHasRequiredParentsForEnrollmentAsync(Guid familyId, CourseResponseDetailed course)
+        {
+            if (course == null || course.IsCourseAnEvent)
+            {
+                return;
+            }
+
+            var familyUsers = await _userService.GetAllFamilyUsersInformation(familyId, true).ConfigureAwait(false)
+                ?? Enumerable.Empty<MaktabDataContracts.Responses.Users.UserInformationResponse>();
+
+            var hasMother = familyUsers.Any(user => user.Relationship == Relationship.Mother);
+            var hasFather = familyUsers.Any(user => user.Relationship == Relationship.Father);
+
+            if (hasMother && hasFather)
+            {
+                return;
+            }
+
+            throw new InvalidOperationException("Both mother and father must be registered before enrolling the child in this course.");
         }
 
         private static bool IsFeeBearingEnrollmentStatus(EnrollmentStatus status)

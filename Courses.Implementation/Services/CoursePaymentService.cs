@@ -73,7 +73,10 @@ namespace Courses.Services.Implementation
                 BuildUpdatedTransaction(
                     transaction,
                     allPayments,
-                    transaction.Comments + $"\n added payment: {payment.AmountPaid} via payment mode: {payment.PaymentMode.ToString()} on date: {DateTime.UtcNow}"))
+                    AppendTransactionComment(
+                        transaction.Comments,
+                        $"added payment: {payment.AmountPaid} via payment mode: {payment.PaymentMode.ToString()} on date: {DateTime.UtcNow}",
+                        payment.Comments)))
                 .ConfigureAwait(false);
             await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
             await SendPaymentNotificationIfApplicableAsync(payment, transaction).ConfigureAwait(false);
@@ -105,7 +108,10 @@ namespace Courses.Services.Implementation
                 BuildUpdatedTransaction(
                     transaction,
                     allPayments,
-                    transaction.Comments + $"\n added payment: {payment.AmountPaid} via payment mode: {payment.PaymentMode.ToString()}"))
+                    AppendTransactionComment(
+                        transaction.Comments,
+                        $"updated payment: {payment.AmountPaid} via payment mode: {payment.PaymentMode.ToString()} on date: {DateTime.UtcNow}",
+                        payment.Comments)))
                 .ConfigureAwait(false);
             await RecalculateEnrollmentState(transaction).ConfigureAwait(false);
 
@@ -214,6 +220,23 @@ namespace Courses.Services.Implementation
                 MaktabDataContracts.Enums.PaymentType.Surcharge => 0m,
                 _ => payment.AmountPaid
             });
+        }
+
+        private static string AppendTransactionComment(string? existingComments, string summary, string? paymentComment = null)
+        {
+            var segments = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(existingComments))
+            {
+                segments.Add(existingComments.TrimEnd());
+            }
+
+            var entry = string.IsNullOrWhiteSpace(paymentComment)
+                ? summary
+                : $"{summary}. Comment: {paymentComment}";
+
+            segments.Add(entry);
+            return string.Join("\n", segments);
         }
 
         private async Task SendPaymentNotificationIfApplicableAsync(

@@ -107,6 +107,96 @@ public class CoursePaymentServiceTests
     }
 
     [Fact]
+    public async Task AddPayment_CashOnCounter_AppendsPaymentCommentToTransactionComments()
+    {
+        var studentTransactionId = Guid.Parse("aaaaaaaa-1111-1111-1111-111111111111");
+        var familyId = Guid.Parse("bbbbbbbb-2222-2222-2222-222222222222");
+        var courseId = Guid.Parse("cccccccc-3333-3333-3333-333333333333");
+        AddStudentCourseTransaction? capturedTransactionUpdate = null;
+
+        var repository = new Mock<ICoursePaymentRepository>();
+        repository
+            .Setup(repo => repo.TryAddPayment(It.IsAny<AddCoursePayment>()))
+            .ReturnsAsync((new CoursePaymentResponse
+            {
+                PaymentId = Guid.NewGuid(),
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                AmountPaid = 50m,
+                Comments = "Paid at front desk",
+                PaymentMode = PaymentMode.CashOnCounter,
+                PaymentType = PaymentType.Credit,
+                IsActive = true
+            }, true));
+        repository
+            .Setup(repo => repo.GetAllPayments(studentTransactionId))
+            .ReturnsAsync(new[]
+            {
+                new CoursePaymentResponse
+                {
+                    StudentCourseTransactionId = studentTransactionId,
+                    FamilyId = familyId,
+                    AmountPaid = 50m,
+                    Comments = "Paid at front desk",
+                    PaymentMode = PaymentMode.CashOnCounter,
+                    PaymentType = PaymentType.Credit,
+                    IsActive = true
+                }
+            });
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransaction(studentTransactionId))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                PaymentCode = "COUNTER1",
+                Comments = "existing",
+                FeeInstallments = new List<FeeInstallment>(),
+                RegistrationStatus = RegistrationStatus.Pending,
+                TransactionStatus = TransactionStatus.AwaitingPayment,
+                IsActive = true,
+                TotalPayable = 100m,
+                Enrollments = new List<StudentCourseEnrollmentResponse>
+                {
+                    new()
+                    {
+                        CourseId = courseId
+                    }
+                }
+            });
+        studentCourseTransactionService
+            .Setup(service => service.UpdateTransaction(studentTransactionId, It.IsAny<AddStudentCourseTransaction>()))
+            .Callback<Guid, AddStudentCourseTransaction>((_, transaction) => capturedTransactionUpdate = transaction)
+            .ReturnsAsync(true);
+
+        var studentCourseEnrollmentService = new Mock<IStudentCourseEnrollmentService>();
+        studentCourseEnrollmentService
+            .Setup(service => service.RecalculateCourseFee(courseId, familyId))
+            .ReturnsAsync(true);
+
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService,
+            studentCourseEnrollmentService);
+
+        await service.AddPayment(new AddCoursePayment
+        {
+            StudentCourseTransactionId = studentTransactionId,
+            FamilyId = familyId,
+            AmountPaid = 50m,
+            Comments = "Paid at front desk",
+            PaymentMode = PaymentMode.CashOnCounter,
+            PaymentType = PaymentType.Credit,
+            IsActive = true
+        });
+
+        Assert.NotNull(capturedTransactionUpdate);
+        Assert.Contains("Paid at front desk", capturedTransactionUpdate!.Comments);
+    }
+
+    [Fact]
     public async Task TryAddPayment_DuplicateExternalPaymentId_DoesNotUpdateTransactionTwice()
     {
         var studentTransactionId = Guid.Parse("44444444-4444-4444-4444-444444444444");

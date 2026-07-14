@@ -185,6 +185,11 @@ public class StudentCourseEnrollmentServiceTests
                 {
                     Email = "parent@example.com",
                     Relationship = Relationship.Mother
+                },
+                new UserInformationResponse
+                {
+                    Email = "parent2@example.com",
+                    Relationship = Relationship.Father
                 }
             });
 
@@ -294,6 +299,11 @@ public class StudentCourseEnrollmentServiceTests
                 {
                     Email = "parent@example.com",
                     Relationship = Relationship.Mother
+                },
+                new UserInformationResponse
+                {
+                    Email = "parent2@example.com",
+                    Relationship = Relationship.Father
                 }
             });
 
@@ -411,6 +421,153 @@ public class StudentCourseEnrollmentServiceTests
 
         Assert.NotNull(response);
         Assert.Equal(3, capturedEnrollment!.EnrollmentIndex);
+    }
+
+    [Fact]
+    public async Task AddEnrollment_WhenRegularCourseMissingAParent_ThrowsAndDoesNotPersistEnrollment()
+    {
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(Array.Empty<StudentCourseTransactionResponse>());
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 120));
+
+        var userService = new Mock<IUserService>();
+        userService
+            .Setup(service => service.GetAllFamilyUsersInformation(familyId, true))
+            .ReturnsAsync(new[]
+            {
+                new UserInformationResponse
+                {
+                    Email = "mother@example.com",
+                    Relationship = Relationship.Mother
+                }
+            });
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            userService: userService);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.AddEnrollment(new AddStudentCourseEnrollment
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            CourseId = courseId,
+            CourseEnrollmentGroupId = groupId,
+            WillUseDayCare = false,
+            DayCareDays = 0
+        }));
+
+        Assert.Equal("Both mother and father must be registered before enrolling the child in this course.", exception.Message);
+        repository.Verify(repo => repo.AddEnrollment(It.IsAny<AddStudentCourseEnrollment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AddEnrollment_WhenCourseIsEvent_AllowsEnrollmentWithoutBothParents()
+    {
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        AddStudentCourseEnrollment? capturedEnrollment = null;
+
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetCourseEnrollmentGroupInformation(groupId))
+            .ReturnsAsync(new CourseEnrollmentGroupInformationResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                MaxStudents = 20,
+                IfRegistrationOpen = true,
+                EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>()
+            });
+        repository
+            .Setup(repo => repo.AddEnrollment(It.IsAny<AddStudentCourseEnrollment>()))
+            .Callback<AddStudentCourseEnrollment>(enrollment => capturedEnrollment = enrollment)
+            .ReturnsAsync(() => new StudentCourseEnrollmentResponse
+            {
+                StudentCourseEnrollmentId = Guid.NewGuid(),
+                ChildId = childId,
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                FamilyId = familyId,
+                EnrollmentStatus = capturedEnrollment!.EnrollmentStatus,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedOn = DateTime.UtcNow
+            });
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(Array.Empty<StudentCourseTransactionResponse>());
+        transactionService
+            .Setup(service => service.AddTransaction(It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = Guid.NewGuid(),
+                FamilyId = familyId
+            });
+        transactionService
+            .Setup(service => service.AddEnrollmentsToTransaction(It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .ReturnsAsync(true);
+
+        var course = CreateCourse(courseId, groupId, 120);
+        course.IsCourseAnEvent = true;
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(course);
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
+
+        var userService = new Mock<IUserService>();
+        userService
+            .Setup(service => service.GetAllFamilyUsersInformation(familyId, true))
+            .ReturnsAsync(new[]
+            {
+                new UserInformationResponse
+                {
+                    Email = "mother@example.com",
+                    Relationship = Relationship.Mother
+                }
+            });
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService,
+            userService: userService);
+
+        var response = await service.AddEnrollment(new AddStudentCourseEnrollment
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            CourseId = courseId,
+            CourseEnrollmentGroupId = groupId,
+            WillUseDayCare = false,
+            DayCareDays = 0
+        });
+
+        Assert.NotNull(response);
+        Assert.NotNull(capturedEnrollment);
     }
 
     [Fact]
@@ -2107,6 +2264,26 @@ public class StudentCourseEnrollmentServiceTests
         Mock<IUserService>? userService = null,
         Mock<ISendEmailService>? sendEmailService = null)
     {
+        if (userService == null)
+        {
+            userService = new Mock<IUserService>();
+            userService
+                .Setup(service => service.GetAllFamilyUsersInformation(It.IsAny<Guid>(), true))
+                .ReturnsAsync(new[]
+                {
+                    new UserInformationResponse
+                    {
+                        Email = "mother@example.com",
+                        Relationship = Relationship.Mother
+                    },
+                    new UserInformationResponse
+                    {
+                        Email = "father@example.com",
+                        Relationship = Relationship.Father
+                    }
+                });
+        }
+
         return new StudentCourseEnrollmentService(
             (repository ?? new Mock<IStudentCourseEnrollmentRepository>()).Object,
             (transactionService ?? new Mock<IStudentCourseTransactionService>()).Object,
@@ -2114,7 +2291,7 @@ public class StudentCourseEnrollmentServiceTests
             (policyService ?? new Mock<IInstitutePolicyService>()).Object,
             (groupService ?? new Mock<ICourseEnrollmentGroupService>()).Object,
             (sendEmailService ?? new Mock<ISendEmailService>()).Object,
-            (userService ?? new Mock<IUserService>()).Object);
+            userService.Object);
     }
 
     private static StudentCourseTransactionResponse CreateFamilyTransaction(
