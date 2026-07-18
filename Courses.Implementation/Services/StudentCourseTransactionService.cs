@@ -43,6 +43,7 @@ namespace Courses.Implementation.Services
         public async Task<bool> UpdateTransaction(Guid transactionId, AddStudentCourseTransaction transaction)
         {
             var existingTransaction = await _repository.GetTransaction(transactionId).ConfigureAwait(false);
+            await NormalizeTransactionTotalsAsync(existingTransaction, transaction).ConfigureAwait(false);
             var updated = await _repository.UpdateTransaction(transactionId, transaction).ConfigureAwait(false);
 
             if (!updated || existingTransaction == null)
@@ -192,6 +193,110 @@ namespace Courses.Implementation.Services
 
         private static decimal CalculateDiscountAmount(StudentCourseTransactionResponse transaction)
             => transaction.FeeAmountDiscount + transaction.DayCareDiscount;
+
+        private async Task NormalizeTransactionTotalsAsync(
+            StudentCourseTransactionResponse? existingTransaction,
+            AddStudentCourseTransaction transaction)
+        {
+            ArgumentNullException.ThrowIfNull(transaction);
+
+            var registrationFee = await GetCourseRegistrationFeeAsync(existingTransaction).ConfigureAwait(false);
+            var recalculatedTotalPayable =
+                transaction.PayableFee +
+                transaction.DayCareFee +
+                registrationFee -
+                (transaction.FeeAmountDiscount + transaction.DayCareDiscount) +
+                Convert.ToDecimal(transaction.Surcharge);
+
+            transaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable;
+            transaction.FeeInstallments = NormalizeFeeInstallments(
+                transaction.FeeInstallments,
+                existingTransaction?.FeeInstallments,
+                transaction.TotalPayable);
+            transaction.IsCompletelyPaid = transaction.TotalPayable <= transaction.TotalAmountPaid;
+        }
+
+        private async Task<decimal> GetCourseRegistrationFeeAsync(StudentCourseTransactionResponse? existingTransaction)
+        {
+            var courseId = existingTransaction?.Enrollments?.FirstOrDefault()?.CourseId ?? Guid.Empty;
+            if (courseId == Guid.Empty)
+            {
+                return 0m;
+            }
+
+            var course = await _courseService.GetCourse(courseId).ConfigureAwait(false);
+            return course?.RegistrationFee ?? 0m;
+        }
+
+        private static List<FeeInstallment> NormalizeFeeInstallments(
+            IReadOnlyCollection<FeeInstallment>? requestedInstallments,
+            IReadOnlyCollection<FeeInstallment>? existingInstallments,
+            decimal totalPayable)
+        {
+            if (totalPayable <= 0m)
+            {
+                return new List<FeeInstallment>();
+            }
+
+            var sourceInstallments = (requestedInstallments != null && requestedInstallments.Count > 0
+                    ? requestedInstallments
+                    : existingInstallments)
+                ?.OrderBy(installment => installment.DueDate)
+                .ToList();
+
+            if (sourceInstallments == null || sourceInstallments.Count == 0)
+            {
+                return new List<FeeInstallment>();
+            }
+
+            var normalized = new List<FeeInstallment>(sourceInstallments.Count);
+            var remainingAmount = totalPayable;
+
+            foreach (var installment in sourceInstallments)
+            {
+                if (remainingAmount <= 0m)
+                {
+                    break;
+                }
+
+                var amount = installment.Amount <= remainingAmount
+                    ? installment.Amount
+                    : remainingAmount;
+
+                if (amount <= 0m)
+                {
+                    continue;
+                }
+
+                normalized.Add(new FeeInstallment
+                {
+                    Description = installment.Description,
+                    DescriptionFr = installment.DescriptionFr,
+                    DueDate = installment.DueDate,
+                    Amount = amount,
+                    PaymentStatus = installment.PaymentStatus
+                });
+
+                remainingAmount -= amount;
+            }
+
+            if (remainingAmount > 0m && normalized.Count > 0)
+            {
+                normalized[^1].Amount += remainingAmount;
+            }
+            else if (remainingAmount > 0m)
+            {
+                normalized.Add(new FeeInstallment
+                {
+                    Description = "Paiement complet de l'inscription/Complete Registration Payment",
+                    DescriptionFr = "Paiement complet de l'inscription",
+                    DueDate = DateTime.UtcNow.Date.AddDays(1),
+                    Amount = remainingAmount
+                });
+            }
+
+            return normalized;
+        }
 
         private static DiscountEmailContent BuildDiscountConfirmationEmail(decimal amount, CourseResponseDetailed course)
         {

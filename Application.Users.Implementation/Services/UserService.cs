@@ -1,7 +1,11 @@
 ﻿using Application.Users.Contracts;
 using Email;
 using Microsoft.Extensions.Configuration;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Users;
+using MaktabDataContracts.Responses.Addresses;
+using MaktabDataContracts.Responses.Course;
+using MaktabDataContracts.Responses.OtherContacts;
 using MaktabDataContracts.Responses.Users;
 using MaktabDataContracts.Helpers;
 using System.Text;
@@ -9,7 +13,6 @@ using Users.Contracts;
 using Users.Repository;
 using Users.Services;
 using Users.Utils.Implementation;
-using MaktabDataContracts.Enums;
 
 namespace Application.Users.Implementation
 {
@@ -418,6 +421,31 @@ namespace Application.Users.Implementation
             return await _repository.GetUserFamilyInformation(userInformation).ConfigureAwait(false);
         }
 
+        public async Task<FamilyInformationResponse> GetFamilyInformation(Guid familyId)
+        {
+            var familyUsersTask = _repository.GetAllFamilyUsersInformation(familyId, true);
+            var otherContactsTask = _otherContactsService.GetFamilyOtherContacts(familyId, Array.Empty<ContactType>());
+            var familyAddressesTask = _addressService.GetAddressWithConnectedId(familyId, includeInactive: false);
+
+            await Task.WhenAll(familyUsersTask, otherContactsTask, familyAddressesTask).ConfigureAwait(false);
+
+            var familyUsers = await familyUsersTask.ConfigureAwait(false) ?? Enumerable.Empty<UserInformation>();
+            var otherContacts = await otherContactsTask.ConfigureAwait(false) ?? Enumerable.Empty<OtherContactResponse>();
+            var familyAddresses = await familyAddressesTask.ConfigureAwait(false) ?? Enumerable.Empty<AddressResponse>();
+
+            return new FamilyInformationResponse
+            {
+                FamilyInformation = ApplyParentRelationshipPrecedence(familyUsers)
+                    .Where(user => IsFamilyInformationRelationship(user.Relationship))
+                    .Select(MapToFamilyInfo)
+                    .ToList(),
+                OtherContacts = otherContacts
+                    .Select(MapToFamilyInfo)
+                    .ToList(),
+                FamilyAddress = familyAddresses.ToList()
+            };
+        }
+
         private async Task<bool> CreateLinkedChildIfRequired(UserInformation userInformation)
         {
             if (!TryMapRelationshipToUserType(userInformation.Relationship, out var userType))
@@ -544,6 +572,43 @@ namespace Application.Users.Implementation
                 .ThenByDescending(user => user.CreatedAt)
                 .ThenByDescending(user => user.UserId)
                 .ToList();
+        }
+
+        private static bool IsFamilyInformationRelationship(Relationship relationship)
+        {
+            return relationship == Relationship.Mother
+                || relationship == Relationship.Father
+                || relationship == Relationship.Guardian;
+        }
+
+        private static FamilyInfo MapToFamilyInfo(UserInformation userInformation)
+        {
+            return new FamilyInfo
+            {
+                UserId = userInformation.UserId,
+                UserName = BuildDisplayName(userInformation.FirstName, userInformation.LastName, userInformation.UserName),
+                Email = userInformation.Email,
+                Phone = userInformation.Phone,
+                Relationship = userInformation.Relationship
+            };
+        }
+
+        private static FamilyInfo MapToFamilyInfo(OtherContactResponse otherContact)
+        {
+            return new FamilyInfo
+            {
+                UserId = otherContact.ContactId,
+                UserName = BuildDisplayName(otherContact.FirstName, otherContact.LastName),
+                Email = string.Empty,
+                Phone = otherContact.Phone,
+                Relationship = otherContact.Relationship
+            };
+        }
+
+        private static string BuildDisplayName(string? firstName, string? lastName, string? fallback = null)
+        {
+            var fullName = $"{firstName} {lastName}".Trim();
+            return string.IsNullOrWhiteSpace(fullName) ? (fallback ?? string.Empty) : fullName;
         }
 
         private static bool IsSingleParentRelationship(Relationship relationship)

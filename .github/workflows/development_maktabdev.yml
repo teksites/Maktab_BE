@@ -55,6 +55,16 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_6D0E730660C04E8587E0916B026AF818 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_956AF0E3A5D54142BFE4B0B1A04DCE0A }}
 
+      - name: Set deployment environment settings
+        shell: pwsh
+        run: |
+          $webAppId = az resource list --name 'maktabdev' --resource-type 'Microsoft.Web/sites' --query "[0].id" -o tsv
+          if ([string]::IsNullOrWhiteSpace($webAppId)) {
+            throw "Azure Web App 'maktabdev' not found."
+          }
+
+          az webapp config appsettings set --ids $webAppId --settings ASPNETCORE_ENVIRONMENT=Development ActiveEnvironmentProfile=dev
+
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3

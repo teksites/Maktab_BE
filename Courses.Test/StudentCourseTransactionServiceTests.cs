@@ -132,4 +132,82 @@ public class StudentCourseTransactionServiceTests
         Assert.True(updated);
         sendEmailService.Verify(service => service.SendBulkEmail(It.IsAny<MultiUserEmailData>()), Times.Never);
     }
+
+    [Fact]
+    public async Task UpdateTransaction_RecalculatesTotalPayableAndClampsNegativeBalanceAfterDiscount()
+    {
+        var transactionId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var courseId = Guid.NewGuid();
+        AddStudentCourseTransaction? capturedTransaction = null;
+
+        var repository = new Mock<IStudentCourseTransactionRepository>();
+        repository
+            .Setup(repo => repo.GetTransaction(transactionId))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = transactionId,
+                FamilyId = familyId,
+                FeeAmountDiscount = 0m,
+                DayCareDiscount = 0m,
+                TotalAmountPaid = 200m,
+                FeeInstallments = new List<FeeInstallment>
+                {
+                    new()
+                    {
+                        Description = "Registration",
+                        DescriptionFr = "Registration",
+                        DueDate = DateTime.UtcNow.Date.AddDays(1),
+                        Amount = 20m,
+                        PaymentStatus = PaymentStatus.Unpaid
+                    }
+                },
+                Enrollments = new List<StudentCourseEnrollmentResponse>
+                {
+                    new()
+                    {
+                        CourseId = courseId,
+                        EnrollmentStatus = EnrollmentStatus.Cancelled
+                    }
+                }
+            });
+        repository
+            .Setup(repo => repo.UpdateTransaction(transactionId, It.IsAny<AddStudentCourseTransaction>()))
+            .Callback<Guid, AddStudentCourseTransaction>((_, updatedTransaction) => capturedTransaction = updatedTransaction)
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(new CourseResponseDetailed
+            {
+                CourseId = courseId,
+                RegistrationFee = 20
+            });
+
+        var service = new StudentCourseTransactionService(
+            repository.Object,
+            courseService.Object,
+            Mock.Of<IUserService>(),
+            Mock.Of<ISendEmailService>());
+
+        var updated = await service.UpdateTransaction(transactionId, new AddStudentCourseTransaction
+        {
+            StudentCourseTransactionId = transactionId,
+            FamilyId = familyId,
+            PayableFee = 0m,
+            DayCareFee = 0m,
+            FeeAmountDiscount = 20m,
+            DayCareDiscount = 0m,
+            Surcharge = 0d,
+            TotalAmountPaid = 200m,
+            TotalPayable = -20m
+        });
+
+        Assert.True(updated);
+        Assert.NotNull(capturedTransaction);
+        Assert.Equal(0m, capturedTransaction!.TotalPayable);
+        Assert.Empty(capturedTransaction.FeeInstallments);
+        Assert.True(capturedTransaction.IsCompletelyPaid);
+    }
 }

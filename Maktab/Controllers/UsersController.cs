@@ -53,6 +53,15 @@ namespace Maktab.Controllers
         }
 
         [Authorize]
+        [ApiAuthorize()]
+        [HttpGet("family/{familyId:guid}/information")]
+        [EnableCors("corspolicy")]
+        public async Task<FamilyInformationResponse> GetFamilyInformation(Guid familyId)
+        {
+            return await _userService.GetFamilyInformation(familyId).ConfigureAwait(false);
+        }
+
+        [Authorize]
         [ApiAuthorize(true)]
         [HttpGet("{userId:guid}")]
         [EnableCors("corspolicy")]
