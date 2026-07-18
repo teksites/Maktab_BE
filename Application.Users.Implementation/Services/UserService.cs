@@ -421,7 +421,7 @@ namespace Application.Users.Implementation
             return await _repository.GetUserFamilyInformation(userInformation).ConfigureAwait(false);
         }
 
-        public async Task<FamilyInformationResponse> GetFamilyInformation(Guid familyId)
+        public async Task<FamilyInformationDetailsResponse> GetFamilyInformation(Guid familyId)
         {
             var familyUsersTask = _repository.GetAllFamilyUsersInformation(familyId, true);
             var otherContactsTask = _otherContactsService.GetFamilyOtherContacts(familyId, Array.Empty<ContactType>());
@@ -433,7 +433,7 @@ namespace Application.Users.Implementation
             var otherContacts = await otherContactsTask.ConfigureAwait(false) ?? Enumerable.Empty<OtherContactResponse>();
             var familyAddresses = await familyAddressesTask.ConfigureAwait(false) ?? Enumerable.Empty<AddressResponse>();
 
-            return new FamilyInformationResponse
+            return new FamilyInformationDetailsResponse
             {
                 FamilyInformation = ApplyParentRelationshipPrecedence(familyUsers)
                     .Where(user => IsFamilyInformationRelationship(user.Relationship))

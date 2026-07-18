@@ -215,3 +215,5 @@
 /.tmp-cloudflared-new-out.log
 /.tmp-host-fetchAdults-err.log
 /.tmp-host-fetchAdults-out.log
+/Zeffy/bin/Debug/net8.0/Zeffy.deps.json
+/Zeffy/bin/Debug/net8.0/Zeffy.deps.json
