@@ -769,11 +769,11 @@ public class UserServiceTests
         Assert.DoesNotContain(result.FamilyInformation, member => member.Relationship == Relationship.Teacher);
 
         Assert.Single(result.OtherContacts);
-        Assert.Equal(otherContactId, result.OtherContacts[0].UserId);
+        Assert.Equal(otherContactId, result.OtherContacts[0].ContactId);
         Assert.Equal("Support Contact", result.OtherContacts[0].UserName);
         Assert.Equal("6666666666", result.OtherContacts[0].Phone);
         Assert.Equal(Relationship.Aunt, result.OtherContacts[0].Relationship);
-        Assert.Equal(string.Empty, result.OtherContacts[0].Email);
+        Assert.Equal(ContactType.Emergency, result.OtherContacts[0].ContactType);
 
         Assert.Single(result.FamilyAddress);
         Assert.Equal(addressId, result.FamilyAddress[0].AddressId);
