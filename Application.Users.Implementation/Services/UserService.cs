@@ -440,7 +440,7 @@ namespace Application.Users.Implementation
                     .Select(MapToFamilyInfo)
                     .ToList(),
                 OtherContacts = otherContacts
-                    .Select(MapToFamilyInfo)
+                    .Select(MapToOtherContactInfo)
                     .ToList(),
                 FamilyAddress = familyAddresses.ToList()
             };
@@ -593,15 +593,15 @@ namespace Application.Users.Implementation
             };
         }
 
-        private static FamilyInfo MapToFamilyInfo(OtherContactResponse otherContact)
+        private static OtherContactInfo MapToOtherContactInfo(OtherContactResponse otherContact)
         {
-            return new FamilyInfo
+            return new OtherContactInfo
             {
-                UserId = otherContact.ContactId,
+                ContactId = otherContact.ContactId,
                 UserName = BuildDisplayName(otherContact.FirstName, otherContact.LastName),
-                Email = string.Empty,
                 Phone = otherContact.Phone,
-                Relationship = otherContact.Relationship
+                Relationship = otherContact.Relationship,
+                ContactType = otherContact.ContactType
             };
         }
 
