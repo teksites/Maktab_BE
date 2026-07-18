@@ -4,6 +4,8 @@ using Email;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using MaktabDataContracts.Enums;
+using MaktabDataContracts.Responses.Addresses;
+using MaktabDataContracts.Responses.OtherContacts;
 using MaktabDataContracts.Requests.Users;
 using Users.Contracts;
 using Users.Repository;
@@ -625,18 +627,173 @@ public class UserServiceTests
         Assert.Equal(1, result.Count(user => user.Relationship == Relationship.Father));
     }
 
+    [Fact]
+    public async Task GetFamilyInformation_ReturnsParentsGuardiansOtherContactsAndAddresses()
+    {
+        var familyId = Guid.NewGuid();
+        var latestMotherId = Guid.NewGuid();
+        var latestFatherId = Guid.NewGuid();
+        var guardianId = Guid.NewGuid();
+        var otherContactId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetAllFamilyUsersInformation(familyId, true))
+            .ReturnsAsync(new[]
+            {
+                new UserInformation
+                {
+                    UserId = Guid.NewGuid(),
+                    FamilyId = familyId,
+                    FirstName = "Older",
+                    LastName = "Mother",
+                    Email = "older-mother@example.com",
+                    Phone = "1111111111",
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-4),
+                    UpdatedOn = DateTime.UtcNow.AddDays(-3)
+                },
+                new UserInformation
+                {
+                    UserId = latestMotherId,
+                    FamilyId = familyId,
+                    FirstName = "Latest",
+                    LastName = "Mother",
+                    Email = "latest-mother@example.com",
+                    Phone = "2222222222",
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-2),
+                    UpdatedOn = DateTime.UtcNow.AddDays(-1)
+                },
+                new UserInformation
+                {
+                    UserId = latestFatherId,
+                    FamilyId = familyId,
+                    FirstName = "Pending",
+                    LastName = "Father",
+                    Email = "pending-father@example.com",
+                    Phone = "3333333333",
+                    Relationship = Relationship.Father,
+                    IfTempUser = true,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-1),
+                    UpdatedOn = DateTime.UtcNow
+                },
+                new UserInformation
+                {
+                    UserId = guardianId,
+                    FamilyId = familyId,
+                    FirstName = "Primary",
+                    LastName = "Guardian",
+                    Email = "guardian@example.com",
+                    Phone = "4444444444",
+                    Relationship = Relationship.Guardian,
+                    IfTempUser = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-3),
+                    UpdatedOn = DateTime.UtcNow.AddHours(-12)
+                },
+                new UserInformation
+                {
+                    UserId = Guid.NewGuid(),
+                    FamilyId = familyId,
+                    FirstName = "Not",
+                    LastName = "Included",
+                    Email = "teacher@example.com",
+                    Phone = "5555555555",
+                    Relationship = Relationship.Teacher,
+                    IfTempUser = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-5),
+                    UpdatedOn = DateTime.UtcNow.AddDays(-4)
+                }
+            });
+
+        var otherContactsService = new Mock<IOtherContactsService>();
+        otherContactsService
+            .Setup(service => service.GetFamilyOtherContacts(familyId, It.IsAny<IEnumerable<ContactType>>()))
+            .ReturnsAsync(new[]
+            {
+                new OtherContactResponse
+                {
+                    ContactId = otherContactId,
+                    FamilyId = familyId,
+                    FirstName = "Support",
+                    LastName = "Contact",
+                    Phone = "6666666666",
+                    Relationship = Relationship.Aunt,
+                    ContactType = ContactType.Emergency,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-1),
+                    UpdatedOn = DateTime.UtcNow
+                }
+            });
+
+        var addressService = new Mock<IAddressService>();
+        addressService
+            .Setup(service => service.GetAddressWithConnectedId(familyId, false))
+            .ReturnsAsync(new[]
+            {
+                new AddressResponse
+                {
+                    AddressId = addressId,
+                    ConnectedId = familyId,
+                    AddressLine1 = "123 Main St",
+                    City = "Montreal",
+                    Province = "QC",
+                    Country = "Canada",
+                    PostalCode = "H1H1H1",
+                    HomeAddress = true,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-10),
+                    UpdatedOn = DateTime.UtcNow.AddDays(-1)
+                }
+            });
+
+        var service = CreateUserService(
+            userRepository: userRepository,
+            addressService: addressService,
+            otherContactsService: otherContactsService);
+
+        var result = await service.GetFamilyInformation(familyId);
+
+        Assert.Equal(3, result.FamilyInformation.Count);
+        Assert.Contains(result.FamilyInformation, member => member.UserId == latestMotherId && member.UserName == "Latest Mother");
+        Assert.Contains(result.FamilyInformation, member => member.UserId == latestFatherId && member.UserName == "Pending Father");
+        Assert.Contains(result.FamilyInformation, member => member.UserId == guardianId && member.UserName == "Primary Guardian");
+        Assert.DoesNotContain(result.FamilyInformation, member => member.Relationship == Relationship.Teacher);
+
+        Assert.Single(result.OtherContacts);
+        Assert.Equal(otherContactId, result.OtherContacts[0].UserId);
+        Assert.Equal("Support Contact", result.OtherContacts[0].UserName);
+        Assert.Equal("6666666666", result.OtherContacts[0].Phone);
+        Assert.Equal(Relationship.Aunt, result.OtherContacts[0].Relationship);
+        Assert.Equal(string.Empty, result.OtherContacts[0].Email);
+
+        Assert.Single(result.FamilyAddress);
+        Assert.Equal(addressId, result.FamilyAddress[0].AddressId);
+        Assert.Equal(familyId, result.FamilyAddress[0].ConnectedId);
+    }
+
     private static UserService CreateUserService(
         Mock<IUserRepository>? userRepository = null,
         Mock<ITempUserRepository>? tempUserRepository = null,
         Mock<IUserChildrenRepository>? userChildrenRepository = null,
-        Mock<ISendEmailService>? sendEmailService = null)
+        Mock<ISendEmailService>? sendEmailService = null,
+        Mock<IAddressService>? addressService = null,
+        Mock<IOtherContactsService>? otherContactsService = null)
     {
         return new UserService(
             Mock.Of<IConfiguration>(),
             (userRepository ?? new Mock<IUserRepository>()).Object,
             (tempUserRepository ?? new Mock<ITempUserRepository>()).Object,
-            new Mock<IAddressService>().Object,
-            new Mock<IOtherContactsService>().Object,
+            (addressService ?? new Mock<IAddressService>()).Object,
+            (otherContactsService ?? new Mock<IOtherContactsService>()).Object,
             new Mock<IUserChildrenService>().Object,
             (userChildrenRepository ?? new Mock<IUserChildrenRepository>()).Object,
             (sendEmailService ?? new Mock<ISendEmailService>()).Object);
