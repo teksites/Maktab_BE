@@ -155,6 +155,13 @@ namespace Courses.Implementation.Services
                         course,
                         selectedCourseEnrollmentGroup).ConfigureAwait(false);
                 }
+                else if (enrollment.ShouldTriggerEmail)
+                {
+                    await SendEnrollmentCreatedEmailAsync(
+                        addedEnrollment,
+                        course,
+                        selectedCourseEnrollmentGroup).ConfigureAwait(false);
+                }
 
                 return addedEnrollment;
             }
@@ -211,6 +218,13 @@ namespace Courses.Implementation.Services
                     if (course.IsManualEnrollment && enrollment.ShouldTriggerEmail)
                     {
                         await SendManualEnrollmentAwaitingEmailAsync(
+                            addedEnrollment,
+                            course,
+                            selectedCourseEnrollmentGroup).ConfigureAwait(false);
+                    }
+                    else if (enrollment.ShouldTriggerEmail)
+                    {
+                        await SendEnrollmentCreatedEmailAsync(
                             addedEnrollment,
                             course,
                             selectedCourseEnrollmentGroup).ConfigureAwait(false);
@@ -1018,7 +1032,7 @@ namespace Courses.Implementation.Services
 
             return enrollmentStatus switch
             {
-                EnrollmentStatus.Enrolled or EnrollmentStatus.Registered or EnrollmentStatus.Cancelled => new EnrollmentEmailNotification
+                EnrollmentStatus.Enrolled or EnrollmentStatus.Awaiting or EnrollmentStatus.Registered or EnrollmentStatus.Cancelled => new EnrollmentEmailNotification
                 {
                     FamilyId = enrollmentDetails.FamilyId,
                     Status = enrollmentStatus,
@@ -1056,6 +1070,32 @@ namespace Courses.Implementation.Services
                     Body = email.Value.Body
                 }).ConfigureAwait(false);
             }
+        }
+
+        private async Task SendEnrollmentCreatedEmailAsync(
+            StudentCourseEnrollmentResponse enrollment,
+            CourseResponseDetailed courseDetails,
+            CourseEnrollmentGroupResponse? enrollmentGroup)
+        {
+            if (courseDetails.IsManualEnrollment && enrollment.EnrollmentStatus == EnrollmentStatus.Awaiting)
+            {
+                await SendManualEnrollmentAwaitingEmailAsync(enrollment, courseDetails, enrollmentGroup).ConfigureAwait(false);
+                return;
+            }
+
+            var notification = CreateEnrollmentEmailNotification(
+                statusChanged: true,
+                enrollmentStatus: enrollment.EnrollmentStatus,
+                enrollmentDetails: enrollment,
+                courseDetails: courseDetails,
+                enrollmentGroup: enrollmentGroup);
+
+            if (notification == null)
+            {
+                return;
+            }
+
+            await SendEnrollmentStatusEmailsAsync(new[] { notification }).ConfigureAwait(false);
         }
 
         private async Task SendManualEnrollmentAwaitingEmailAsync(
@@ -1133,6 +1173,16 @@ namespace Courses.Implementation.Services
                     $"<div>&nbsp;</div>" +
                     $"<div>&nbsp;</div>" +
                     $"<div><strong>ICC Brossard School Registration Portal</strong></div>"),
+                EnrollmentStatus.Awaiting => (
+                    $"{notification.CourseNameFr} Liste d'attente / {notification.CourseName} Waiting List",
+                    $"<p><strong>Cher parent,</strong></p>" +
+                    $"<p>Votre enfant {notification.ChildName} a été ajouté(e) à la liste d'attente pour le cours / l'activité <strong>{notification.CourseNameFr}</strong>{FormatGroupSuffix(notification.CourseGroupDetailsFr)}. Nous communiquerons avec vous lorsqu'une place se libérera ou lorsqu'une prochaine étape sera requise.</p>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<p><strong>Dear parent,</strong></p>" +
+                    $"<p>Your child {notification.ChildName} has been added to the waiting list for the course / activity <strong>{notification.CourseName}</strong>{FormatGroupSuffix(notification.CourseGroupDetails)}. We will contact you if a seat becomes available or if any next step is required.</p>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<div>&nbsp;</div>" +
+                    $"<div><strong>ICC Brossard School / Activities Registration Portal - Portail de l'inscription écoles / activités</strong></div>"),
                 EnrollmentStatus.Registered => (
                     $"{notification.CourseNameFr} Confirmation d'inscription / {notification.CourseName} Registration Confirmation",
                     $"<p><strong>Cher parent,</strong></p>" +
@@ -1195,6 +1245,7 @@ namespace Courses.Implementation.Services
             return notification.Status switch
             {
                 EnrollmentStatus.Enrolled => $"<li>{notification.ChildName} - <strong>{notification.CourseNameFr}</strong>{FormatGroupSuffix(notification.CourseGroupDetailsFr)} : inscription recue, paiement requis.</li>",
+                EnrollmentStatus.Awaiting => $"<li>{notification.ChildName} - <strong>{notification.CourseNameFr}</strong>{FormatGroupSuffix(notification.CourseGroupDetailsFr)} : ajoute(e) a la liste d'attente.</li>",
                 EnrollmentStatus.Registered => $"<li>{notification.ChildName} - <strong>{notification.CourseNameFr}</strong> : inscription confirmee, tous les frais sont regles.</li>",
                 EnrollmentStatus.Cancelled => $"<li>{notification.ChildName} - <strong>{notification.CourseNameFr}</strong> : inscription annulee.</li>",
                 _ => string.Empty
@@ -1206,6 +1257,7 @@ namespace Courses.Implementation.Services
             return notification.Status switch
             {
                 EnrollmentStatus.Enrolled => $"<li>{notification.ChildName} - <strong>{notification.CourseName}</strong>{FormatGroupSuffix(notification.CourseGroupDetails)}: enrollment received, payment required.</li>",
+                EnrollmentStatus.Awaiting => $"<li>{notification.ChildName} - <strong>{notification.CourseName}</strong>{FormatGroupSuffix(notification.CourseGroupDetails)}: added to the waiting list.</li>",
                 EnrollmentStatus.Registered => $"<li>{notification.ChildName} - <strong>{notification.CourseName}</strong>: registration confirmed, all fees are paid.</li>",
                 EnrollmentStatus.Cancelled => $"<li>{notification.ChildName} - <strong>{notification.CourseName}</strong>: registration cancelled.</li>",
                 _ => string.Empty
