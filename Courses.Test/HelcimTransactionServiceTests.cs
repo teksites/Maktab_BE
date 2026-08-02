@@ -969,6 +969,135 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
+    public async Task RefundAchInvoice_AppliesImmediateRefundPaymentForRecalculation()
+    {
+        const int invoiceId = 63677015;
+        const int transactionId = 2040;
+        const string paymentCode = "ACHREFUND1";
+        var studentTransactionId = Guid.Parse("aaaaaaaa-4444-4444-4444-444444444444");
+        var familyId = Guid.Parse("bbbbbbbb-4444-4444-4444-444444444444");
+        JsonMessageData? capturedPutPayload = null;
+
+        var repository = new Mock<IHelcimTransactionRepository>();
+        var sender = new Mock<IWebMsgSenderService>();
+        var responses = new Queue<string>(new[]
+        {
+            $"{{\"invoiceId\":{invoiceId},\"invoiceNumber\":\"ORD-20260802-ACHREFUND\",\"token\":\"tok-1\",\"notes\":\"{paymentCode}\",\"dateCreated\":\"2026-08-01 10:00:00\",\"dateUpdated\":\"2026-08-02 10:00:00\",\"datePaid\":\"2026-08-01 11:00:00\",\"status\":\"PAID\",\"customerId\":40499452,\"amount\":100.00,\"amountPaid\":100.00,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"{studentTransactionId}\",\"description\":\"127.0.0.1\",\"quantity\":1,\"price\":100.00,\"total\":100.00}}]}}",
+            $"[{{\"id\":{transactionId},\"orderId\":{invoiceId},\"invoiceNumber\":\"ORD-20260802-ACHREFUND\",\"statusAuth\":1,\"statusClearing\":1,\"statusBatch\":2,\"batchId\":5220,\"amount\":100.00,\"currency\":1,\"dateCreated\":\"2026-08-01 11:00:00\",\"dateClosed\":\"2026-08-02 10:00:00\"}}]",
+            $"[{{\"id\":{transactionId},\"orderId\":{invoiceId},\"invoiceNumber\":\"ORD-20260802-ACHREFUND\",\"statusAuth\":1,\"statusClearing\":1,\"statusBatch\":2,\"batchId\":5220,\"amount\":100.00,\"currency\":1,\"dateCreated\":\"2026-08-01 11:00:00\",\"dateClosed\":\"2026-08-02 10:00:00\"}}]"
+        });
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync(() => responses.Dequeue());
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Put))
+            .Callback<JsonMessageData, InternalContracts.IClientConfiguration, HttpMethod>((payload, _, _) => capturedPutPayload = payload)
+            .ReturnsAsync("{\"status\":\"accepted\"}");
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransactionByPaymentCode(paymentCode))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                PaymentCode = paymentCode,
+                Enrollments = new List<StudentCourseEnrollmentResponse>()
+            });
+
+        AddCoursePayment? capturedPayment = null;
+        var coursePaymentService = new Mock<ICoursePaymentService>();
+        coursePaymentService
+            .Setup(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()))
+            .Callback<AddCoursePayment>(payment => capturedPayment = payment)
+            .ReturnsAsync((new CoursePaymentResponse(), true));
+
+        var service = CreateService(
+            repository.Object,
+            sender.Object,
+            studentCourseTransactionService: studentCourseTransactionService.Object,
+            coursePaymentService: coursePaymentService.Object);
+
+        var result = await service.RefundAchInvoice(new RefundAchInvoiceRequest
+        {
+            InvoiceId = invoiceId,
+            Amount = 25m,
+            IdempotencyKey = "invoice-refund-key"
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(invoiceId, result.InvoiceId);
+        Assert.Equal(transactionId, result.TransactionId);
+        Assert.Equal("ORD-20260802-ACHREFUND", result.InvoiceNumber);
+        Assert.True(result.LocalRefundRecorded);
+        Assert.True(result.RequiresReconciliation);
+        Assert.NotNull(capturedPutPayload);
+        Assert.NotNull(capturedPayment);
+        Assert.Equal(PaymentType.Refund, capturedPayment!.PaymentType);
+        Assert.Equal(PaymentMode.Helcim, capturedPayment.PaymentMode);
+        Assert.Equal("HEL-REFUND-2040", capturedPayment.ExternalPaymentId);
+        Assert.Equal(studentTransactionId, capturedPayment.StudentCourseTransactionId);
+        Assert.Equal(familyId, capturedPayment.FamilyId);
+    }
+
+    [Fact]
+    public async Task GetAchRefundInvoices_WhenOnlyRefundable_ReturnsOnlyRefundablePurchaseTransactions()
+    {
+        const int refundableInvoiceId = 7001;
+        const int refundableTransactionId = 3001;
+        const string paymentCode = "REFLIST1";
+        var studentTransactionId = Guid.Parse("aaaaaaaa-5555-5555-5555-555555555555");
+        var familyId = Guid.Parse("bbbbbbbb-5555-5555-5555-555555555555");
+
+        var repository = new Mock<IHelcimTransactionRepository>();
+        var sender = new Mock<IWebMsgSenderService>();
+        var responses = new Queue<string>(new[]
+        {
+            "[" +
+            $"{{\"id\":{refundableTransactionId},\"orderId\":{refundableInvoiceId},\"invoiceNumber\":\"ORD-REF-LIST-1\",\"statusAuth\":1,\"statusClearing\":1,\"statusBatch\":2,\"batchId\":700,\"amount\":120.00,\"currency\":1,\"dateCreated\":\"2026-08-01 09:00:00\",\"dateClosed\":\"2026-08-02 09:30:00\",\"customerCode\":\"CST1001\"}}," +
+            "{\"id\":3002,\"orderId\":7002,\"invoiceNumber\":\"ORD-REF-LIST-2\",\"statusAuth\":1,\"statusClearing\":0,\"statusBatch\":1,\"batchId\":701,\"amount\":90.00,\"currency\":1,\"dateCreated\":\"2026-08-01 08:00:00\",\"customerCode\":\"CST1002\"}," +
+            "{\"id\":3003,\"orderId\":7003,\"invoiceNumber\":\"ORD-REF-LIST-3\",\"statusAuth\":1,\"statusClearing\":1,\"statusBatch\":2,\"batchId\":702,\"amount\":30.00,\"currency\":1,\"dateCreated\":\"2026-08-01 07:00:00\",\"dateClosed\":\"2026-08-02 07:30:00\",\"customerCode\":\"CST1003\",\"originalTransactionId\":3001}" +
+            "]",
+            $"{{\"invoiceId\":{refundableInvoiceId},\"invoiceNumber\":\"ORD-REF-LIST-1\",\"token\":\"tok-2\",\"notes\":\"{paymentCode}\",\"dateCreated\":\"2026-08-01 08:00:00\",\"dateUpdated\":\"2026-08-02 10:00:00\",\"datePaid\":\"2026-08-02 09:30:00\",\"status\":\"PAID\",\"customerId\":40490001,\"amount\":120.00,\"amountPaid\":120.00,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"{studentTransactionId}\",\"description\":\"127.0.0.1\",\"quantity\":1,\"price\":120.00,\"total\":120.00}}]}}"
+        });
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync(() => responses.Dequeue());
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransactionByPaymentCode(paymentCode))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                PaymentCode = paymentCode,
+                Enrollments = new List<StudentCourseEnrollmentResponse>()
+            });
+
+        var service = CreateService(
+            repository.Object,
+            sender.Object,
+            studentCourseTransactionService: studentCourseTransactionService.Object);
+
+        var result = await service.GetAchRefundInvoices(new GetAchRefundInvoicesRequest
+        {
+            StartDate = new DateTime(2026, 8, 1),
+            EndDate = new DateTime(2026, 8, 2),
+            OnlyRefundable = true
+        });
+
+        Assert.Single(result);
+        Assert.Equal(refundableInvoiceId, result[0].InvoiceId);
+        Assert.Equal(refundableTransactionId, result[0].TransactionId);
+        Assert.Equal(paymentCode, result[0].PaymentCode);
+        Assert.Equal(studentTransactionId, result[0].MaktabTransactionId);
+        Assert.Equal(familyId, result[0].FamilyId);
+        Assert.True(result[0].IsRefundable);
+        Assert.False(result[0].IsRefundTransaction);
+    }
+
+    [Fact]
     public async Task HandleWebhook_DoesNothingWhenTransactionAlreadyExists()
     {
         var repository = new Mock<IHelcimTransactionRepository>();

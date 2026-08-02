@@ -22,15 +22,21 @@ namespace Maktab.Controllers
     {
         private readonly IUserService _userService;
         private readonly IExtendedUserInformationService _extendedUserInformationService;
+        private readonly IDataAccessVerificationService _dataAccessVerificationService;
         //If its success, we will update the DB with success
 
 
         private readonly ILogger<UsersController> _logger;
 
-        public UsersController(IUserService userService, IExtendedUserInformationService extendedUserInformationService, ILogger<UsersController> logger)
+        public UsersController(
+            IUserService userService,
+            IExtendedUserInformationService extendedUserInformationService,
+            IDataAccessVerificationService dataAccessVerificationService,
+            ILogger<UsersController> logger)
         {
             _userService = userService;
             _extendedUserInformationService = extendedUserInformationService;
+            _dataAccessVerificationService = dataAccessVerificationService;
             _logger = logger;
         }
 
@@ -68,6 +74,34 @@ namespace Maktab.Controllers
         public async Task<UserInformationResponse> GetUserInformation(Guid userId)
         {
             return await _userService.GetUserInformation(userId).ConfigureAwait(false);
+        }
+
+        [Authorize]
+        [ApiAuthorize(false, false, MaktabDataContracts.Enums.UserRoleType.Normal)]
+        [HttpGet("{email}")]
+        [EnableCors("corspolicy")]
+        public async Task<ActionResult<UserInformationResponse>> GetUserInformationByEmail(string email)
+        {
+            var decodedEmail = HttpUtility.UrlDecode(email)?.Trim();
+            if (string.IsNullOrWhiteSpace(decodedEmail))
+            {
+                return BadRequest("Email is required.");
+            }
+
+            var userInformation = await _userService.GetUserInformationByEmail(decodedEmail).ConfigureAwait(false);
+            if (userInformation == null)
+            {
+                return NotFound();
+            }
+
+            var session = await GetRequiredSessionContext().ConfigureAwait(false);
+            if (!_dataAccessVerificationService.HasElevatedAccess(session.UserRoles)
+                && userInformation.FamilyId != session.FamilyId)
+            {
+                return Forbid();
+            }
+
+            return Ok(userInformation);
         }
 
         [HttpGet("registered")]
@@ -243,6 +277,24 @@ namespace Maktab.Controllers
         public async Task<bool> CheckIfFamilySinExists(Guid familyId, string sin)
         {
             return await _extendedUserInformationService.CheckIfFamilySinExists(familyId, sin).ConfigureAwait(false);
+        }
+
+        private async Task<SessionAccessContext> GetRequiredSessionContext()
+        {
+            if (!Request.Headers.TryGetValue("Session_Info", out var sessionHeader)
+                || !Guid.TryParse(sessionHeader, out var sessionId)
+                || sessionId == Guid.Empty)
+            {
+                throw new UnauthorizedAccessException("Session header not found or invalid.");
+            }
+
+            var sessionContext = await _dataAccessVerificationService.GetSessionAccessContext(sessionId).ConfigureAwait(false);
+            if (sessionContext == null || sessionContext.UserId == Guid.Empty)
+            {
+                throw new UnauthorizedAccessException("No active session found.");
+            }
+
+            return sessionContext;
         }
     }
 }

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
 using System.Text.Json;
 using MaktabDataContracts.Enums;
 
@@ -49,9 +50,19 @@ public class HelcimController : ControllerBase
         => _service.ReconcileTransactions();
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
+    [HttpPost("byadmin/ach/refund/invoices/search")]
+    public Task<IReadOnlyList<HelcimAchRefundInvoiceSummaryResponse>> GetAchRefundInvoices(GetAchRefundInvoicesRequest request)
+        => _service.GetAchRefundInvoices(request);
+
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpPost("byadmin/ach/refund")]
     public Task<HelcimAchRefundResponse> RefundAchTransaction(RefundAchTransactionRequest request)
         => _service.RefundAchTransaction(request);
+
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
+    [HttpPost("byadmin/ach/refund/invoice")]
+    public Task<HelcimAchRefundResponse> RefundAchInvoice(RefundAchInvoiceRequest request)
+        => _service.RefundAchInvoice(request);
 
     [HttpPost("/api/payment-notifier")]
     public async Task<IActionResult> HelcimWebhook([FromBody] JsonElement body)

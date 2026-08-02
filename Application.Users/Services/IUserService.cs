@@ -22,6 +22,7 @@ namespace Users.Services
         Task<IEnumerable<UserInformationResponse>> GetAllUsersInformation(bool ifOnlyActive = true);
         Task<bool> SendActivationCode(Guid userId);
         Task<UserInformationResponse> GetUserInformation(string userName, string? password, bool ifForgotPassword);
+        Task<UserInformationResponse> GetUserInformationByEmail(string email);
         Task<bool> ForgotPassword(string userName, string? password);
         Task<bool> ResetUserPassword(UpdateUserPassword updateUserPassword);
         Task<bool> CheckIfTempUser(string userName);

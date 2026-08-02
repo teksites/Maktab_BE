@@ -90,6 +90,34 @@ public class StudentCourseTransactionRepositoryTests
     }
 
     [Fact]
+    public async Task GetAllTransactionsByCourse_MapsChildProfileAndHealthFieldsOntoEnrollments()
+    {
+        var expectedDateOfBirth = new DateTime(2018, 4, 15, 0, 0, 0, DateTimeKind.Utc);
+        var expectedRamqExpiry = new DateTime(2027, 12, 31, 0, 0, 0, DateTimeKind.Utc);
+
+        var database = new FakeDatabase(() => CreateCourseTransactionEnrollmentReader(
+            expectedDateOfBirth,
+            Gender.Female,
+            "RAMQ-12345",
+            expectedRamqExpiry,
+            "Peanuts",
+            "Asthma"));
+
+        var repository = new StudentCourseTransactionRepository(database);
+
+        var result = (await repository.GetAllTransactionsByCourse(Guid.NewGuid())).ToList();
+
+        var transaction = Assert.Single(result);
+        var enrollment = Assert.Single(transaction.Enrollments);
+        Assert.Equal(expectedDateOfBirth, enrollment.DateOfBirth);
+        Assert.Equal(Gender.Female, enrollment.Gender);
+        Assert.Equal("RAMQ-12345", enrollment.RAMQNumber);
+        Assert.Equal(expectedRamqExpiry, enrollment.RAMQExpiry);
+        Assert.Equal("Peanuts", enrollment.Allergies);
+        Assert.Equal("Asthma", enrollment.OtherHealthConditions);
+    }
+
+    [Fact]
     public async Task GetCourseEnrollmentGroupInformation_MapsGroupedStatusesForSpecificGroup()
     {
         var groupId = Guid.Parse("c517c470-6478-4caa-8f02-d8886371277d");
@@ -119,7 +147,7 @@ public class StudentCourseTransactionRepositoryTests
         string? commandText = null;
 
         var database = new FakeDatabase(
-            CreateEnrollmentListReader,
+            () => CreateEnrollmentListReader(),
             command => commandText = command.CommandText);
 
         var repository = new StudentCourseEnrollmentRepository(database);
@@ -137,7 +165,7 @@ public class StudentCourseTransactionRepositoryTests
         string? commandText = null;
 
         var database = new FakeDatabase(
-            CreateEnrollmentListReader,
+            () => CreateEnrollmentListReader(),
             command => commandText = command.CommandText);
 
         var repository = new StudentCourseEnrollmentRepository(database);
@@ -149,6 +177,61 @@ public class StudentCourseTransactionRepositoryTests
         Assert.Contains("FROM temp_user_info tui", commandText);
         Assert.Contains("tui.Relationship NOT IN (1, 2, 3)", commandText);
         Assert.Contains("NOT EXISTS", commandText);
+    }
+
+    [Fact]
+    public async Task GetAllEnrollmentsByCourse_MapsChildProfileFieldsWhenAvailable()
+    {
+        var expectedDateOfBirth = new DateTime(2017, 6, 10, 0, 0, 0, DateTimeKind.Utc);
+        var expectedRamqExpiry = new DateTime(2028, 1, 31, 0, 0, 0, DateTimeKind.Utc);
+
+        var database = new FakeDatabase(() => CreateEnrollmentListReader(
+            expectedDateOfBirth,
+            Gender.Male,
+            "RAMQ-ENROLL-01",
+            expectedRamqExpiry,
+            "Pollen",
+            "Diabetes"));
+
+        var repository = new StudentCourseEnrollmentRepository(database);
+
+        var result = (await repository.GetAllEnrollmentsByCourse(Guid.NewGuid())).ToList();
+
+        var enrollment = Assert.Single(result);
+        Assert.Equal(expectedDateOfBirth, enrollment.DateOfBirth);
+        Assert.Equal(Gender.Male, enrollment.Gender);
+        Assert.Equal("RAMQ-ENROLL-01", enrollment.RAMQNumber);
+        Assert.Equal(expectedRamqExpiry, enrollment.RAMQExpiry);
+        Assert.Equal("Pollen", enrollment.Allergies);
+        Assert.Equal("Diabetes", enrollment.OtherHealthConditions);
+    }
+
+    [Fact]
+    public async Task GetEnrollmentsForTransaction_MapsChildProfileFieldsWhenAvailable()
+    {
+        var expectedDateOfBirth = new DateTime(2019, 2, 20, 0, 0, 0, DateTimeKind.Utc);
+        var expectedRamqExpiry = new DateTime(2029, 3, 31, 0, 0, 0, DateTimeKind.Utc);
+
+        var database = new FakeDatabase(() => CreateTransactionEnrollmentListReader(
+            expectedDateOfBirth,
+            Gender.Female,
+            "RAMQ-TX-01",
+            expectedRamqExpiry,
+            "Sesame",
+            "Asthma"));
+
+        var repository = new StudentCourseTransactionRepository(database);
+
+        var result = (await repository.GetEnrollmentsForTransaction(Guid.NewGuid())).ToList();
+
+        var enrollment = Assert.Single(result);
+        Assert.Equal("Child One", enrollment.ChildName);
+        Assert.Equal(expectedDateOfBirth, enrollment.DateOfBirth);
+        Assert.Equal(Gender.Female, enrollment.Gender);
+        Assert.Equal("RAMQ-TX-01", enrollment.RAMQNumber);
+        Assert.Equal(expectedRamqExpiry, enrollment.RAMQExpiry);
+        Assert.Equal("Sesame", enrollment.Allergies);
+        Assert.Equal("Asthma", enrollment.OtherHealthConditions);
     }
 
     private static DbDataReader CreateSingleTransactionReader(string feeInstallmentsJson, decimal totalAmountPaid)
@@ -251,7 +334,13 @@ public class StudentCourseTransactionRepositoryTests
         return table.CreateDataReader();
     }
 
-    private static DbDataReader CreateEnrollmentListReader()
+    private static DbDataReader CreateEnrollmentListReader(
+        DateTime? dateOfBirth = null,
+        Gender gender = Gender.Unknown,
+        string ramqNumber = "",
+        DateTime? ramqExpiry = null,
+        string allergies = "",
+        string otherHealthConditions = "")
     {
         var table = new DataTable();
         table.Columns.Add("StudentCourseEnrollmentId", typeof(byte[]));
@@ -269,6 +358,13 @@ public class StudentCourseTransactionRepositoryTests
         table.Columns.Add("GroupIndex", typeof(int));
         table.Columns.Add("ChildFirstName", typeof(string));
         table.Columns.Add("ChildLastName", typeof(string));
+        table.Columns.Add("ChildRegistrationNumber", typeof(string));
+        table.Columns.Add("ChildDateOfBirth", typeof(DateTime));
+        table.Columns.Add("ChildGender", typeof(int));
+        table.Columns.Add("ChildRamqNumber", typeof(string));
+        table.Columns.Add("ChildRamqExpiry", typeof(DateTime));
+        table.Columns.Add("ChildAllergies", typeof(string));
+        table.Columns.Add("ChildOtherHealthConditions", typeof(string));
         table.Columns.Add("ChildConsent", typeof(string));
         table.Columns.Add("UserId", typeof(byte[]));
         table.Columns.Add("UserFirstName", typeof(string));
@@ -293,6 +389,13 @@ public class StudentCourseTransactionRepositoryTests
             1,
             "Child",
             "One",
+            "REG-CHILD-01",
+            dateOfBirth ?? DateTime.MinValue,
+            (int)gender,
+            ramqNumber,
+            ramqExpiry ?? DateTime.MinValue,
+            allergies,
+            otherHealthConditions,
             string.Empty,
             Guid.NewGuid().ToByteArray(),
             "Parent",
@@ -300,6 +403,182 @@ public class StudentCourseTransactionRepositoryTests
             "parent@example.com",
             "5551112222",
             1);
+
+        return table.CreateDataReader();
+    }
+
+    private static DbDataReader CreateTransactionEnrollmentListReader(
+        DateTime dateOfBirth,
+        Gender gender,
+        string ramqNumber,
+        DateTime ramqExpiry,
+        string allergies,
+        string otherHealthConditions)
+    {
+        var table = new DataTable();
+        table.Columns.Add("StudentCourseEnrollmentId", typeof(byte[]));
+        table.Columns.Add("CourseEnrollmentGroupId", typeof(byte[]));
+        table.Columns.Add("CourseId", typeof(byte[]));
+        table.Columns.Add("FamilyId", typeof(byte[]));
+        table.Columns.Add("ChildId", typeof(byte[]));
+        table.Columns.Add("IsActive", typeof(bool));
+        table.Columns.Add("WillUseDayCare", typeof(bool));
+        table.Columns.Add("DayCareDays", typeof(int));
+        table.Columns.Add("CreatedAt", typeof(DateTime));
+        table.Columns.Add("UpdatedOn", typeof(DateTime));
+        table.Columns.Add("GroupIndex", typeof(int));
+        table.Columns.Add("EnrollmentIndex", typeof(int));
+        table.Columns.Add("EnrollmentStatus", typeof(int));
+        table.Columns.Add("ChildFirstName", typeof(string));
+        table.Columns.Add("ChildLastName", typeof(string));
+        table.Columns.Add("ChildRegistrationNumber", typeof(string));
+        table.Columns.Add("ChildDateOfBirth", typeof(DateTime));
+        table.Columns.Add("ChildGender", typeof(int));
+        table.Columns.Add("ChildRamqNumber", typeof(string));
+        table.Columns.Add("ChildRamqExpiry", typeof(DateTime));
+        table.Columns.Add("ChildAllergies", typeof(string));
+        table.Columns.Add("ChildOtherHealthConditions", typeof(string));
+        table.Columns.Add("ChildConsent", typeof(string));
+
+        table.Rows.Add(
+            Guid.NewGuid().ToByteArray(),
+            Guid.NewGuid().ToByteArray(),
+            Guid.NewGuid().ToByteArray(),
+            Guid.NewGuid().ToByteArray(),
+            Guid.NewGuid().ToByteArray(),
+            true,
+            false,
+            0,
+            DateTime.UtcNow.AddDays(-1),
+            DateTime.UtcNow,
+            1,
+            1,
+            (int)EnrollmentStatus.Enrolled,
+            "Child",
+            "One",
+            "REG-TX-01",
+            dateOfBirth,
+            (int)gender,
+            ramqNumber,
+            ramqExpiry,
+            allergies,
+            otherHealthConditions,
+            "Consent");
+
+        return table.CreateDataReader();
+    }
+
+    private static DbDataReader CreateCourseTransactionEnrollmentReader(
+        DateTime dateOfBirth,
+        Gender gender,
+        string ramqNumber,
+        DateTime ramqExpiry,
+        string allergies,
+        string otherHealthConditions)
+    {
+        var table = new DataTable();
+        table.Columns.Add("StudentCourseTransactionId", typeof(byte[]));
+        table.Columns.Add("FamilyId", typeof(byte[]));
+        table.Columns.Add("PayableFee", typeof(decimal));
+        table.Columns.Add("DayCareFee", typeof(decimal));
+        table.Columns.Add("DayCareDiscount", typeof(int));
+        table.Columns.Add("FeeAmountDiscount", typeof(int));
+        table.Columns.Add("Surcharge", typeof(double));
+        table.Columns.Add("TotalPayable", typeof(decimal));
+        table.Columns.Add("Comments", typeof(string));
+        table.Columns.Add("FeeInstallmentsJson", typeof(string));
+        table.Columns.Add("TransactionStatus", typeof(int));
+        table.Columns.Add("RegistrationStatus", typeof(int));
+        table.Columns.Add("PaymentCode", typeof(string));
+        table.Columns.Add("IsActive", typeof(bool));
+        table.Columns.Add("TotalAmountPaid", typeof(decimal));
+        table.Columns.Add("IsCompletelyPaid", typeof(bool));
+        table.Columns.Add("CreatedAt", typeof(DateTime));
+        table.Columns.Add("UpdatedOn", typeof(DateTime));
+        table.Columns.Add("StudentCourseEnrollmentId", typeof(byte[]));
+        table.Columns.Add("CourseEnrollmentGroupId", typeof(byte[]));
+        table.Columns.Add("CourseId", typeof(byte[]));
+        table.Columns.Add("EnrollmentFamilyId", typeof(byte[]));
+        table.Columns.Add("ChildId", typeof(byte[]));
+        table.Columns.Add("EnrollmentIsActive", typeof(bool));
+        table.Columns.Add("WillUseDayCare", typeof(bool));
+        table.Columns.Add("DayCareDays", typeof(int));
+        table.Columns.Add("EnrollmentCreatedAt", typeof(DateTime));
+        table.Columns.Add("EnrollmentUpdatedOn", typeof(DateTime));
+        table.Columns.Add("EnrollmentIndex", typeof(int));
+        table.Columns.Add("EnrollmentStatus", typeof(int));
+        table.Columns.Add("GroupTitle", typeof(string));
+        table.Columns.Add("GroupTitleFr", typeof(string));
+        table.Columns.Add("GroupIndex", typeof(int));
+        table.Columns.Add("ChildFirstName", typeof(string));
+        table.Columns.Add("ChildLastName", typeof(string));
+        table.Columns.Add("ChildRegistrationNumber", typeof(string));
+        table.Columns.Add("ChildDateOfBirth", typeof(DateTime));
+        table.Columns.Add("ChildGender", typeof(int));
+        table.Columns.Add("ChildRamqNumber", typeof(string));
+        table.Columns.Add("ChildRamqExpiry", typeof(DateTime));
+        table.Columns.Add("ChildAllergies", typeof(string));
+        table.Columns.Add("ChildOtherHealthConditions", typeof(string));
+        table.Columns.Add("ParentUserId", typeof(byte[]));
+        table.Columns.Add("ParentFirstName", typeof(string));
+        table.Columns.Add("ParentLastName", typeof(string));
+        table.Columns.Add("ParentEmail", typeof(string));
+        table.Columns.Add("ParentPhone", typeof(string));
+        table.Columns.Add("ParentRelationship", typeof(int));
+        table.Columns.Add("ParentContactType", typeof(int));
+        table.Columns.Add("CourseRegistrationFee", typeof(int));
+
+        table.Rows.Add(
+            Guid.NewGuid().ToByteArray(),
+            Guid.NewGuid().ToByteArray(),
+            500m,
+            25m,
+            0,
+            0,
+            10d,
+            535m,
+            "Transaction",
+            "[]",
+            (int)TransactionStatus.FullyPaid,
+            (int)RegistrationStatus.Completed,
+            "PAY-COURSE-001",
+            true,
+            100m,
+            false,
+            DateTime.UtcNow.AddDays(-2),
+            DateTime.UtcNow,
+            Guid.NewGuid().ToByteArray(),
+            Guid.NewGuid().ToByteArray(),
+            Guid.NewGuid().ToByteArray(),
+            Guid.NewGuid().ToByteArray(),
+            Guid.NewGuid().ToByteArray(),
+            true,
+            false,
+            0,
+            DateTime.UtcNow.AddDays(-2),
+            DateTime.UtcNow,
+            1,
+            (int)EnrollmentStatus.Enrolled,
+            "Morning Group",
+            "Groupe du matin",
+            1,
+            "Sara",
+            "Ali",
+            "REG-001",
+            dateOfBirth,
+            (int)gender,
+            ramqNumber,
+            ramqExpiry,
+            allergies,
+            otherHealthConditions,
+            Guid.NewGuid().ToByteArray(),
+            "Parent",
+            "Ali",
+            "parent@example.com",
+            "5551234567",
+            (int)Relationship.Mother,
+            (int)ContactType.Unknown,
+            50);
 
         return table.CreateDataReader();
     }

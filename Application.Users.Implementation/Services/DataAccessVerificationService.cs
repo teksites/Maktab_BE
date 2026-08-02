@@ -47,6 +47,7 @@ namespace Application.Users.Implementation
         {
             return userRoles.HasFlag(UserRoleType.Admin)
                 || userRoles.HasFlag(UserRoleType.SuperUser)
+                || userRoles.HasFlag(UserRoleType.Manager)
                 || userRoles.HasFlag(UserRoleType.SchoolAdmin)
                 || userRoles.HasFlag(UserRoleType.SchoolSupervisor);
         }

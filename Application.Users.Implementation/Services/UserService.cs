@@ -370,6 +370,16 @@ namespace Application.Users.Implementation
             return null;
         }
 
+        public async Task<UserInformationResponse> GetUserInformationByEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return null;
+            }
+
+            return await GetUserInformation(email.Trim(), null, true).ConfigureAwait(false);
+        }
+
         public async Task<bool> ResetUserPassword(UpdateUserPassword updateUserPassword)
         {
             var userInformation = await _repository.GetUserInformation(updateUserPassword.UserId).ConfigureAwait(false);

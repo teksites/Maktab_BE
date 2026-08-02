@@ -9,7 +9,9 @@ namespace Helcim.Services
         Task<HelcimPaymentCompletionResponse> CompleteHelcimPayPayment(CompleteHelcimPayPaymentRequest request);
         Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceId(int invoiceId);
         Task<HelcimReconciliationResponse> ReconcileTransactions(HelcimReconciliationRequest? request = null);
+        Task<IReadOnlyList<HelcimAchRefundInvoiceSummaryResponse>> GetAchRefundInvoices(GetAchRefundInvoicesRequest request);
         Task<HelcimAchRefundResponse> RefundAchTransaction(RefundAchTransactionRequest request);
+        Task<HelcimAchRefundResponse> RefundAchInvoice(RefundAchInvoiceRequest request);
         Task<HelcimWebhookHandlingStatus> HandleWebhook(
             string rawBody,
             string? webhookId,

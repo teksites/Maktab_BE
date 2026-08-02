@@ -842,6 +842,9 @@ namespace Courses.Implementation.Services
         public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollments(Guid courseId)
             => _repository.GetAllEnrollmentsByCourse(courseId);
 
+        public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentsByGroup(Guid courseEnrollmentGroupId)
+            => _repository.GetAllEnrollmentsByGroup(courseEnrollmentGroupId);
+
         public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment, bool ifUpdatedByAdmin = false)
         {
             var result = await UpdateEnrollmentInternal(

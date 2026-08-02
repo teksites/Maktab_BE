@@ -149,28 +149,40 @@ namespace Maktab.Attributes
 
         private bool HasRequiredRole(UserRoleType userRoles, UserRoleType requiredRole)
         {
-            // Hierarchy: Normal < SchoolSupervoiser < SchoolAdmin < SuperUser < Admin
-            // Only allow access if user role >= required role in hierarchy
-            int roleHierarchy(UserRoleType role) => role switch
+            if (requiredRole == UserRoleType.None)
+            {
+                return true;
+            }
+
+            // Hierarchy: Normal < Assistant < SchoolTeacher < SchoolSupervisor < SchoolAdmin < SuperUser < Manager < Admin
+            static int RoleHierarchy(UserRoleType role) => role switch
             {
                 UserRoleType.Normal => 1,
-                UserRoleType.SchoolSupervisor => 2,
-                UserRoleType.SchoolAdmin => 3,
-                UserRoleType.SuperUser => 4,
-                UserRoleType.Admin => 5,
+                UserRoleType.Assistant => 2,
+                UserRoleType.SchoolTeacher => 3,
+                UserRoleType.SchoolSupervisor => 4,
+                UserRoleType.SchoolAdmin => 5,
+                UserRoleType.SuperUser => 6,
+                UserRoleType.Manager => 7,
+                UserRoleType.Admin => 8,
                 _ => 0
             };
 
-            int maxUserRoleLevel = Enum.GetValues(typeof(UserRoleType))
+            var userRoleLevel = Enum.GetValues(typeof(UserRoleType))
                 .Cast<UserRoleType>()
-                .Where(r => r != UserRoleType.None && userRoles.HasFlag(r))
-                .Select(r => roleHierarchy(r))
+                .Where(role => role != UserRoleType.None && userRoles.HasFlag(role))
+                .Select(RoleHierarchy)
                 .DefaultIfEmpty(0)
                 .Max();
 
-            int requiredRoleLevel = roleHierarchy(requiredRole);
+            var minimumRequiredRoleLevel = Enum.GetValues(typeof(UserRoleType))
+                .Cast<UserRoleType>()
+                .Where(role => role != UserRoleType.None && requiredRole.HasFlag(role))
+                .Select(RoleHierarchy)
+                .DefaultIfEmpty(0)
+                .Min();
 
-            return maxUserRoleLevel >= requiredRoleLevel;
+            return userRoleLevel >= minimumRequiredRoleLevel;
         }
 
         private IActionResult CreateUnauthorizedResult(string message)
