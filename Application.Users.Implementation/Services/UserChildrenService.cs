@@ -87,7 +87,7 @@ namespace Application.Users.Implementation
             if (!fetchAdults)
             {
                 children = children
-                    .Where(child => child.UserType == UserType.Child)
+                    .Where(child => IsIncludedFamilyMemberUserType(child.UserType))
                     .ToList();
             }
 
@@ -122,8 +122,8 @@ namespace Application.Users.Implementation
                 UpdatedOn = DateTime.UtcNow,
                 IsActive = true,
                 AcedemicGroup = child.AcedemicGroup,
-                Consent = GetConsent(child),
-                UserType = GetUserType(child),
+                Consent = child.Consent,
+                UserType = child.UserType,
             };
         }
 
@@ -152,25 +152,10 @@ namespace Application.Users.Implementation
                 UpdatedOn = child.UpdatedOn,
                 IsActive = child.IsActive,
                 AcedemicGroup = child.AcedemicGroup,
+                RegistrationNumber = child.RegistrationNumber,
+                Consent = child.Consent,
+                UserType = child.UserType,
             };
-
-            var registrationNumberProperty = typeof(ChildResponse).GetProperty("RegistrationNumber");
-            if (registrationNumberProperty?.CanWrite == true)
-            {
-                registrationNumberProperty.SetValue(response, child.RegistrationNumber);
-            }
-
-            var consentProperty = typeof(ChildResponse).GetProperty("Consent");
-            if (consentProperty?.CanWrite == true)
-            {
-                consentProperty.SetValue(response, child.Consent);
-            }
-
-            var userTypeProperty = typeof(ChildResponse).GetProperty("UserType");
-            if (userTypeProperty?.CanWrite == true)
-            {
-                userTypeProperty.SetValue(response, child.UserType);
-            }
 
             return new MaktabApiResult<ChildResponse>
             {
@@ -179,16 +164,12 @@ namespace Application.Users.Implementation
             };
         }
 
-        private static string GetConsent(AddChildRequest child)
+        private static bool IsIncludedFamilyMemberUserType(UserType userType)
         {
-            var consentProperty = child.GetType().GetProperty("Consent");
-            var consentValue = consentProperty?.GetValue(child) as string;
-            return consentValue ?? string.Empty;
-        }
-
-        private static UserType GetUserType(AddChildRequest child)
-        {
-            return child.UserType == default ? UserType.Child : child.UserType;
+            return userType == UserType.Child
+                || userType == UserType.Mother
+                || userType == UserType.Father
+                || userType == UserType.Guardian;
         }
     }
 }

@@ -462,7 +462,7 @@ namespace Application.Users.Implementation
                     FirstName = userInformation.FirstName,
                     LastName = userInformation.LastName,
                     DateOfBirth = GetLinkedUserPlaceholderDate(),
-                    Gender = Gender.Unknown,
+                    Gender = MapLinkedUserGender(userInformation.Relationship),
                     RAMQNumber = string.Empty,
                     RAMQExpiry = GetLinkedUserPlaceholderDate(),
                     RAMQSequenceNumber = 0,
@@ -471,7 +471,7 @@ namespace Application.Users.Implementation
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedOn = DateTime.UtcNow,
-                    AcedemicGroup = AcedemicGroupType.None,
+                    AcedemicGroup = AcedemicGroupType.Adults,
                     HasAllergy = false,
                     Consent = string.Empty,
                     UserType = userType
@@ -507,6 +507,16 @@ namespace Application.Users.Implementation
         private static DateTime GetLinkedUserPlaceholderDate()
         {
             return new DateTime(1900, 1, 1);
+        }
+
+        private static Gender MapLinkedUserGender(Relationship relationship)
+        {
+            return relationship switch
+            {
+                Relationship.Mother => Gender.Female,
+                Relationship.Father => Gender.Male,
+                _ => Gender.Unknown
+            };
         }
 
         private async Task EnsureParentRelationshipIsAvailableAsync(Guid familyId, Relationship relationship, Guid? excludedUserId = null)

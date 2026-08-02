@@ -82,7 +82,7 @@ public class UserChildrenServiceTests
     }
 
     [Fact]
-    public async Task GetUserChilds_DefaultsToChildUserTypeOnly()
+    public async Task GetUserChilds_DefaultsToChildMotherFatherAndGuardian()
     {
         var familyId = Guid.NewGuid();
         var repository = new Mock<IUserChildrenRepository>();
@@ -92,20 +92,25 @@ public class UserChildrenServiceTests
             {
                 CreateChild(familyId, "Maryam", UserType.Child),
                 CreateChild(familyId, "Parent", UserType.Mother),
-                CreateChild(familyId, "Guardian", UserType.Guardian)
+                CreateChild(familyId, "Father", UserType.Father),
+                CreateChild(familyId, "Guardian", UserType.Guardian),
+                CreateChild(familyId, "Other", (UserType)99)
             });
 
         var service = new UserChildrenService(Mock.Of<IConfiguration>(), repository.Object);
 
         var result = (await service.GetUserChilds(familyId)).ToList();
 
-        Assert.Single(result);
-        Assert.Equal(UserType.Child, result[0].Result.UserType);
-        Assert.Equal("Maryam", result[0].Result.FirstName);
+        Assert.Equal(4, result.Count);
+        Assert.Contains(result, child => child.Result.UserType == UserType.Child);
+        Assert.Contains(result, child => child.Result.UserType == UserType.Mother);
+        Assert.Contains(result, child => child.Result.UserType == UserType.Father);
+        Assert.Contains(result, child => child.Result.UserType == UserType.Guardian);
+        Assert.DoesNotContain(result, child => (int)child.Result.UserType == 99);
     }
 
     [Fact]
-    public async Task GetUserChilds_WhenFetchAdultsIsFalse_ReturnsOnlyChildren()
+    public async Task GetUserChilds_WhenFetchAdultsIsFalse_ReturnsSupportedFamilyMemberTypes()
     {
         var familyId = Guid.NewGuid();
         var repository = new Mock<IUserChildrenRepository>();
@@ -114,19 +119,24 @@ public class UserChildrenServiceTests
             .ReturnsAsync(new[]
             {
                 CreateChild(familyId, "Maryam", UserType.Child),
-                CreateChild(familyId, "Parent", UserType.Father)
+                CreateChild(familyId, "Parent", UserType.Father),
+                CreateChild(familyId, "Guardian", UserType.Guardian),
+                CreateChild(familyId, "Other", (UserType)99)
             });
 
         var service = new UserChildrenService(Mock.Of<IConfiguration>(), repository.Object);
 
         var result = (await service.GetUserChilds(familyId, fetchAdults: false)).ToList();
 
-        Assert.Single(result);
-        Assert.Equal(UserType.Child, result[0].Result.UserType);
+        Assert.Equal(3, result.Count);
+        Assert.Contains(result, child => child.Result.UserType == UserType.Child);
+        Assert.Contains(result, child => child.Result.UserType == UserType.Father);
+        Assert.Contains(result, child => child.Result.UserType == UserType.Guardian);
+        Assert.DoesNotContain(result, child => (int)child.Result.UserType == 99);
     }
 
     [Fact]
-    public async Task GetUserChilds_WhenFetchAdultsIsTrue_ReturnsAdultsToo()
+    public async Task GetUserChilds_WhenFetchAdultsIsTrue_ReturnsAllUserTypes()
     {
         var familyId = Guid.NewGuid();
         var repository = new Mock<IUserChildrenRepository>();
@@ -136,17 +146,19 @@ public class UserChildrenServiceTests
             {
                 CreateChild(familyId, "Maryam", UserType.Child),
                 CreateChild(familyId, "Parent", UserType.Mother),
-                CreateChild(familyId, "Guardian", UserType.Guardian)
+                CreateChild(familyId, "Guardian", UserType.Guardian),
+                CreateChild(familyId, "Other", (UserType)99)
             });
 
         var service = new UserChildrenService(Mock.Of<IConfiguration>(), repository.Object);
 
         var result = (await service.GetUserChilds(familyId, fetchAdults: true)).ToList();
 
-        Assert.Equal(3, result.Count);
+        Assert.Equal(4, result.Count);
         Assert.Contains(result, child => child.Result.UserType == UserType.Child);
         Assert.Contains(result, child => child.Result.UserType == UserType.Mother);
         Assert.Contains(result, child => child.Result.UserType == UserType.Guardian);
+        Assert.Contains(result, child => (int)child.Result.UserType == 99);
     }
 
     private static Child CreateChild(Guid familyId, string firstName, UserType userType)

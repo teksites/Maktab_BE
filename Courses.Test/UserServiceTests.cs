@@ -17,10 +17,13 @@ namespace Courses.Test;
 public class UserServiceTests
 {
     [Theory]
-    [InlineData(Relationship.Mother, UserType.Mother)]
-    [InlineData(Relationship.Father, UserType.Father)]
-    [InlineData(Relationship.Guardian, UserType.Guardian)]
-    public async Task VerifyUserVerificationCodes_CreatesLinkedChildForSupportedRelationships(Relationship relationship, UserType expectedUserType)
+    [InlineData(Relationship.Mother, UserType.Mother, Gender.Female)]
+    [InlineData(Relationship.Father, UserType.Father, Gender.Male)]
+    [InlineData(Relationship.Guardian, UserType.Guardian, Gender.Unknown)]
+    public async Task VerifyUserVerificationCodes_CreatesLinkedChildForSupportedRelationships(
+        Relationship relationship,
+        UserType expectedUserType,
+        Gender expectedGender)
     {
         var userId = Guid.NewGuid();
         var familyId = Guid.NewGuid();
@@ -80,8 +83,8 @@ public class UserServiceTests
         Assert.Equal(tempUser.FirstName, createdChild.FirstName);
         Assert.Equal(tempUser.LastName, createdChild.LastName);
         Assert.Equal(expectedUserType, createdChild.UserType);
-        Assert.Equal(Gender.Unknown, createdChild.Gender);
-        Assert.Equal(AcedemicGroupType.None, createdChild.AcedemicGroup);
+        Assert.Equal(expectedGender, createdChild.Gender);
+        Assert.Equal(AcedemicGroupType.Adults, createdChild.AcedemicGroup);
         Assert.Equal(string.Empty, createdChild.RAMQNumber);
         Assert.Equal(0, createdChild.RAMQSequenceNumber);
     }
