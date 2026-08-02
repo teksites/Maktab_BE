@@ -40,14 +40,14 @@ public class StudentCourseTransactionController : ControllerBase
     public async Task<StudentCourseTransactionResponse> GetTransaction(Guid transactionId)
         => await _service.GetTransaction(transactionId);
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
+    [ApiAuthorize()]
     [HttpGet("family/{familyId:guid}/institute/{instituteId:guid}")]
     public async Task<IEnumerable<StudentCourseTransactionResponse>> GetFamilyTransactionsByInstitute(Guid familyId, Guid instituteId)
     {
         return await _service.GetInstituteTransactionsByFamily(familyId, instituteId).ConfigureAwait(false);
     }
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
+    [ApiAuthorize()]
     [HttpGet("family/{familyId:guid}/course/{courseId:guid}")]
     public async Task<IEnumerable<StudentCourseTransactionResponse>> GetFamilyTransactionsByCourse(Guid familyId, Guid courseId)
     {

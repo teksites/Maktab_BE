@@ -66,6 +66,8 @@ namespace Application.Users.Repository.Implementation
                 OtherHealthConditions = @OtherHealthConditions,
                 Allergies = @Allergies,
                 AcedemicGroupType = @AcedemicGroupType,
+                DateOfBirth = @DateOfBirth,
+                Gender = @Gender,
                 RAMQExpiry = @RAMQExpiry,
                 RAMQNumber = @RAMQNumber,
                 RAMQSequenceNumber = @RAMQSequenceNumber,
@@ -79,6 +81,8 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@OtherHealthConditions", child.OtherHealthConditions);
             cmd.AddParameter("@Allergies", child.Allergies);
             cmd.AddParameter("@AcedemicGroupType", (int)child.AcedemicGroup);
+            cmd.AddParameter("@DateOfBirth", child.DateOfBirth);
+            cmd.AddParameter("@Gender", (int)child.Gender);
             cmd.AddParameter("@RAMQExpiry", child.RAMQExpiry);
             cmd.AddParameter("@RAMQNumber", child.RAMQNumber);
             cmd.AddParameter("@RAMQSequenceNumber", child.RAMQSequenceNumber);
