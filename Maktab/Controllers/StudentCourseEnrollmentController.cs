@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Http;
 using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Addresses;
 using MaktabDataContracts.Responses.Addresses;
+using Users.Services;
 
 [Route("api/student-course-enrollments")]
 [ApiController]
@@ -18,10 +19,14 @@ using MaktabDataContracts.Responses.Addresses;
 public class StudentCourseEnrollmentController : ControllerBase
 {
     private readonly IStudentCourseEnrollmentService _service;
+    private readonly IDataAccessVerificationService _dataAccessVerificationService;
 
-    public StudentCourseEnrollmentController(IStudentCourseEnrollmentService service)
+    public StudentCourseEnrollmentController(
+        IStudentCourseEnrollmentService service,
+        IDataAccessVerificationService dataAccessVerificationService)
     {
         _service = service;
+        _dataAccessVerificationService = dataAccessVerificationService;
     }
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
@@ -36,8 +41,22 @@ public class StudentCourseEnrollmentController : ControllerBase
 
     [ApiAuthorize]
     [HttpGet("{enrollmentId:guid}")]
-    public async Task<StudentCourseEnrollmentResponse> GetEnrollment(Guid enrollmentId)
-        => await _service.GetEnrollment(enrollmentId);
+    public async Task<ActionResult<StudentCourseEnrollmentResponse>> GetEnrollment(Guid enrollmentId)
+    {
+        var enrollment = await _service.GetEnrollment(enrollmentId).ConfigureAwait(false);
+        if (enrollment == null)
+        {
+            return NotFound();
+        }
+
+        var hasAccess = await HasFamilyEnrollmentAccessAsync(enrollment.FamilyId).ConfigureAwait(false);
+        if (!hasAccess)
+        {
+            return Forbid();
+        }
+
+        return Ok(enrollment);
+    }
 
     [ApiAuthorize]
     [HttpGet("family/{familyId:guid}")]
@@ -83,21 +102,66 @@ public class StudentCourseEnrollmentController : ControllerBase
     public async Task<bool> UpdateEnrollmentsBatchByAdmin(UpdateStudentCourseEnrollmentsBatchRequest request)
         => await _service.UpdateEnrollmentsBatch(request, true);
 
+    [ApiAuthorize]
     [HttpPut("{enrollmentId:guid}")]
     public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment)
         => await _service.UpdateEnrollment(enrollmentId, enrollment, false);
 
+    [ApiAuthorize]
     [HttpPut("batch")]
     public async Task<bool> UpdateEnrollmentsBatch(UpdateStudentCourseEnrollmentsBatchRequest request)
         => await _service.UpdateEnrollmentsBatch(request, false);
 
+    [ApiAuthorize]
     [HttpDelete("{enrollmentId:guid}")]
-    public async Task<bool> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false)
-        => await _service.DeleteEnrollment(enrollmentId, hardDelete, false);
+    public async Task<ActionResult<bool>> DeleteEnrollment(Guid enrollmentId, bool hardDelete = false)
+    {
+        var enrollment = await _service.GetEnrollment(enrollmentId).ConfigureAwait(false);
+        if (enrollment == null)
+        {
+            return NotFound();
+        }
+
+        var hasAccess = await HasFamilyEnrollmentAccessAsync(enrollment.FamilyId).ConfigureAwait(false);
+        if (!hasAccess)
+        {
+            return Forbid();
+        }
+
+        return await _service.DeleteEnrollment(enrollmentId, hardDelete, false).ConfigureAwait(false);
+    }
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpDelete("byadmin/{enrollmentId:guid}")]
     public async Task<bool> DeleteEnrollmentByAdmin(Guid enrollmentId, bool hardDelete = false)
         => await _service.DeleteEnrollment(enrollmentId, hardDelete, true);
 
+    private async Task<bool> HasFamilyEnrollmentAccessAsync(Guid familyId)
+    {
+        var sessionContext = await GetRequiredSessionContext().ConfigureAwait(false);
+        if (_dataAccessVerificationService.HasElevatedAccess(sessionContext.UserRoles))
+        {
+            return true;
+        }
+
+        return familyId == sessionContext.FamilyId;
+    }
+
+    private async Task<SessionAccessContext> GetRequiredSessionContext()
+    {
+        if (!Request.Headers.TryGetValue("Session_Info", out var sessionHeader)
+            || !Guid.TryParse(sessionHeader, out var sessionId)
+            || sessionId == Guid.Empty)
+        {
+            throw new UnauthorizedAccessException("Session header not found or invalid.");
+        }
+
+        var sessionContext = await _dataAccessVerificationService.GetSessionAccessContext(sessionId).ConfigureAwait(false);
+        if (sessionContext == null || sessionContext.UserId == Guid.Empty)
+        {
+            throw new UnauthorizedAccessException("No active session found.");
+        }
+
+        return sessionContext;
+    }
 }
