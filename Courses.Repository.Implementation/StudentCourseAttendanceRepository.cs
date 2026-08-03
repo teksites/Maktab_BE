@@ -212,6 +212,66 @@ namespace Courses.Repository.Implementation
                 reader.GetIntOrDefault("PresentCount", 0));
         }
 
+        public async Task<(int TotalRecords, int PresentCount)> GetAttendanceSummary(Guid courseId, Guid childId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                SELECT
+                    COUNT(*) AS TotalRecords,
+                    SUM(CASE WHEN AttendanceStatus = @PresentStatus THEN 1 ELSE 0 END) AS PresentCount
+                FROM student_course_attendance
+                WHERE CourseId = @CourseId
+                  AND ChildId = @ChildId
+                  AND IsActive = TRUE";
+
+            cmd.AddParameter("@CourseId", courseId.ToByteArray());
+            cmd.AddParameter("@ChildId", childId.ToByteArray());
+            cmd.AddParameter("@PresentStatus", (int)AttendanceStatus.Present);
+
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            if (!await reader.ReadAsync().ConfigureAwait(false))
+            {
+                return (0, 0);
+            }
+
+            return (
+                reader.GetIntOrDefault("TotalRecords", 0),
+                reader.GetIntOrDefault("PresentCount", 0));
+        }
+
+        public async Task<IReadOnlyDictionary<Guid, (int TotalRecords, int PresentCount)>> GetAttendanceSummariesByCourse(Guid courseId)
+        {
+            var summaries = new Dictionary<Guid, (int TotalRecords, int PresentCount)>();
+
+            using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                SELECT
+                    ChildId,
+                    COUNT(*) AS TotalRecords,
+                    SUM(CASE WHEN AttendanceStatus = @PresentStatus THEN 1 ELSE 0 END) AS PresentCount
+                FROM student_course_attendance
+                WHERE CourseId = @CourseId
+                  AND IsActive = TRUE
+                GROUP BY ChildId";
+
+            cmd.AddParameter("@CourseId", courseId.ToByteArray());
+            cmd.AddParameter("@PresentStatus", (int)AttendanceStatus.Present);
+
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                summaries[reader.GetGuidFromByteArray("ChildId")] = (
+                    reader.GetIntOrDefault("TotalRecords", 0),
+                    reader.GetIntOrDefault("PresentCount", 0));
+            }
+
+            return summaries;
+        }
+
         public async Task<CourseGroupAttendanceResponse> UpsertCourseGroupAttendance(UpsertCourseGroupAttendanceRequest request)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);

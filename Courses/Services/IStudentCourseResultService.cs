@@ -6,9 +6,10 @@ namespace Courses.Services
 {
     public interface IStudentCourseResultService
     {
-        Task<IReadOnlyList<StudentCourseResultResponse>> GetFamilyResults(Guid userId, UserRoleType userRoles, Guid familyId, Guid? courseId = null, Guid? courseEnrollmentGroupId = null);
-        Task<IReadOnlyList<StudentCourseResultResponse>> GetChildResults(Guid userId, UserRoleType userRoles, Guid childId, Guid? courseId = null, Guid? courseEnrollmentGroupId = null);
-        Task<StudentCourseResultResponse?> GetEnrollmentResult(Guid userId, UserRoleType userRoles, Guid studentCourseEnrollmentId);
-        Task<StudentCourseResultResponse> UpsertEnrollmentResult(Guid userId, UserRoleType userRoles, Guid studentCourseEnrollmentId, UpsertStudentCourseResultRequest request);
+        Task<IReadOnlyList<StudentCourseResultResponse>> GetFamilyResults(Guid userId, UserRoleType userRoles, Guid familyId, Guid? courseId = null);
+        Task<IReadOnlyList<StudentCourseResultResponse>> GetChildResults(Guid userId, UserRoleType userRoles, Guid childId, Guid? courseId = null);
+        Task<IReadOnlyList<StudentCourseResultResponse>> GetCourseResults(Guid userId, UserRoleType userRoles, Guid courseId);
+        Task<StudentCourseResultResponse?> GetCourseChildResult(Guid userId, UserRoleType userRoles, Guid courseId, Guid childId);
+        Task<StudentCourseResultResponse> UpsertCourseChildResult(Guid userId, UserRoleType userRoles, Guid courseId, Guid childId, UpsertStudentCourseResultRequest request);
     }
 }

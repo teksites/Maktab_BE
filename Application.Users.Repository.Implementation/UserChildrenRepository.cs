@@ -202,7 +202,9 @@ namespace Application.Users.Repository.Implementation
         public async Task<ChildEducationalProfileResponse> UpsertChildEducationalProfile(Guid childId, Guid familyId, IReadOnlyCollection<QuranSurah> completedSurahs)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
             using var cmd = conn.CreateCommand();
+            cmd.Transaction = tx;
 
             var now = DateTime.UtcNow;
             var profileId = Guid.NewGuid();
@@ -227,6 +229,21 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@UpdatedOn", now);
 
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+            cmd.Parameters.Clear();
+            cmd.CommandText = @"
+                UPDATE child_information
+                SET HasSurahCatalogBeenProvided = @HasSurahCatalogBeenProvided,
+                    UpdatedOn = @UpdatedOn
+                WHERE ChildId = @ChildId";
+
+            cmd.AddParameter("@HasSurahCatalogBeenProvided", true);
+            cmd.AddParameter("@UpdatedOn", now);
+            cmd.AddParameter("@ChildId", childId.ToByteArray());
+
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            await tx.CommitAsync().ConfigureAwait(false);
+
             return await GetChildEducationalProfile(childId).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("Failed to load child educational profile after upsert.");
         }
@@ -240,6 +257,7 @@ namespace Application.Users.Repository.Implementation
                 FirstName = reader.GetString("FirstName"),
                 LastName = reader.GetString("LastName"),
                 ArabicName = GetArabicName(reader),
+                HasSurahCatalogBeenProvided = GetHasSurahCatalogBeenProvided(reader),
                 OtherHealthConditions = reader.GetString("OtherHealthConditions"),
                 Allergies = reader.GetString("Allergies"),
                 //AcedemicGroup = (AcedemicGroupType)reader.GetInt32("AcedemicGroupType"),
@@ -306,6 +324,12 @@ namespace Application.Users.Repository.Implementation
         {
             var ordinal = reader.GetOrdinal("CompletedSurahsJson");
             return reader.IsDBNull(ordinal) ? "[]" : reader.GetString(ordinal);
+        }
+
+        private static bool GetHasSurahCatalogBeenProvided(DbDataReader reader)
+        {
+            var ordinal = reader.GetOrdinal("HasSurahCatalogBeenProvided");
+            return !reader.IsDBNull(ordinal) && reader.GetBoolean(ordinal);
         }
 
         private static string SerializeCompletedSurahs(IEnumerable<QuranSurah> completedSurahs)

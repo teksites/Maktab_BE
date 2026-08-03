@@ -5,17 +5,16 @@ namespace Courses.Repository
 {
     public interface IStudentCourseResultRepository
     {
-        Task<StudentCourseResultResponse?> GetByEnrollmentId(Guid studentCourseEnrollmentId);
-        Task<IReadOnlyList<StudentCourseResultResponse>> GetByFamilyId(Guid familyId, Guid? courseId = null, Guid? courseEnrollmentGroupId = null);
-        Task<IReadOnlyList<StudentCourseResultResponse>> GetByChildId(Guid childId, Guid? courseId = null, Guid? courseEnrollmentGroupId = null);
+        Task<StudentCourseResultResponse?> GetByChildAndCourse(Guid childId, Guid courseId);
+        Task<IReadOnlyList<StudentCourseResultResponse>> GetByFamilyId(Guid familyId, Guid? courseId = null);
+        Task<IReadOnlyList<StudentCourseResultResponse>> GetByChildId(Guid childId, Guid? courseId = null);
+        Task<IReadOnlyList<StudentCourseResultResponse>> GetByCourseId(Guid courseId);
         Task<StudentCourseResultResponse> Upsert(
-            Guid studentCourseEnrollmentId,
             Guid childId,
             Guid familyId,
             Guid courseId,
-            Guid courseEnrollmentGroupId,
             Guid instituteId,
-            decimal attendancePercentage,
+            decimal? attendancePercentage,
             StudentCourseResultStatus resultStatus,
             string remarks,
             Guid recordedByUserId,

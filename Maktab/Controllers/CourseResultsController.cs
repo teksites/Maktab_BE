@@ -32,12 +32,11 @@ namespace Maktab.Controllers
         [HttpGet("family/{familyId:guid}")]
         public async Task<ActionResult<IReadOnlyList<StudentCourseResultResponse>>> GetFamilyResults(
             Guid familyId,
-            Guid? courseId = null,
-            Guid? courseEnrollmentGroupId = null)
+            Guid? courseId = null)
         {
             var session = await GetRequiredSessionContext().ConfigureAwait(false);
             return Ok(await _studentCourseResultService
-                .GetFamilyResults(session.UserId, session.UserRoles, familyId, courseId, courseEnrollmentGroupId)
+                .GetFamilyResults(session.UserId, session.UserRoles, familyId, courseId)
                 .ConfigureAwait(false));
         }
 
@@ -45,22 +44,31 @@ namespace Maktab.Controllers
         [HttpGet("child/{childId:guid}")]
         public async Task<ActionResult<IReadOnlyList<StudentCourseResultResponse>>> GetChildResults(
             Guid childId,
-            Guid? courseId = null,
-            Guid? courseEnrollmentGroupId = null)
+            Guid? courseId = null)
         {
             var session = await GetRequiredSessionContext().ConfigureAwait(false);
             return Ok(await _studentCourseResultService
-                .GetChildResults(session.UserId, session.UserRoles, childId, courseId, courseEnrollmentGroupId)
+                .GetChildResults(session.UserId, session.UserRoles, childId, courseId)
+                .ConfigureAwait(false));
+        }
+
+        [ApiAuthorize(false, false, UserRoleType.Assistant)]
+        [HttpGet("course/{courseId:guid}")]
+        public async Task<ActionResult<IReadOnlyList<StudentCourseResultResponse>>> GetCourseResults(Guid courseId)
+        {
+            var session = await GetRequiredSessionContext().ConfigureAwait(false);
+            return Ok(await _studentCourseResultService
+                .GetCourseResults(session.UserId, session.UserRoles, courseId)
                 .ConfigureAwait(false));
         }
 
         [ApiAuthorize(false, false, UserRoleType.Normal)]
-        [HttpGet("enrollment/{studentCourseEnrollmentId:guid}")]
-        public async Task<ActionResult<StudentCourseResultResponse>> GetEnrollmentResult(Guid studentCourseEnrollmentId)
+        [HttpGet("course/{courseId:guid}/child/{childId:guid}")]
+        public async Task<ActionResult<StudentCourseResultResponse>> GetCourseChildResult(Guid courseId, Guid childId)
         {
             var session = await GetRequiredSessionContext().ConfigureAwait(false);
             var result = await _studentCourseResultService
-                .GetEnrollmentResult(session.UserId, session.UserRoles, studentCourseEnrollmentId)
+                .GetCourseChildResult(session.UserId, session.UserRoles, courseId, childId)
                 .ConfigureAwait(false);
 
             if (result == null)
@@ -72,12 +80,15 @@ namespace Maktab.Controllers
         }
 
         [ApiAuthorize(false, false, UserRoleType.Assistant)]
-        [HttpPut("enrollment/{studentCourseEnrollmentId:guid}")]
-        public async Task<ActionResult<StudentCourseResultResponse>> UpsertEnrollmentResult(Guid studentCourseEnrollmentId, UpsertStudentCourseResultRequest request)
+        [HttpPut("course/{courseId:guid}/child/{childId:guid}")]
+        public async Task<ActionResult<StudentCourseResultResponse>> UpsertCourseChildResult(
+            Guid courseId,
+            Guid childId,
+            UpsertStudentCourseResultRequest request)
         {
             var session = await GetRequiredSessionContext().ConfigureAwait(false);
             return Ok(await _studentCourseResultService
-                .UpsertEnrollmentResult(session.UserId, session.UserRoles, studentCourseEnrollmentId, request)
+                .UpsertCourseChildResult(session.UserId, session.UserRoles, courseId, childId, request)
                 .ConfigureAwait(false));
         }
 

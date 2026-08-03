@@ -148,6 +148,7 @@ namespace Application.Users.Implementation
                 FirstName = child.FirstName,
                 LastName = child.LastName,
                 ArabicName = child.ArabicName,
+                HasSurahCatalogBeenProvided = child.HasSurahCatalogBeenProvided,
                 Gender = child.Gender,
                 OtherHealthConditions = child.OtherHealthConditions,
                 CreatedAt = child.CreatedAt,

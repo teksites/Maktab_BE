@@ -58,6 +58,13 @@ namespace Application.Users.Implementation
 
             await EnsureCanAccessChildProfile(userId, userRoles, child.ChildId, child.FamilyId).ConfigureAwait(false);
 
+            if (!_dataAccessVerificationService.HasElevatedAccess(userRoles)
+                && !HasStaffAssignmentRole(userRoles)
+                && child.HasSurahCatalogBeenProvided)
+            {
+                throw new UnauthorizedAccessException("The surah catalog was already provided and can only be updated by school staff.");
+            }
+
             var completedSurahs = (request.CompletedSurahs ?? new List<QuranSurahSelectionRequest>())
                 .Select(item => item?.Surah ?? 0)
                 .Where(surah => Enum.IsDefined(typeof(QuranSurah), surah))

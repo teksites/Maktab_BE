@@ -146,6 +146,44 @@ public class UserChildrenServiceTests
     }
 
     [Fact]
+    public async Task GetChild_MapsSurahCatalogFlagIntoResponse()
+    {
+        var childId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var repository = new Mock<IUserChildrenRepository>();
+        repository
+            .Setup(repo => repo.GetChild(childId))
+            .ReturnsAsync(new Child
+            {
+                ChildId = childId,
+                FamilyId = familyId,
+                FirstName = "Flag",
+                LastName = "Child",
+                HasSurahCatalogBeenProvided = true,
+                UserType = UserType.Child,
+                Gender = Gender.Unknown,
+                AcedemicGroup = AcedemicGroupType.None,
+                DateOfBirth = DateTime.UtcNow.AddYears(-10),
+                RAMQExpiry = DateTime.UtcNow.AddYears(1),
+                RAMQNumber = "FLAG-1",
+                RAMQSequenceNumber = 1,
+                HasAllergy = false,
+                Allergies = string.Empty,
+                OtherHealthConditions = string.Empty,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedOn = DateTime.UtcNow
+            });
+
+        var service = new UserChildrenService(Mock.Of<IConfiguration>(), repository.Object);
+
+        var result = await service.GetChild(childId);
+
+        Assert.NotNull(result);
+        Assert.True(result!.Result.HasSurahCatalogBeenProvided);
+    }
+
+    [Fact]
     public async Task GetUserChilds_WhenFetchAdultsIsFalse_ReturnsSupportedFamilyMemberTypes()
     {
         var familyId = Guid.NewGuid();
