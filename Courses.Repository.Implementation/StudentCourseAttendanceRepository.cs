@@ -185,6 +185,33 @@ namespace Courses.Repository.Implementation
             return results;
         }
 
+        public async Task<(int TotalRecords, int PresentCount)> GetAttendanceSummary(Guid studentCourseEnrollmentId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                SELECT
+                    COUNT(*) AS TotalRecords,
+                    SUM(CASE WHEN AttendanceStatus = @PresentStatus THEN 1 ELSE 0 END) AS PresentCount
+                FROM student_course_attendance
+                WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId
+                  AND IsActive = TRUE";
+
+            cmd.AddParameter("@StudentCourseEnrollmentId", studentCourseEnrollmentId.ToByteArray());
+            cmd.AddParameter("@PresentStatus", (int)AttendanceStatus.Present);
+
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            if (!await reader.ReadAsync().ConfigureAwait(false))
+            {
+                return (0, 0);
+            }
+
+            return (
+                reader.GetIntOrDefault("TotalRecords", 0),
+                reader.GetIntOrDefault("PresentCount", 0));
+        }
+
         public async Task<CourseGroupAttendanceResponse> UpsertCourseGroupAttendance(UpsertCourseGroupAttendanceRequest request)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);

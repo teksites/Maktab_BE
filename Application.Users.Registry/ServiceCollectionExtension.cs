@@ -23,6 +23,7 @@ namespace Application.Users.Registry
             services.AddScoped<IOtherContactsService, OtherContactsService>();
             services.AddScoped<IOtherContactsRepository, OtherContactsRepository>();
             services.AddScoped<IUserChildrenService, UserChildrenService>();
+            services.AddScoped<IChildEducationalProfileService, ChildEducationalProfileService>();
             services.AddScoped<IUserChildrenRepository, UserChildrenRepository>();
             services.AddScoped<IAddressService, AddressService>();
             services.AddScoped<IAddressRepository, AddressRepository>();

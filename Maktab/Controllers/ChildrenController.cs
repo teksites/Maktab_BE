@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Maktab.Attributes;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Models;
 using MaktabDataContracts.Requests.Children;
 using MaktabDataContracts.Responses.Children;
@@ -21,17 +22,20 @@ namespace Maktab.Controllers
     public class ChildrenController : ControllerBase
     {
         private readonly IUserChildrenService _childrenService;
+        private readonly IChildEducationalProfileService _childEducationalProfileService;
         private readonly IDataAccessVerificationService _dataAccessVerificationService;
         private readonly ILogger<ChildrenController> _logger;
         private readonly IUserService userService;
 
         public ChildrenController(
             IUserChildrenService childrenService,
+            IChildEducationalProfileService childEducationalProfileService,
             IUserService service,
             IDataAccessVerificationService dataAccessVerificationService,
             ILogger<ChildrenController> logger)
         {
             _childrenService = childrenService;
+            _childEducationalProfileService = childEducationalProfileService;
             _logger = logger;
             userService = service;
             _dataAccessVerificationService = dataAccessVerificationService;
@@ -126,6 +130,35 @@ namespace Maktab.Controllers
         {
 
             return await _childrenService.CheckIfChildExisit(clientchild).ConfigureAwait(false);
+        }
+
+        [Authorize]
+        [HttpGet("children/{childId:guid}/educational-profile")]
+        [EnableCors("corspolicy")]
+        public async Task<ActionResult<ChildEducationalProfileResponse>> GetChildEducationalProfile(Guid childId)
+        {
+            var session = await GetRequiredSessionContext().ConfigureAwait(false);
+            var profile = await _childEducationalProfileService
+                .GetChildEducationalProfile(session.UserId, session.UserRoles, childId)
+                .ConfigureAwait(false);
+
+            if (profile == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(profile);
+        }
+
+        [ApiAuthorize(false, false, UserRoleType.Assistant)]
+        [HttpPut("children/{childId:guid}/educational-profile")]
+        [EnableCors("corspolicy")]
+        public async Task<ActionResult<ChildEducationalProfileResponse>> UpsertChildEducationalProfile(Guid childId, UpsertChildEducationalProfileRequest request)
+        {
+            var session = await GetRequiredSessionContext().ConfigureAwait(false);
+            return Ok(await _childEducationalProfileService
+                .UpsertChildEducationalProfile(session.UserId, session.UserRoles, childId, request)
+                .ConfigureAwait(false));
         }
 
         private async Task<bool> HasFamilyAccessAsync(Guid familyId)

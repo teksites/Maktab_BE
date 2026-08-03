@@ -82,6 +82,42 @@ public class UserChildrenServiceTests
     }
 
     [Fact]
+    public async Task AddChild_MapsArabicNameIntoRepositoryAndResponse()
+    {
+        Child? capturedChild = null;
+        var repository = new Mock<IUserChildrenRepository>();
+        repository
+            .Setup(repo => repo.AddChild(It.IsAny<Child>()))
+            .Callback<Child>(child => capturedChild = child)
+            .ReturnsAsync((Child child) => child);
+
+        var service = new UserChildrenService(Mock.Of<IConfiguration>(), repository.Object);
+
+        var result = await service.AddChild(new AddChildRequest
+        {
+            FamilyId = Guid.NewGuid(),
+            FirstName = "Test",
+            LastName = "Child",
+            ArabicName = "محمد",
+            DateOfBirth = DateTime.UtcNow.AddYears(-9),
+            Gender = Gender.Male,
+            RAMQExpiry = DateTime.UtcNow.AddYears(1),
+            RAMQNumber = "ARABIC123",
+            RAMQSequenceNumber = 2,
+            HasAllergy = false,
+            Allergies = string.Empty,
+            OtherHealthConditions = string.Empty,
+            AcedemicGroup = AcedemicGroupType.None,
+            Consent = "yes"
+        });
+
+        Assert.NotNull(capturedChild);
+        Assert.Equal("محمد", capturedChild!.ArabicName);
+        Assert.NotNull(result);
+        Assert.Equal("محمد", result!.Result.ArabicName);
+    }
+
+    [Fact]
     public async Task GetUserChilds_DefaultsToChildMotherFatherAndGuardian()
     {
         var familyId = Guid.NewGuid();

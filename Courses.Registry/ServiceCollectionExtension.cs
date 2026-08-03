@@ -25,6 +25,8 @@ namespace Courses.Registry
             services.AddScoped<ICourseStaffAssignmentRepository, CourseStaffAssignmentRepository>();
             services.AddScoped<IStudentCourseAttendanceService, StudentCourseAttendanceService>();
             services.AddScoped<IStudentCourseAttendanceRepository, StudentCourseAttendanceRepository>();
+            services.AddScoped<IStudentCourseResultService, StudentCourseResultService>();
+            services.AddScoped<IStudentCourseResultRepository, StudentCourseResultRepository>();
 
             services.AddScoped<IInstitutePolicyService, InstitutePolicyService>();
             services.AddScoped<IInstitutePolicyRepository, InstitutePolicyRepository>();

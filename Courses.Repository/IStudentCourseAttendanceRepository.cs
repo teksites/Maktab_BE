@@ -7,6 +7,7 @@ namespace Courses.Repository
     {
         Task<IReadOnlyList<StudentCourseAttendanceResponse>> GetCourseGroupAttendance(Guid courseEnrollmentGroupId, DateTime attendanceDate, Guid? childId = null);
         Task<IReadOnlyList<AttendanceRecordResponse>> GetAttendanceRecords(GetAttendanceRecordsRequest request, IReadOnlyCollection<Guid>? accessibleGroupIds = null);
+        Task<(int TotalRecords, int PresentCount)> GetAttendanceSummary(Guid studentCourseEnrollmentId);
         Task<CourseGroupAttendanceResponse> UpsertCourseGroupAttendance(UpsertCourseGroupAttendanceRequest request);
     }
 }
