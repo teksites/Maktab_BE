@@ -8,6 +8,7 @@ using MaktabDataContracts.Requests.OtherContacts;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MaktabDataContracts.Models;
 using Users.Services;
 using MaktabDataContracts.Responses.OtherContacts;
 using MaktabDataContracts.Enums;
@@ -64,9 +65,16 @@ namespace Maktab.Controllers
         [Authorize]
         [HttpPost("families/{familyId:guid}/otherContacts/add")]
         [EnableCors("corspolicy")]
-        public async Task<OtherContactResponse> AddUserAddress(Guid familyId, AddOtherContact otherContact)
+        public async Task<ActionResult<OtherContactResponse>> AddUserAddress(Guid familyId, AddOtherContact otherContact)
         {
-            return await _otherContactsService.AddOtherContact(otherContact).ConfigureAwait(false);
+            try
+            {
+                return Ok(await _otherContactsService.AddOtherContact(otherContact).ConfigureAwait(false));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiResult.Error(ex.Message));
+            }
         }
 
         [Authorize]
@@ -104,7 +112,14 @@ namespace Maktab.Controllers
                 return Forbid();
             }
 
-            return Ok(await _otherContactsService.UpdateOtherContact(otherContact).ConfigureAwait(false));
+            try
+            {
+                return Ok(await _otherContactsService.UpdateOtherContact(otherContact).ConfigureAwait(false));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiResult.Error(ex.Message));
+            }
         }
 
         [Authorize]

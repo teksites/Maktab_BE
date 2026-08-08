@@ -112,7 +112,7 @@ namespace Courses.Repository.Implementation
                         oci.ContactType
                     FROM other_contacts_information oci
                     WHERE oci.IsActive = 1
-                      AND oci.Relationship NOT IN ({MotherRelationship}, {FatherRelationship}, {GuardianRelationship})
+                      AND oci.Relationship NOT IN ({MotherRelationship}, {FatherRelationship})
                 ) fi
                     ON fi.FamilyId = sct.FamilyId";
 
@@ -291,6 +291,7 @@ namespace Courses.Repository.Implementation
                     ON ceg.CourseId = crcs.CourseId
 
                 WHERE LOWER(sct.PaymentCode) = LOWER(@PaymentCode)
+                  AND sct.IsActive = TRUE
 
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
             ";
@@ -602,6 +603,7 @@ namespace Courses.Repository.Implementation
                 WHERE
                     sct.FamilyId = @FamilyId
                     AND crcs.InstituteId = @InstituteId
+                    AND sct.IsActive = TRUE
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt
                 LIMIT 500;
             ";
@@ -773,6 +775,7 @@ namespace Courses.Repository.Implementation
 
                 WHERE sct.FamilyId = @FamilyId
                   AND crcs.InstituteId = @InstituteId
+                  AND sct.IsActive = TRUE
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
             ";
 
@@ -857,6 +860,7 @@ namespace Courses.Repository.Implementation
 
                 WHERE sct.FamilyId = @FamilyId
                   AND sce.CourseId = @CourseId
+                  AND sct.IsActive = TRUE
                 ORDER BY sct.CreatedAt DESC, sce.IsActive DESC, sce.UpdatedOn DESC, sce.CreatedAt DESC;
             ";
 
@@ -1248,7 +1252,10 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            var filters = new List<string>();
+            var filters = new List<string>
+            {
+                "sct.IsActive = TRUE"
+            };
 
             // real base table alias: sct
             if (familyId.HasValue)

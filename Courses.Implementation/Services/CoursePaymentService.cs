@@ -40,12 +40,7 @@ namespace Courses.Services.Implementation
         public async Task<CoursePaymentResponse> AddPayment(AddCoursePayment payment)
         {
             NormalizePayment(payment);
-            var transaction = await _studentCourseTransactionService.GetTransaction(payment.StudentCourseTransactionId).ConfigureAwait(false);
-
-            if (transaction == null)
-            {
-                throw new Exception("The transaaction doesn't exist");
-            }
+            await GetActiveTransactionForPaymentMutation(payment.StudentCourseTransactionId).ConfigureAwait(false);
 
             var result = await TryAddPayment(payment).ConfigureAwait(false);
             return result.Payment;
@@ -54,12 +49,7 @@ namespace Courses.Services.Implementation
         public async Task<(CoursePaymentResponse Payment, bool Created)> TryAddPayment(AddCoursePayment payment)
         {
             NormalizePayment(payment);
-            var transaction = await _studentCourseTransactionService.GetTransaction(payment.StudentCourseTransactionId).ConfigureAwait(false);
-
-            if (transaction == null)
-            {
-                throw new Exception("The transaaction doesn't exist");
-            }
+            var transaction = await GetActiveTransactionForPaymentMutation(payment.StudentCourseTransactionId).ConfigureAwait(false);
 
             var result = await _repository.TryAddPayment(payment).ConfigureAwait(false);
             if (!result.Created)
@@ -93,12 +83,7 @@ namespace Courses.Services.Implementation
         public async Task<bool> UpdatePayment(Guid paymentId, AddCoursePayment payment)
         {
             NormalizePayment(payment);
-            var transaction = await _studentCourseTransactionService.GetTransaction(payment.StudentCourseTransactionId).ConfigureAwait(false);
-
-            if (transaction == null)
-            {
-                throw new Exception("The transaaction doesn't exist");
-            }
+            var transaction = await GetActiveTransactionForPaymentMutation(payment.StudentCourseTransactionId).ConfigureAwait(false);
 
             var paymentResponse = await _repository.UpdatePayment(paymentId, payment).ConfigureAwait(false);
 
@@ -152,6 +137,23 @@ namespace Courses.Services.Implementation
         public async Task<IEnumerable<CoursePaymentResponse>> GetAllPaymentsByStudentTransactionId(Guid studentTransactionId)
         {
             return await _repository.GetAllPaymentsByStudentTransactionId(studentTransactionId).ConfigureAwait(false);
+        }
+
+        private async Task<StudentCourseTransactionResponse> GetActiveTransactionForPaymentMutation(Guid studentCourseTransactionId)
+        {
+            var transaction = await _studentCourseTransactionService.GetTransaction(studentCourseTransactionId).ConfigureAwait(false);
+
+            if (transaction == null)
+            {
+                throw new Exception("The transaaction doesn't exist");
+            }
+
+            if (!transaction.IsActive)
+            {
+                throw new InvalidOperationException("Cannot add or update a payment for an inactive transaction.");
+            }
+
+            return transaction;
         }
 
         private async Task RecalculateEnrollmentState(StudentCourseTransactionResponse transaction)

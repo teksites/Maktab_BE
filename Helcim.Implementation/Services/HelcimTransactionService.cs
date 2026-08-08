@@ -929,9 +929,16 @@ namespace Helcim.Implementation.Services
                 }
             }
 
-            return await _studentCourseTransactionService
+            var transactionById = await _studentCourseTransactionService
                 .GetTransaction(request.TransactionId)
                 .ConfigureAwait(false);
+
+            if (transactionById != null && !transactionById.IsActive)
+            {
+                throw new InvalidOperationException("Active student course transaction not found for the provided payment code or transaction id.");
+            }
+
+            return transactionById;
         }
 
         private static int ParseInvoiceSequence(string? invoiceNumber)

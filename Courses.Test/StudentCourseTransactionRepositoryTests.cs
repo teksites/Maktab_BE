@@ -69,7 +69,7 @@ public class StudentCourseTransactionRepositoryTests
     }
 
     [Fact]
-    public async Task GetAllTransactionsByCourse_PrefersRegisteredParentSourcesOverOtherContacts()
+    public async Task GetAllTransactionsByCourse_PrefersRegisteredParentSourcesWhileKeepingGuardianOtherContacts()
     {
         string? commandText = null;
 
@@ -86,7 +86,8 @@ public class StudentCourseTransactionRepositoryTests
         Assert.DoesNotContain("{FamilyInformationJoinSql}", commandText);
         Assert.Contains("tui.Relationship NOT IN (1, 2, 3)", commandText);
         Assert.Contains("NOT EXISTS", commandText);
-        Assert.Contains("oci.Relationship NOT IN (1, 2, 3)", commandText);
+        Assert.Contains("oci.Relationship NOT IN (1, 2)", commandText);
+        Assert.DoesNotContain("oci.Relationship NOT IN (1, 2, 3)", commandText);
     }
 
     [Fact]

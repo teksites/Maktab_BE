@@ -172,6 +172,7 @@ public class HelcimTransactionServiceTests
             .ReturnsAsync(new StudentCourseTransactionResponse
             {
                 StudentCourseTransactionId = transactionId,
+                IsActive = true,
                 Enrollments = new List<StudentCourseEnrollmentResponse>
                 {
                     new()
@@ -204,6 +205,41 @@ public class HelcimTransactionServiceTests
         var payload = JObject.Parse(payloadJson);
 
         Assert.Equal(65432, payload["terminalId"]!.Value<int>());
+    }
+
+    [Fact]
+    public async Task InitializePayment_RejectsInactiveTransactionIdFallback()
+    {
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository
+            .Setup(repo => repo.GetByMaktabTransactionId(It.IsAny<Guid>()))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+
+        var transactionId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetTransaction(transactionId))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = transactionId,
+                IsActive = false
+            });
+
+        var service = CreateService(
+            repository.Object,
+            Mock.Of<IWebMsgSenderService>(),
+            studentCourseTransactionService: transactionService.Object);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.InitializePayment(new InitiatePaymentRequest
+        {
+            PaymentCode = string.Empty,
+            Amount = 99,
+            TransactionId = transactionId,
+            UserIp = "127.0.0.1"
+        }));
+
+        Assert.Contains("Active student course transaction not found", exception.Message);
     }
 
     [Fact]
