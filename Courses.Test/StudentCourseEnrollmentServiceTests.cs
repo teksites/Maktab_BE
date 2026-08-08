@@ -184,12 +184,14 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 },
                 new UserInformationResponse
                 {
                     Email = "parent2@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
@@ -298,12 +300,14 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 },
                 new UserInformationResponse
                 {
                     Email = "parent2@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
@@ -1278,7 +1282,8 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 }
             });
 
@@ -1722,7 +1727,8 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
@@ -1920,12 +1926,14 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent1@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 },
                 new UserInformationResponse
                 {
                     Email = "parent2@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
@@ -2061,7 +2069,8 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "family1@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 }
             });
         userService
@@ -2071,7 +2080,8 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "family2@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
@@ -2182,7 +2192,8 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 }
             });
 
@@ -2463,12 +2474,14 @@ public class StudentCourseEnrollmentServiceTests
                     new UserInformationResponse
                     {
                         Email = "mother@example.com",
-                        Relationship = Relationship.Mother
+                        Relationship = Relationship.Mother,
+                        IfTempUser = false
                     },
                     new UserInformationResponse
                     {
                         Email = "father@example.com",
-                        Relationship = Relationship.Father
+                        Relationship = Relationship.Father,
+                        IfTempUser = false
                     }
                 });
         }

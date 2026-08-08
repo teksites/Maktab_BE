@@ -550,13 +550,15 @@ public class StudentCourseAttendanceServiceTests
                 {
                     FamilyId = familyId,
                     Email = "mother@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 },
                 new UserInformationResponse
                 {
                     FamilyId = familyId,
                     Email = "father@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 

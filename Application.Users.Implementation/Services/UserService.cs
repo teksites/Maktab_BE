@@ -421,8 +421,33 @@ namespace Application.Users.Implementation
                 .ToList();
         }
 
+        public async Task<IReadOnlyList<string>> GetVerifiedFamilyNotificationEmailAddresses(Guid familyId)
+        {
+            var familyUsers = await GetAllFamilyUsersInformation(familyId, true).ConfigureAwait(false);
+
+            return familyUsers
+                .Where(user =>
+                    !user.IfTempUser &&
+                    IsFamilyInformationRelationship(user.Relationship))
+                .Select(user => user.Email?.Trim() ?? string.Empty)
+                .Where(emailAddress => !string.IsNullOrWhiteSpace(emailAddress))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         public async Task<UserInformationResponse> LinkUserToAFamily(Guid userId, Guid familyId)
         {
+            var userInformation = await _repository.GetUserInformation(userId).ConfigureAwait(false);
+            if (userInformation == null)
+            {
+                return null;
+            }
+
+            await EnsureParentRelationshipIsAvailableAsync(
+                familyId,
+                userInformation.Relationship,
+                userId).ConfigureAwait(false);
+
             return MapToUserInformationResponse(await _repository.LinkUserToAFamily(userId, familyId).ConfigureAwait(false), false);
         }
 

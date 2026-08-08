@@ -1123,12 +1123,21 @@ namespace Courses.Implementation.Services
 
         private async Task<List<string>> GetFamilyNotificationEmailAddressesAsync(Guid familyId)
         {
-            var familyUsers = await _userService.GetAllFamilyUsersInformation(familyId, true).ConfigureAwait(false);
+            var verifiedEmails = await _userService.GetVerifiedFamilyNotificationEmailAddresses(familyId).ConfigureAwait(false);
+            if (verifiedEmails?.Any() == true)
+            {
+                return verifiedEmails.ToList();
+            }
+
+            var familyUsers = await _userService.GetAllFamilyUsersInformation(familyId, true).ConfigureAwait(false)
+                ?? Enumerable.Empty<MaktabDataContracts.Responses.Users.UserInformationResponse>();
+
             return familyUsers
-                .Where(x => x.Relationship == Relationship.Mother ||
-                            x.Relationship == Relationship.Father ||
-                            x.Relationship == Relationship.Guardian)
-                .Select(x => x.Email)
+                .Where(x => !x.IfTempUser &&
+                            (x.Relationship == Relationship.Mother ||
+                             x.Relationship == Relationship.Father ||
+                             x.Relationship == Relationship.Guardian))
+                .Select(x => x.Email?.Trim() ?? string.Empty)
                 .Where(emailAddress => !string.IsNullOrWhiteSpace(emailAddress))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();

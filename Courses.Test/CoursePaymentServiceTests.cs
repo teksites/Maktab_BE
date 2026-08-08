@@ -759,7 +759,8 @@ public class CoursePaymentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 }
             });
 
@@ -890,7 +891,8 @@ public class CoursePaymentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
