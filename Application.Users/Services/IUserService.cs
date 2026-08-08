@@ -22,10 +22,12 @@ namespace Users.Services
         Task<IEnumerable<UserInformationResponse>> GetAllUsersInformation(bool ifOnlyActive = true);
         Task<bool> SendActivationCode(Guid userId);
         Task<UserInformationResponse> GetUserInformation(string userName, string? password, bool ifForgotPassword);
+        Task<UserInformationResponse> GetUserInformationByEmail(string email);
         Task<bool> ForgotPassword(string userName, string? password);
         Task<bool> ResetUserPassword(UpdateUserPassword updateUserPassword);
         Task<bool> CheckIfTempUser(string userName);
         Task<IEnumerable<UserInformationResponse>> GetAllFamilyUsersInformation(Guid familyId, bool ifOnlyActive = true);
+        Task<IReadOnlyList<string>> GetVerifiedFamilyNotificationEmailAddresses(Guid familyId);
         Task<UserInformationResponse> LinkUserToAFamily(Guid userId, Guid familyId);
         //Task<MaktabApiResult<UserTransactionsDetails>> CreateUserTransaction(AddUserTransaction addUserTransactions);
 

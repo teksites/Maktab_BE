@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Users.Services;
 
 [Route("api/student-course-transactions")]
 [ApiController]
@@ -18,11 +19,16 @@ public class StudentCourseTransactionController : ControllerBase
 {
     private readonly IStudentCourseTransactionService _service;
     private readonly IHelcimTransactionService _helcimService;
+    private readonly IDataAccessVerificationService _dataAccessVerificationService;
 
-    public StudentCourseTransactionController(IStudentCourseTransactionService service, IHelcimTransactionService helcimService)
+    public StudentCourseTransactionController(
+        IStudentCourseTransactionService service,
+        IHelcimTransactionService helcimService,
+        IDataAccessVerificationService dataAccessVerificationService)
     {
         _service = service;
         _helcimService = helcimService;
+        _dataAccessVerificationService = dataAccessVerificationService;
     }
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
@@ -35,30 +41,56 @@ public class StudentCourseTransactionController : ControllerBase
     public async Task<IEnumerable<StudentCourseTransactionResponse>> GetAllInstituteTransactions(Guid instituteId)
         => await _service.GetAllTransactionsByInstitute(instituteId);
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
+    [ApiAuthorize()]
     [HttpGet("{transactionId:guid}")]
-    public async Task<StudentCourseTransactionResponse> GetTransaction(Guid transactionId)
-        => await _service.GetTransaction(transactionId);
+    public async Task<ActionResult<StudentCourseTransactionResponse>> GetTransaction(Guid transactionId)
+    {
+        var transaction = await _service.GetTransaction(transactionId).ConfigureAwait(false);
+        if (transaction == null)
+        {
+            return NotFound();
+        }
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
+        var hasAccess = await HasFamilyTransactionAccessAsync(transaction.FamilyId).ConfigureAwait(false);
+        if (!hasAccess)
+        {
+            return Forbid();
+        }
+
+        return Ok(transaction);
+    }
+
+    [ApiAuthorize()]
     [HttpGet("family/{familyId:guid}/institute/{instituteId:guid}")]
     public async Task<IEnumerable<StudentCourseTransactionResponse>> GetFamilyTransactionsByInstitute(Guid familyId, Guid instituteId)
     {
         return await _service.GetInstituteTransactionsByFamily(familyId, instituteId).ConfigureAwait(false);
     }
 
-    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin)]
+    [ApiAuthorize()]
     [HttpGet("family/{familyId:guid}/course/{courseId:guid}")]
     public async Task<IEnumerable<StudentCourseTransactionResponse>> GetFamilyTransactionsByCourse(Guid familyId, Guid courseId)
     {
         return await _service.GetCourseTransactionsByFamily(courseId, familyId).ConfigureAwait(false);
     }
 
-    [ApiAuthorize(false, false, UserRoleType.Admin)]
+    [ApiAuthorize()]
     [HttpGet("paymentcode/{paymentCode}")]
-    public async Task<StudentCourseTransactionResponse> GetTransactionByPaymentCode(string paymentCode)
+    public async Task<ActionResult<StudentCourseTransactionResponse>> GetTransactionByPaymentCode(string paymentCode)
     {
-        return await _service.GetTransactionByPaymentCode(paymentCode).ConfigureAwait(false);
+        var transaction = await _service.GetTransactionByPaymentCode(paymentCode).ConfigureAwait(false);
+        if (transaction == null)
+        {
+            return NotFound();
+        }
+
+        var hasAccess = await HasFamilyTransactionAccessAsync(transaction.FamilyId).ConfigureAwait(false);
+        if (!hasAccess)
+        {
+            return Forbid();
+        }
+
+        return Ok(transaction);
     }
 
     [ApiAuthorize(false, false, UserRoleType.Admin)]
@@ -116,4 +148,33 @@ public class StudentCourseTransactionController : ControllerBase
     [HttpDelete("{transactionId:guid}")]
     public async Task<bool> DeleteTransaction(Guid transactionId, bool hardDelete = false)
         => await _service.DeleteTransaction(transactionId, hardDelete);
+
+    private async Task<bool> HasFamilyTransactionAccessAsync(Guid familyId)
+    {
+        var sessionContext = await GetRequiredSessionContext().ConfigureAwait(false);
+        if (_dataAccessVerificationService.HasElevatedAccess(sessionContext.UserRoles))
+        {
+            return true;
+        }
+
+        return familyId == sessionContext.FamilyId;
+    }
+
+    private async Task<SessionAccessContext> GetRequiredSessionContext()
+    {
+        if (!Request.Headers.TryGetValue("Session_Info", out var sessionHeader)
+            || !Guid.TryParse(sessionHeader, out var sessionId)
+            || sessionId == Guid.Empty)
+        {
+            throw new UnauthorizedAccessException("Session header not found or invalid.");
+        }
+
+        var sessionContext = await _dataAccessVerificationService.GetSessionAccessContext(sessionId).ConfigureAwait(false);
+        if (sessionContext == null || sessionContext.UserId == Guid.Empty)
+        {
+            throw new UnauthorizedAccessException("No active session found.");
+        }
+
+        return sessionContext;
+    }
 }

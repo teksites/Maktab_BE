@@ -22,6 +22,7 @@ namespace Application.Users.Implementation
 
         public async Task<OtherContactResponse> AddOtherContact(AddOtherContact otherContactInformation)
         {
+           ValidateRelationship(otherContactInformation.Relationship);
            return MaptToOtherContactResonse( await _repository.AddOtherContact(MapToOtherContactInformation(otherContactInformation)).ConfigureAwait(false));
         }
 
@@ -174,8 +175,20 @@ namespace Application.Users.Implementation
                 destination.SetValue(merged, value);
             }
 
+            ValidateRelationship(merged.Relationship);
+
             var updated = await _repository.UpdateOtherContact(merged).ConfigureAwait(false);
             return MaptToOtherContactResonse(updated);
+        }
+
+        private static void ValidateRelationship(Relationship relationship)
+        {
+            if (relationship == Relationship.Mother
+                || relationship == Relationship.Father
+                || relationship == Relationship.Guardian)
+            {
+                throw new InvalidOperationException("Other contacts cannot use Mother, Father, or Guardian relationship. Please add them as family users instead.");
+            }
         }
     }
 }

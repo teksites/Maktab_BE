@@ -61,7 +61,8 @@ public class StudentCourseTransactionServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 }
             });
 

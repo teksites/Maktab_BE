@@ -2,8 +2,11 @@
 using Cumulus.Data;
 using Data;
 using MaktabDataContracts.Enums;
+using MaktabDataContracts.Helpers;
 using MaktabDataContracts.Requests.Children;
+using MaktabDataContracts.Responses.Children;
 using System.Data.Common;
+using System.Text.Json;
 using Users.Repository;
 
 namespace Application.Users.Repository.Implementation
@@ -19,9 +22,9 @@ namespace Application.Users.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"INSERT INTO child_information 
-                (ChildId, FamilyId, FirstName, LastName, OtherHealthConditions, HasAllergy, Allergies, AcedemicGroupType, DateOfBirth, Gender, RAMQExpiry, RAMQNumber, RAMQSequenceNumber, IsActive, CreatedAt, UpdatedOn, RegistrationNumber, Consent, UserType)
+                (ChildId, FamilyId, FirstName, LastName, ArabicName, OtherHealthConditions, HasAllergy, Allergies, AcedemicGroupType, DateOfBirth, Gender, RAMQExpiry, RAMQNumber, RAMQSequenceNumber, IsActive, CreatedAt, UpdatedOn, RegistrationNumber, Consent, UserType)
                 VALUES 
-                (@ChildId, @FamilyId, @FirstName, @LastName, @OtherHealthConditions, @HasAllergy, @Allergies, @AcedemicGroupType, @DateOfBirth, @Gender, @RAMQExpiry, @RAMQNumber, @RAMQSequenceNumber, @IsActive, @CreatedAt, @UpdatedOn, @RegistrationNumber, @Consent, @UserType)";
+                (@ChildId, @FamilyId, @FirstName, @LastName, @ArabicName, @OtherHealthConditions, @HasAllergy, @Allergies, @AcedemicGroupType, @DateOfBirth, @Gender, @RAMQExpiry, @RAMQNumber, @RAMQSequenceNumber, @IsActive, @CreatedAt, @UpdatedOn, @RegistrationNumber, @Consent, @UserType)";
             cmd.Transaction = tx;
 
             child.RegistrationNumber = await GetNextRegistrationNumber(conn, tx).ConfigureAwait(false);
@@ -30,6 +33,7 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@FamilyId", child.FamilyId.ToByteArray());
             cmd.AddParameter("@FirstName", child.FirstName);
             cmd.AddParameter("@LastName", child.LastName);
+            cmd.AddParameter("@ArabicName", GetArabicName(child.ArabicName));
             cmd.AddParameter("@OtherHealthConditions", child.OtherHealthConditions);
             cmd.AddParameter("@HasAllergy", child.HasAllergy);
             cmd.AddParameter("@Allergies", child.Allergies);
@@ -66,6 +70,9 @@ namespace Application.Users.Repository.Implementation
                 OtherHealthConditions = @OtherHealthConditions,
                 Allergies = @Allergies,
                 AcedemicGroupType = @AcedemicGroupType,
+                ArabicName = @ArabicName,
+                DateOfBirth = @DateOfBirth,
+                Gender = @Gender,
                 RAMQExpiry = @RAMQExpiry,
                 RAMQNumber = @RAMQNumber,
                 RAMQSequenceNumber = @RAMQSequenceNumber,
@@ -79,6 +86,9 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@OtherHealthConditions", child.OtherHealthConditions);
             cmd.AddParameter("@Allergies", child.Allergies);
             cmd.AddParameter("@AcedemicGroupType", (int)child.AcedemicGroup);
+            cmd.AddParameter("@ArabicName", GetArabicName(child.ArabicName));
+            cmd.AddParameter("@DateOfBirth", child.DateOfBirth);
+            cmd.AddParameter("@Gender", (int)child.Gender);
             cmd.AddParameter("@RAMQExpiry", child.RAMQExpiry);
             cmd.AddParameter("@RAMQNumber", child.RAMQNumber);
             cmd.AddParameter("@RAMQSequenceNumber", child.RAMQSequenceNumber);
@@ -167,6 +177,77 @@ namespace Application.Users.Repository.Implementation
             return reader.HasRows;
         }
 
+        public async Task<ChildEducationalProfileResponse?> GetChildEducationalProfile(Guid childId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                SELECT ChildEducationalProfileId, ChildId, FamilyId, CompletedSurahsJson, IsActive, CreatedAt, UpdatedOn
+                FROM child_educational_profile
+                WHERE ChildId = @ChildId
+                LIMIT 1";
+
+            cmd.AddParameter("@ChildId", childId.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            if (!await reader.ReadAsync().ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            return MapToChildEducationalProfile(reader);
+        }
+
+        public async Task<ChildEducationalProfileResponse> UpsertChildEducationalProfile(Guid childId, Guid familyId, IReadOnlyCollection<QuranSurah> completedSurahs)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
+            using var cmd = conn.CreateCommand();
+            cmd.Transaction = tx;
+
+            var now = DateTime.UtcNow;
+            var profileId = Guid.NewGuid();
+
+            cmd.CommandText = @"
+                INSERT INTO child_educational_profile
+                (ChildEducationalProfileId, ChildId, FamilyId, CompletedSurahsJson, IsActive, CreatedAt, UpdatedOn)
+                VALUES
+                (@ChildEducationalProfileId, @ChildId, @FamilyId, @CompletedSurahsJson, @IsActive, @CreatedAt, @UpdatedOn)
+                ON DUPLICATE KEY UPDATE
+                    FamilyId = VALUES(FamilyId),
+                    CompletedSurahsJson = VALUES(CompletedSurahsJson),
+                    IsActive = VALUES(IsActive),
+                    UpdatedOn = VALUES(UpdatedOn)";
+
+            cmd.AddParameter("@ChildEducationalProfileId", profileId.ToByteArray());
+            cmd.AddParameter("@ChildId", childId.ToByteArray());
+            cmd.AddParameter("@FamilyId", familyId.ToByteArray());
+            cmd.AddParameter("@CompletedSurahsJson", SerializeCompletedSurahs(completedSurahs));
+            cmd.AddParameter("@IsActive", true);
+            cmd.AddParameter("@CreatedAt", now);
+            cmd.AddParameter("@UpdatedOn", now);
+
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+            cmd.Parameters.Clear();
+            cmd.CommandText = @"
+                UPDATE child_information
+                SET HasSurahCatalogBeenProvided = @HasSurahCatalogBeenProvided,
+                    UpdatedOn = @UpdatedOn
+                WHERE ChildId = @ChildId";
+
+            cmd.AddParameter("@HasSurahCatalogBeenProvided", true);
+            cmd.AddParameter("@UpdatedOn", now);
+            cmd.AddParameter("@ChildId", childId.ToByteArray());
+
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            await tx.CommitAsync().ConfigureAwait(false);
+
+            return await GetChildEducationalProfile(childId).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("Failed to load child educational profile after upsert.");
+        }
+
         private Child MapToChild(DbDataReader reader)
         {
             return new Child
@@ -175,6 +256,8 @@ namespace Application.Users.Repository.Implementation
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
                 FirstName = reader.GetString("FirstName"),
                 LastName = reader.GetString("LastName"),
+                ArabicName = GetArabicName(reader),
+                HasSurahCatalogBeenProvided = GetHasSurahCatalogBeenProvided(reader),
                 OtherHealthConditions = reader.GetString("OtherHealthConditions"),
                 Allergies = reader.GetString("Allergies"),
                 //AcedemicGroup = (AcedemicGroupType)reader.GetInt32("AcedemicGroupType"),
@@ -194,6 +277,20 @@ namespace Application.Users.Repository.Implementation
             };
         }
 
+        private static ChildEducationalProfileResponse MapToChildEducationalProfile(DbDataReader reader)
+        {
+            return new ChildEducationalProfileResponse
+            {
+                ChildEducationalProfileId = reader.GetGuidFromByteArray("ChildEducationalProfileId"),
+                ChildId = reader.GetGuidFromByteArray("ChildId"),
+                FamilyId = reader.GetGuidFromByteArray("FamilyId"),
+                CompletedSurahs = DeserializeCompletedSurahs(GetCompletedSurahsJson(reader)),
+                IsActive = reader.GetBoolean("IsActive"),
+                CreatedAt = reader.GetDateTime("CreatedAt"),
+                UpdatedOn = reader.GetDateTime("UpdatedOn")
+            };
+        }
+
         private static string GetRegistrationNumber(DbDataReader reader)
         {
             var ordinal = reader.GetOrdinal("RegistrationNumber");
@@ -210,6 +307,65 @@ namespace Application.Users.Repository.Implementation
         {
             var ordinal = reader.GetOrdinal("Consent");
             return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
+        }
+
+        private static string GetArabicName(string? arabicName)
+        {
+            return string.IsNullOrWhiteSpace(arabicName) ? string.Empty : arabicName.Trim();
+        }
+
+        private static string GetArabicName(DbDataReader reader)
+        {
+            var ordinal = reader.GetOrdinal("ArabicName");
+            return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
+        }
+
+        private static string GetCompletedSurahsJson(DbDataReader reader)
+        {
+            var ordinal = reader.GetOrdinal("CompletedSurahsJson");
+            return reader.IsDBNull(ordinal) ? "[]" : reader.GetString(ordinal);
+        }
+
+        private static bool GetHasSurahCatalogBeenProvided(DbDataReader reader)
+        {
+            var ordinal = reader.GetOrdinal("HasSurahCatalogBeenProvided");
+            return !reader.IsDBNull(ordinal) && reader.GetBoolean(ordinal);
+        }
+
+        private static string SerializeCompletedSurahs(IEnumerable<QuranSurah> completedSurahs)
+        {
+            var normalizedSurahs = (completedSurahs ?? Enumerable.Empty<QuranSurah>())
+                .Where(surah => Enum.IsDefined(typeof(QuranSurah), surah))
+                .Distinct()
+                .OrderBy(surah => (int)surah)
+                .Select(surah => surah.ToString())
+                .ToList();
+
+            return JsonSerializer.Serialize(normalizedSurahs);
+        }
+
+        private static List<QuranSurahOptionResponse> DeserializeCompletedSurahs(string completedSurahsJson)
+        {
+            if (string.IsNullOrWhiteSpace(completedSurahsJson))
+            {
+                return new List<QuranSurahOptionResponse>();
+            }
+
+            try
+            {
+                var names = JsonSerializer.Deserialize<List<string>>(completedSurahsJson) ?? new List<string>();
+                return names
+                    .Where(name => Enum.TryParse<QuranSurah>(name, out _))
+                    .Select(name => Enum.Parse<QuranSurah>(name))
+                    .Distinct()
+                    .OrderBy(surah => (int)surah)
+                    .Select(QuranSurahCatalog.GetOption)
+                    .ToList();
+            }
+            catch (JsonException)
+            {
+                return new List<QuranSurahOptionResponse>();
+            }
         }
 
         private async Task<string> GetNextRegistrationNumber(DbConnection conn, DbTransaction tx)

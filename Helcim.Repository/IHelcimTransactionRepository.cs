@@ -6,6 +6,7 @@ namespace Helcim.Repository
     public interface IHelcimTransactionRepository
     {
         Task Add(AddHelcimTransactionDetails transactionDetails);
+        Task Update(AddHelcimTransactionDetails transactionDetails);
         Task<HelcimWebhookReservationResult> TryReserveWebhookProcessing(ReserveHelcimWebhookProcessing webhookProcessing);
         Task UpdateWebhookProcessing(UpdateHelcimWebhookProcessing webhookProcessing);
         Task<List<HelcimTransactionResponse>> GetByFamilyId(Guid familyId);
@@ -15,5 +16,6 @@ namespace Helcim.Repository
         Task<List<HelcimTransactionResponse>> GetByMaktabTransactionId(Guid maktabTransactionId);
         Task<List<HelcimTransactionResponseDetailed>> GetDetailedByMaktabTransactionId(Guid maktabTransactionId);
         Task<List<HelcimTransactionResponse>> GetByTransactionId(int transactionId);
+        Task<List<HelcimTransactionResponseDetailed>> GetDetailedByTransactionId(int transactionId);
     }
 }

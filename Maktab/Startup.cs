@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using AppConfigurations.Registry;
 using Application.Users.Registry;
 using Courses.Registry;
+using Helcim.Implementation.Configuration;
 using Helcim.Registry;
 using Zeffy.Registry;
 using Data.MySql.Regjstry;
@@ -180,16 +181,29 @@ namespace Maktab
             services.AddHelcimServices();
             services.AddZeffyServices();
 
+            var helcimClientConfiguration = new HelcimClientConfiguration(Configuration);
+
             // Quartz jobs
             services.AddQuartz(q =>
             {
-                var jobKey = new JobKey("updatedailyexchangeratesjob");
-                q.AddJob<UpdateDailyExchangeRatesJob>(opts => opts.WithIdentity(jobKey));
+                var exchangeRatesJobKey = new JobKey("updatedailyexchangeratesjob");
+                q.AddJob<UpdateDailyExchangeRatesJob>(opts => opts.WithIdentity(exchangeRatesJobKey));
 
                 q.AddTrigger(opts => opts
-                    .ForJob(jobKey)
+                    .ForJob(exchangeRatesJobKey)
                     .WithIdentity("updatedailexchangeratestrigger")
                     .WithSimpleSchedule(a => a.WithIntervalInHours(4).RepeatForever()));
+
+                if (helcimClientConfiguration.ReconciliationEnabled)
+                {
+                    var helcimReconciliationJobKey = new JobKey("reconcilehelcimtransactionsjob");
+                    q.AddJob<ReconcileHelcimTransactionsJob>(opts => opts.WithIdentity(helcimReconciliationJobKey));
+
+                    q.AddTrigger(opts => opts
+                        .ForJob(helcimReconciliationJobKey)
+                        .WithIdentity("reconcilehelcimtransactionstrigger")
+                        .WithCronSchedule(helcimClientConfiguration.ReconciliationCronSchedule));
+                }
             });
 
             services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);

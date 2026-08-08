@@ -107,6 +107,41 @@ public class CoursePaymentServiceTests
     }
 
     [Fact]
+    public async Task AddPayment_WhenTransactionIsInactive_RejectsMutation()
+    {
+        var studentTransactionId = Guid.Parse("11111111-aaaa-bbbb-cccc-111111111111");
+        var familyId = Guid.Parse("22222222-aaaa-bbbb-cccc-222222222222");
+
+        var repository = new Mock<ICoursePaymentRepository>();
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransaction(studentTransactionId))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                IsActive = false
+            });
+
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AddPayment(new AddCoursePayment
+        {
+            StudentCourseTransactionId = studentTransactionId,
+            FamilyId = familyId,
+            AmountPaid = 50m,
+            PaymentMode = PaymentMode.CashOnCounter,
+            PaymentType = PaymentType.Credit,
+            IsActive = true
+        }));
+
+        repository.Verify(repo => repo.TryAddPayment(It.IsAny<AddCoursePayment>()), Times.Never);
+    }
+
+    [Fact]
     public async Task AddPayment_CashOnCounter_AppendsPaymentCommentToTransactionComments()
     {
         var studentTransactionId = Guid.Parse("aaaaaaaa-1111-1111-1111-111111111111");
@@ -498,6 +533,42 @@ public class CoursePaymentServiceTests
     }
 
     [Fact]
+    public async Task UpdatePayment_WhenTransactionIsInactive_RejectsMutation()
+    {
+        var paymentId = Guid.Parse("aaaaaaaa-9999-8888-7777-666666666666");
+        var studentTransactionId = Guid.Parse("55555555-4444-3333-2222-111111111111");
+        var familyId = Guid.Parse("12345678-1234-1234-1234-123456789012");
+
+        var repository = new Mock<ICoursePaymentRepository>();
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransaction(studentTransactionId))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                IsActive = false
+            });
+
+        var service = CreateService(
+            repository,
+            studentCourseTransactionService);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.UpdatePayment(paymentId, new AddCoursePayment
+        {
+            StudentCourseTransactionId = studentTransactionId,
+            FamilyId = familyId,
+            AmountPaid = 20m,
+            PaymentMode = PaymentMode.CashOnCounter,
+            PaymentType = PaymentType.Credit,
+            IsActive = true
+        }));
+
+        repository.Verify(repo => repo.UpdatePayment(It.IsAny<Guid>(), It.IsAny<AddCoursePayment>()), Times.Never);
+    }
+
+    [Fact]
     public async Task AddPayment_Debit_DeductsFromTotalAmountPaid()
     {
         var studentTransactionId = Guid.Parse("10101010-2020-3030-4040-505050505050");
@@ -759,7 +830,8 @@ public class CoursePaymentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 }
             });
 
@@ -890,7 +962,8 @@ public class CoursePaymentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 

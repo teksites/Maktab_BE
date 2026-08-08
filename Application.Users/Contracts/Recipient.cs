@@ -8,6 +8,8 @@ namespace Application.Users.Contracts
         public Guid FamilyId { get; set; }
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
+        public string ArabicName { get; set; } = string.Empty;
+        public bool HasSurahCatalogBeenProvided { get; set; }
         public DateTime DateOfBirth { get; set; } = DateTime.MinValue;
         public Gender Gender { get; set; }
         public string RAMQNumber { get; set; } = string.Empty;

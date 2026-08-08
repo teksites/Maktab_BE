@@ -17,10 +17,13 @@ namespace Courses.Test;
 public class UserServiceTests
 {
     [Theory]
-    [InlineData(Relationship.Mother, UserType.Mother)]
-    [InlineData(Relationship.Father, UserType.Father)]
-    [InlineData(Relationship.Guardian, UserType.Guardian)]
-    public async Task VerifyUserVerificationCodes_CreatesLinkedChildForSupportedRelationships(Relationship relationship, UserType expectedUserType)
+    [InlineData(Relationship.Mother, UserType.Mother, Gender.Female)]
+    [InlineData(Relationship.Father, UserType.Father, Gender.Male)]
+    [InlineData(Relationship.Guardian, UserType.Guardian, Gender.Unknown)]
+    public async Task VerifyUserVerificationCodes_CreatesLinkedChildForSupportedRelationships(
+        Relationship relationship,
+        UserType expectedUserType,
+        Gender expectedGender)
     {
         var userId = Guid.NewGuid();
         var familyId = Guid.NewGuid();
@@ -80,8 +83,8 @@ public class UserServiceTests
         Assert.Equal(tempUser.FirstName, createdChild.FirstName);
         Assert.Equal(tempUser.LastName, createdChild.LastName);
         Assert.Equal(expectedUserType, createdChild.UserType);
-        Assert.Equal(Gender.Unknown, createdChild.Gender);
-        Assert.Equal(AcedemicGroupType.None, createdChild.AcedemicGroup);
+        Assert.Equal(expectedGender, createdChild.Gender);
+        Assert.Equal(AcedemicGroupType.Adults, createdChild.AcedemicGroup);
         Assert.Equal(string.Empty, createdChild.RAMQNumber);
         Assert.Equal(0, createdChild.RAMQSequenceNumber);
     }
@@ -301,6 +304,55 @@ public class UserServiceTests
 
         Assert.Equal("Father is already added and multiple same parents can't be added", exception.Message);
         userRepository.Verify(repo => repo.AddUser(It.IsAny<UserInformation>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LinkUserToAFamily_RejectsDuplicateMotherForFamily()
+    {
+        var userId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var userToLink = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = Guid.Empty,
+            FirstName = "Second",
+            LastName = "Mother",
+            Email = "second.mother@example.com",
+            Phone = "1234567890",
+            UserName = "second-mother",
+            IsActive = true,
+            Relationship = Relationship.Mother
+        };
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetUserInformation(userId))
+            .ReturnsAsync(userToLink);
+        userRepository
+            .Setup(repo => repo.GetAllFamilyUsersInformation(familyId, true))
+            .ReturnsAsync(new[]
+            {
+                new UserInformation
+                {
+                    UserId = Guid.NewGuid(),
+                    FamilyId = familyId,
+                    FirstName = "Existing",
+                    LastName = "Mother",
+                    Email = "existing.mother@example.com",
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-2),
+                    UpdatedOn = DateTime.UtcNow.AddDays(-1)
+                }
+            });
+
+        var service = CreateUserService(userRepository: userRepository);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LinkUserToAFamily(userId, familyId));
+
+        Assert.Equal("Mother is already added and multiple same parents can't be added", exception.Message);
+        userRepository.Verify(repo => repo.LinkUserToAFamily(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
     }
 
     [Fact]
@@ -625,6 +677,94 @@ public class UserServiceTests
         Assert.Contains(result, user => user.Relationship == Relationship.Guardian);
         Assert.Equal(1, result.Count(user => user.Relationship == Relationship.Mother));
         Assert.Equal(1, result.Count(user => user.Relationship == Relationship.Father));
+    }
+
+    [Fact]
+    public async Task GetVerifiedFamilyNotificationEmailAddresses_ExcludesTempUsersAndNonFamilyRelationships()
+    {
+        var familyId = Guid.NewGuid();
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetAllFamilyUsersInformation(familyId, true))
+            .ReturnsAsync(new[]
+            {
+                new UserInformation
+                {
+                    UserId = Guid.NewGuid(),
+                    FamilyId = familyId,
+                    FirstName = "Verified",
+                    LastName = "Mother",
+                    Email = "mother@example.com",
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-2),
+                    UpdatedOn = DateTime.UtcNow.AddDays(-1)
+                },
+                new UserInformation
+                {
+                    UserId = Guid.NewGuid(),
+                    FamilyId = familyId,
+                    FirstName = "Pending",
+                    LastName = "Father",
+                    Email = "father-temp@example.com",
+                    Relationship = Relationship.Father,
+                    IfTempUser = true,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-1),
+                    UpdatedOn = DateTime.UtcNow
+                },
+                new UserInformation
+                {
+                    UserId = Guid.NewGuid(),
+                    FamilyId = familyId,
+                    FirstName = "Verified",
+                    LastName = "Guardian",
+                    Email = "guardian@example.com",
+                    Relationship = Relationship.Guardian,
+                    IfTempUser = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-3),
+                    UpdatedOn = DateTime.UtcNow.AddDays(-2)
+                },
+                new UserInformation
+                {
+                    UserId = Guid.NewGuid(),
+                    FamilyId = familyId,
+                    FirstName = "Teacher",
+                    LastName = "User",
+                    Email = "teacher@example.com",
+                    Relationship = Relationship.Teacher,
+                    IfTempUser = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-4),
+                    UpdatedOn = DateTime.UtcNow.AddDays(-3)
+                },
+                new UserInformation
+                {
+                    UserId = Guid.NewGuid(),
+                    FamilyId = familyId,
+                    FirstName = "Duplicate",
+                    LastName = "Mother",
+                    Email = " mother@example.com ",
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-5),
+                    UpdatedOn = DateTime.UtcNow.AddDays(-4)
+                }
+            });
+
+        var service = CreateUserService(userRepository: userRepository);
+
+        var result = await service.GetVerifiedFamilyNotificationEmailAddresses(familyId);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains("mother@example.com", result);
+        Assert.Contains("guardian@example.com", result);
+        Assert.DoesNotContain("father-temp@example.com", result);
+        Assert.DoesNotContain("teacher@example.com", result);
     }
 
     [Fact]

@@ -370,6 +370,16 @@ namespace Application.Users.Implementation
             return null;
         }
 
+        public async Task<UserInformationResponse> GetUserInformationByEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return null;
+            }
+
+            return await GetUserInformation(email.Trim(), null, true).ConfigureAwait(false);
+        }
+
         public async Task<bool> ResetUserPassword(UpdateUserPassword updateUserPassword)
         {
             var userInformation = await _repository.GetUserInformation(updateUserPassword.UserId).ConfigureAwait(false);
@@ -411,8 +421,33 @@ namespace Application.Users.Implementation
                 .ToList();
         }
 
+        public async Task<IReadOnlyList<string>> GetVerifiedFamilyNotificationEmailAddresses(Guid familyId)
+        {
+            var familyUsers = await GetAllFamilyUsersInformation(familyId, true).ConfigureAwait(false);
+
+            return familyUsers
+                .Where(user =>
+                    !user.IfTempUser &&
+                    IsFamilyInformationRelationship(user.Relationship))
+                .Select(user => user.Email?.Trim() ?? string.Empty)
+                .Where(emailAddress => !string.IsNullOrWhiteSpace(emailAddress))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         public async Task<UserInformationResponse> LinkUserToAFamily(Guid userId, Guid familyId)
         {
+            var userInformation = await _repository.GetUserInformation(userId).ConfigureAwait(false);
+            if (userInformation == null)
+            {
+                return null;
+            }
+
+            await EnsureParentRelationshipIsAvailableAsync(
+                familyId,
+                userInformation.Relationship,
+                userId).ConfigureAwait(false);
+
             return MapToUserInformationResponse(await _repository.LinkUserToAFamily(userId, familyId).ConfigureAwait(false), false);
         }
 
@@ -462,7 +497,7 @@ namespace Application.Users.Implementation
                     FirstName = userInformation.FirstName,
                     LastName = userInformation.LastName,
                     DateOfBirth = GetLinkedUserPlaceholderDate(),
-                    Gender = Gender.Unknown,
+                    Gender = MapLinkedUserGender(userInformation.Relationship),
                     RAMQNumber = string.Empty,
                     RAMQExpiry = GetLinkedUserPlaceholderDate(),
                     RAMQSequenceNumber = 0,
@@ -471,7 +506,7 @@ namespace Application.Users.Implementation
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedOn = DateTime.UtcNow,
-                    AcedemicGroup = AcedemicGroupType.None,
+                    AcedemicGroup = AcedemicGroupType.Adults,
                     HasAllergy = false,
                     Consent = string.Empty,
                     UserType = userType
@@ -507,6 +542,16 @@ namespace Application.Users.Implementation
         private static DateTime GetLinkedUserPlaceholderDate()
         {
             return new DateTime(1900, 1, 1);
+        }
+
+        private static Gender MapLinkedUserGender(Relationship relationship)
+        {
+            return relationship switch
+            {
+                Relationship.Mother => Gender.Female,
+                Relationship.Father => Gender.Male,
+                _ => Gender.Unknown
+            };
         }
 
         private async Task EnsureParentRelationshipIsAvailableAsync(Guid familyId, Relationship relationship, Guid? excludedUserId = null)

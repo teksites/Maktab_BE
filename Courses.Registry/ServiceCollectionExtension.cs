@@ -21,12 +21,20 @@ namespace Courses.Registry
 
             services.AddScoped<ICourseService, CourseService>();
             services.AddScoped<ICourseRepository, CourseRepository>();
+            services.AddScoped<ICourseStaffAssignmentService, CourseStaffAssignmentService>();
+            services.AddScoped<ICourseStaffAssignmentRepository, CourseStaffAssignmentRepository>();
+            services.AddScoped<IStudentCourseAttendanceService, StudentCourseAttendanceService>();
+            services.AddScoped<IStudentCourseAttendanceRepository, StudentCourseAttendanceRepository>();
+            services.AddScoped<IStudentCourseResultService, StudentCourseResultService>();
+            services.AddScoped<IStudentCourseResultRepository, StudentCourseResultRepository>();
 
             services.AddScoped<IInstitutePolicyService, InstitutePolicyService>();
             services.AddScoped<IInstitutePolicyRepository, InstitutePolicyRepository>();
 
             services.AddScoped<IInstituteService, InstituteService>();
             services.AddScoped<IInstituteRepository, InstituteRepository>();
+            services.AddScoped<IInstituteStaffAssignmentService, InstituteStaffAssignmentService>();
+            services.AddScoped<IInstituteStaffAssignmentRepository, InstituteStaffAssignmentRepository>();
 
             services.AddScoped<IStudentCourseEnrollmentService, StudentCourseEnrollmentService>();
             services.AddScoped<IStudentCourseEnrollmentRepository, StudentCourseEnrollmentRepository>();

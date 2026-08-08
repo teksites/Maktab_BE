@@ -1,0 +1,41 @@
+CREATE TABLE IF NOT EXISTS `maktab`.`student_course_results` (
+    `StudentCourseResultId` BINARY(16) NOT NULL,
+    `ChildId` BINARY(16) NOT NULL,
+    `FamilyId` BINARY(16) NOT NULL,
+    `CourseId` BINARY(16) NOT NULL,
+    `InstituteId` BINARY(16) NOT NULL,
+    `AttendancePercentage` DECIMAL(5,2) NULL,
+    `ResultStatus` INT NOT NULL DEFAULT 0,
+    `Remarks` TEXT NULL,
+    `RecordedByUserId` BINARY(16) NOT NULL,
+    `IsActive` BIT NOT NULL DEFAULT b'1',
+    `CreatedAt` DATETIME NOT NULL,
+    `UpdatedOn` DATETIME NOT NULL,
+    PRIMARY KEY (`StudentCourseResultId`),
+    UNIQUE KEY `uq_student_course_results_child_course` (`ChildId`, `CourseId`),
+    KEY `idx_student_course_results_family_course` (`FamilyId`, `CourseId`, `IsActive`),
+    KEY `idx_student_course_results_child_course` (`ChildId`, `CourseId`, `IsActive`),
+    KEY `idx_student_course_results_course_active` (`CourseId`, `IsActive`),
+    KEY `idx_student_course_results_recorded_by` (`RecordedByUserId`, `UpdatedOn`)
+);
+
+CREATE TABLE IF NOT EXISTS `maktab_dev`.`student_course_results` (
+    `StudentCourseResultId` BINARY(16) NOT NULL,
+    `ChildId` BINARY(16) NOT NULL,
+    `FamilyId` BINARY(16) NOT NULL,
+    `CourseId` BINARY(16) NOT NULL,
+    `InstituteId` BINARY(16) NOT NULL,
+    `AttendancePercentage` DECIMAL(5,2) NULL,
+    `ResultStatus` INT NOT NULL DEFAULT 0,
+    `Remarks` TEXT NULL,
+    `RecordedByUserId` BINARY(16) NOT NULL,
+    `IsActive` BIT NOT NULL DEFAULT b'1',
+    `CreatedAt` DATETIME NOT NULL,
+    `UpdatedOn` DATETIME NOT NULL,
+    PRIMARY KEY (`StudentCourseResultId`),
+    UNIQUE KEY `uq_student_course_results_child_course` (`ChildId`, `CourseId`),
+    KEY `idx_student_course_results_family_course` (`FamilyId`, `CourseId`, `IsActive`),
+    KEY `idx_student_course_results_child_course` (`ChildId`, `CourseId`, `IsActive`),
+    KEY `idx_student_course_results_course_active` (`CourseId`, `IsActive`),
+    KEY `idx_student_course_results_recorded_by` (`RecordedByUserId`, `UpdatedOn`)
+);

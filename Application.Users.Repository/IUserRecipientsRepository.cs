@@ -1,5 +1,7 @@
-﻿using Application.Users.Contracts;
+using Application.Users.Contracts;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Children;
+using MaktabDataContracts.Responses.Children;
 
 namespace Users.Repository
 {
@@ -12,5 +14,7 @@ namespace Users.Repository
         Task<Child> GetChild(Guid childId);
         Task<IEnumerable<Child>> GetFamilyChildren(Guid familyId);
         Task<bool> CheckIfChildExist(UserChildToVerify child);
+        Task<ChildEducationalProfileResponse?> GetChildEducationalProfile(Guid childId);
+        Task<ChildEducationalProfileResponse> UpsertChildEducationalProfile(Guid childId, Guid familyId, IReadOnlyCollection<QuranSurah> completedSurahs);
     }
 }

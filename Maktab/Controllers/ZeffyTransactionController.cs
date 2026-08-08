@@ -10,6 +10,7 @@ using Maktab.Attributes;
 using Microsoft.AspNetCore.Cors;
 using Newtonsoft.Json;
 using System.Text.Json;
+using Users.Services;
 
 namespace Maktab.Api.Controllers
 {
@@ -19,10 +20,14 @@ namespace Maktab.Api.Controllers
     public class ZeffyTransactionController : ControllerBase
     {
         private readonly IZeffyTransactionService _zeffyService;
+        private readonly IDataAccessVerificationService _dataAccessVerificationService;
 
-        public ZeffyTransactionController(IZeffyTransactionService zeffyService)
+        public ZeffyTransactionController(
+            IZeffyTransactionService zeffyService,
+            IDataAccessVerificationService dataAccessVerificationService)
         {
             _zeffyService = zeffyService;
+            _dataAccessVerificationService = dataAccessVerificationService;
         }
 
         /// <summary>
@@ -111,7 +116,7 @@ namespace Maktab.Api.Controllers
         /// <summary>
         /// Returns all Zeffy donations.
         /// </summary>
-        [ApiAuthorize]
+        [ApiAuthorize(false, false, MaktabDataContracts.Enums.UserRoleType.Admin)]
         [HttpGet]
         public async Task<ActionResult<List<ZeffyResponse>>> GetAllZeffyDonations()
         {
@@ -127,6 +132,10 @@ namespace Maktab.Api.Controllers
         {
             var result = await _zeffyService.GetByZeffyId(zeffyId);
             if (result == null) return NotFound();
+            if (!await HasFamilyAccessAsync(result.FamilyId).ConfigureAwait(false))
+            {
+                return Forbid();
+            }
             return Ok(result);
         }
 
@@ -142,7 +151,11 @@ namespace Maktab.Api.Controllers
         [HttpGet("zeffy/by-transaction/{studentCourseTransactionId:guid}")]
         public async Task<ActionResult<IEnumerable<ZeffyResponse>>> GetByStudentCourseTransactionId(Guid studentCourseTransactionId)
         {
-            var result = await _zeffyService.GetByStudentCourseTransactionId(studentCourseTransactionId);
+            var result = (await _zeffyService.GetByStudentCourseTransactionId(studentCourseTransactionId).ConfigureAwait(false)).ToList();
+            if (!await HasFamilyAccessAsync(result.Select(item => item.FamilyId)).ConfigureAwait(false))
+            {
+                return Forbid();
+            }
             return Ok(result);
         }
 
@@ -150,7 +163,11 @@ namespace Maktab.Api.Controllers
         [HttpGet("zeffy/by-paymentcode/{paymentCode}")]
         public async Task<ActionResult<IEnumerable<ZeffyResponse>>> GetByPaymentCode(string paymentCode)
         {
-            var result = await _zeffyService.GetByPaymentCode(paymentCode);
+            var result = (await _zeffyService.GetByPaymentCode(paymentCode).ConfigureAwait(false)).ToList();
+            if (!await HasFamilyAccessAsync(result.Select(item => item.FamilyId)).ConfigureAwait(false))
+            {
+                return Forbid();
+            }
             return Ok(result);
         }
 
@@ -162,7 +179,7 @@ namespace Maktab.Api.Controllers
             return Ok(result);
         }
 
-        [ApiAuthorize]
+        [ApiAuthorize(false, false, MaktabDataContracts.Enums.UserRoleType.Admin)]
         [HttpDelete("{zeffyId:guid}")]
         public async Task<IActionResult> Delete(Guid zeffyId, [FromQuery] bool hardDelete = false)
         {
@@ -171,7 +188,7 @@ namespace Maktab.Api.Controllers
             return NoContent();
         }
 
-        [ApiAuthorize]
+        [ApiAuthorize(false, false, MaktabDataContracts.Enums.UserRoleType.Admin)]
         [HttpPut("{zeffyId:guid}")]
         public async Task<IActionResult> Update(Guid zeffyId, [FromBody] ZeffyResponse zeffy)
         {
@@ -182,6 +199,56 @@ namespace Maktab.Api.Controllers
             if (!success) return NotFound();
 
             return NoContent();
+        }
+
+        private async Task<bool> HasFamilyAccessAsync(Guid familyId)
+        {
+            var sessionContext = await GetRequiredSessionContext().ConfigureAwait(false);
+            if (_dataAccessVerificationService.HasElevatedAccess(sessionContext.UserRoles))
+            {
+                return true;
+            }
+
+            return familyId == sessionContext.FamilyId;
+        }
+
+        private async Task<bool> HasFamilyAccessAsync(IEnumerable<Guid> familyIds)
+        {
+            var familyList = familyIds
+                .Where(familyId => familyId != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            if (familyList.Count == 0)
+            {
+                return true;
+            }
+
+            var sessionContext = await GetRequiredSessionContext().ConfigureAwait(false);
+            if (_dataAccessVerificationService.HasElevatedAccess(sessionContext.UserRoles))
+            {
+                return true;
+            }
+
+            return familyList.All(familyId => familyId == sessionContext.FamilyId);
+        }
+
+        private async Task<SessionAccessContext> GetRequiredSessionContext()
+        {
+            if (!Request.Headers.TryGetValue("Session_Info", out var sessionHeader)
+                || !Guid.TryParse(sessionHeader, out var sessionId)
+                || sessionId == Guid.Empty)
+            {
+                throw new UnauthorizedAccessException("Session header not found or invalid.");
+            }
+
+            var sessionContext = await _dataAccessVerificationService.GetSessionAccessContext(sessionId).ConfigureAwait(false);
+            if (sessionContext == null || sessionContext.UserId == Guid.Empty)
+            {
+                throw new UnauthorizedAccessException("No active session found.");
+            }
+
+            return sessionContext;
         }
     }
 }

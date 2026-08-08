@@ -112,7 +112,7 @@ namespace Courses.Repository.Implementation
                         oci.ContactType
                     FROM other_contacts_information oci
                     WHERE oci.IsActive = 1
-                      AND oci.Relationship NOT IN ({MotherRelationship}, {FatherRelationship}, {GuardianRelationship})
+                      AND oci.Relationship NOT IN ({MotherRelationship}, {FatherRelationship})
                 ) fi
                     ON fi.FamilyId = sct.FamilyId";
 
@@ -262,6 +262,12 @@ namespace Courses.Repository.Implementation
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
+                    ci.DateOfBirth AS ChildDateOfBirth,
+                    ci.Gender AS ChildGender,
+                    ci.RAMQNumber AS ChildRamqNumber,
+                    ci.RAMQExpiry AS ChildRamqExpiry,
+                    ci.Allergies AS ChildAllergies,
+                    ci.OtherHealthConditions AS ChildOtherHealthConditions,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
@@ -285,6 +291,7 @@ namespace Courses.Repository.Implementation
                     ON ceg.CourseId = crcs.CourseId
 
                 WHERE LOWER(sct.PaymentCode) = LOWER(@PaymentCode)
+                  AND sct.IsActive = TRUE
 
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
             ";
@@ -344,6 +351,12 @@ namespace Courses.Repository.Implementation
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
+                    ci.DateOfBirth AS ChildDateOfBirth,
+                    ci.Gender AS ChildGender,
+                    ci.RAMQNumber AS ChildRamqNumber,
+                    ci.RAMQExpiry AS ChildRamqExpiry,
+                    ci.Allergies AS ChildAllergies,
+                    ci.OtherHealthConditions AS ChildOtherHealthConditions,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
@@ -560,6 +573,12 @@ namespace Courses.Repository.Implementation
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
+                    ci.DateOfBirth AS ChildDateOfBirth,
+                    ci.Gender AS ChildGender,
+                    ci.RAMQNumber AS ChildRamqNumber,
+                    ci.RAMQExpiry AS ChildRamqExpiry,
+                    ci.Allergies AS ChildAllergies,
+                    ci.OtherHealthConditions AS ChildOtherHealthConditions,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
@@ -584,6 +603,7 @@ namespace Courses.Repository.Implementation
                 WHERE
                     sct.FamilyId = @FamilyId
                     AND crcs.InstituteId = @InstituteId
+                    AND sct.IsActive = TRUE
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt
                 LIMIT 500;
             ";
@@ -643,6 +663,12 @@ namespace Courses.Repository.Implementation
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
+                    ci.DateOfBirth AS ChildDateOfBirth,
+                    ci.Gender AS ChildGender,
+                    ci.RAMQNumber AS ChildRamqNumber,
+                    ci.RAMQExpiry AS ChildRamqExpiry,
+                    ci.Allergies AS ChildAllergies,
+                    ci.OtherHealthConditions AS ChildOtherHealthConditions,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
@@ -719,6 +745,12 @@ namespace Courses.Repository.Implementation
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
+                    ci.DateOfBirth AS ChildDateOfBirth,
+                    ci.Gender AS ChildGender,
+                    ci.RAMQNumber AS ChildRamqNumber,
+                    ci.RAMQExpiry AS ChildRamqExpiry,
+                    ci.Allergies AS ChildAllergies,
+                    ci.OtherHealthConditions AS ChildOtherHealthConditions,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
@@ -743,6 +775,7 @@ namespace Courses.Repository.Implementation
 
                 WHERE sct.FamilyId = @FamilyId
                   AND crcs.InstituteId = @InstituteId
+                  AND sct.IsActive = TRUE
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
             ";
 
@@ -797,6 +830,12 @@ namespace Courses.Repository.Implementation
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
+                    ci.DateOfBirth AS ChildDateOfBirth,
+                    ci.Gender AS ChildGender,
+                    ci.RAMQNumber AS ChildRamqNumber,
+                    ci.RAMQExpiry AS ChildRamqExpiry,
+                    ci.Allergies AS ChildAllergies,
+                    ci.OtherHealthConditions AS ChildOtherHealthConditions,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
@@ -821,6 +860,7 @@ namespace Courses.Repository.Implementation
 
                 WHERE sct.FamilyId = @FamilyId
                   AND sce.CourseId = @CourseId
+                  AND sct.IsActive = TRUE
                 ORDER BY sct.CreatedAt DESC, sce.IsActive DESC, sce.UpdatedOn DESC, sce.CreatedAt DESC;
             ";
 
@@ -875,6 +915,12 @@ namespace Courses.Repository.Implementation
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
+                    ci.DateOfBirth AS ChildDateOfBirth,
+                    ci.Gender AS ChildGender,
+                    ci.RAMQNumber AS ChildRamqNumber,
+                    ci.RAMQExpiry AS ChildRamqExpiry,
+                    ci.Allergies AS ChildAllergies,
+                    ci.OtherHealthConditions AS ChildOtherHealthConditions,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
@@ -951,6 +997,12 @@ namespace Courses.Repository.Implementation
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
+                    ci.DateOfBirth AS ChildDateOfBirth,
+                    ci.Gender AS ChildGender,
+                    ci.RAMQNumber AS ChildRamqNumber,
+                    ci.RAMQExpiry AS ChildRamqExpiry,
+                    ci.Allergies AS ChildAllergies,
+                    ci.OtherHealthConditions AS ChildOtherHealthConditions,
                                         fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
@@ -1094,12 +1146,26 @@ namespace Courses.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-                SELECT sce.*, ceg.GroupIndex AS GroupIndex
+                SELECT
+                    sce.*,
+                    ceg.GroupIndex AS GroupIndex,
+                    ci.FirstName AS ChildFirstName,
+                    ci.LastName AS ChildLastName,
+                    ci.RegistrationNumber AS ChildRegistrationNumber,
+                    ci.DateOfBirth AS ChildDateOfBirth,
+                    ci.Gender AS ChildGender,
+                    ci.RAMQNumber AS ChildRamqNumber,
+                    ci.RAMQExpiry AS ChildRamqExpiry,
+                    ci.Allergies AS ChildAllergies,
+                    ci.OtherHealthConditions AS ChildOtherHealthConditions,
+                    ci.Consent AS ChildConsent
                 FROM student_course_transaction_enrollment scte
                 JOIN student_course_enrollment sce
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
                 JOIN course_enrollment_groups ceg
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN child_information ci
+                    ON sce.ChildId = ci.ChildId
                 WHERE scte.StudentCourseTransactionId = @TransactionId
                 ORDER BY ceg.GroupIndex ASC, sce.CreatedAt;
             ";
@@ -1116,6 +1182,15 @@ namespace Courses.Repository.Implementation
                     CourseId = reader.GetGuidFromByteArray("CourseId"),
                     FamilyId = reader.GetGuidFromByteArray("FamilyId"),
                     ChildId = reader.GetGuidFromByteArray("ChildId"),
+                    ChildName = $"{reader.GetString("ChildFirstName")} {reader.GetString("ChildLastName")}".Trim(),
+                    RegistrationNumber = reader.GetStringOrDefault("ChildRegistrationNumber"),
+                    DateOfBirth = reader.GetDateTimeUtcOrDefault("ChildDateOfBirth", DateTime.MinValue),
+                    Gender = (Gender)reader.GetIntOrDefault("ChildGender", (int)Gender.Unknown),
+                    RAMQNumber = reader.GetStringOrDefault("ChildRamqNumber"),
+                    RAMQExpiry = reader.GetDateTimeUtcOrDefault("ChildRamqExpiry", DateTime.MinValue),
+                    Allergies = reader.GetStringOrDefault("ChildAllergies"),
+                    OtherHealthConditions = reader.GetStringOrDefault("ChildOtherHealthConditions"),
+                    Consent = reader.GetStringOrDefault("ChildConsent"),
                     IsActive = reader.GetBoolean("IsActive"),
                     WillUseDayCare = reader.GetBoolean("WillUseDayCare"),
                     DayCareDays = reader.GetInt32("DayCareDays"),
@@ -1177,7 +1252,10 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            var filters = new List<string>();
+            var filters = new List<string>
+            {
+                "sct.IsActive = TRUE"
+            };
 
             // real base table alias: sct
             if (familyId.HasValue)
@@ -1348,6 +1426,12 @@ namespace Courses.Repository.Implementation
             var ordChildFirstName = reader.GetOrdinal("ChildFirstName");
             var ordChildLastName = reader.GetOrdinal("ChildLastName");
             var ordChildRegistrationNumber = reader.GetOrdinal("ChildRegistrationNumber");
+            var ordChildDateOfBirth = reader.GetOrdinal("ChildDateOfBirth");
+            var ordChildGender = reader.GetOrdinal("ChildGender");
+            var ordChildRamqNumber = reader.GetOrdinal("ChildRamqNumber");
+            var ordChildRamqExpiry = reader.GetOrdinal("ChildRamqExpiry");
+            var ordChildAllergies = reader.GetOrdinal("ChildAllergies");
+            var ordChildOtherHealthConditions = reader.GetOrdinal("ChildOtherHealthConditions");
             var ordParentUserId = reader.GetOrdinal("ParentUserId");
             var ordParentFirstName = reader.GetOrdinal("ParentFirstName");
             var ordParentLastName = reader.GetOrdinal("ParentLastName");
@@ -1420,6 +1504,13 @@ namespace Courses.Repository.Implementation
                         FamilyId = reader.GetGuidFromByteArray(ordEnrollmentFamilyId),
                         ChildId = reader.GetGuidFromByteArray(ordChildId),
                         ChildName = childName,
+                        RegistrationNumber = reader.IsDBNull(ordChildRegistrationNumber) ? string.Empty : reader.GetString(ordChildRegistrationNumber),
+                        DateOfBirth = reader.GetDateTime(ordChildDateOfBirth),
+                        Gender = (Gender)reader.GetInt32(ordChildGender),
+                        RAMQNumber = reader.IsDBNull(ordChildRamqNumber) ? string.Empty : reader.GetString(ordChildRamqNumber),
+                        RAMQExpiry = reader.GetDateTime(ordChildRamqExpiry),
+                        Allergies = reader.IsDBNull(ordChildAllergies) ? string.Empty : reader.GetString(ordChildAllergies),
+                        OtherHealthConditions = reader.IsDBNull(ordChildOtherHealthConditions) ? string.Empty : reader.GetString(ordChildOtherHealthConditions),
                         IsActive = reader.GetBoolean(ordEnrollmentIsActive),
                         WillUseDayCare = reader.GetBoolean(ordWillUseDayCare),
                         DayCareDays = reader.GetInt32(ordDayCareDays),
@@ -1431,15 +1522,6 @@ namespace Courses.Repository.Implementation
                         GroupTitle = reader.IsDBNull(ordGroupTitle) ? string.Empty : reader.GetString(ordGroupTitle),
                         GroupTitleFr = reader.IsDBNull(ordGroupTitleFr) ? string.Empty : reader.GetString(ordGroupTitleFr)
                     };
-
-                    var childRegistrationNumberProperty = typeof(StudentCourseEnrollmentResponse).GetProperty("RegistrationNumber");
-                    if (childRegistrationNumberProperty?.CanWrite == true)
-                    {
-                        var childRegistrationNumber = reader.IsDBNull(ordChildRegistrationNumber)
-                            ? string.Empty
-                            : reader.GetString(ordChildRegistrationNumber);
-                        childRegistrationNumberProperty.SetValue(enrollmentResponse, childRegistrationNumber);
-                    }
 
                     tx.Enrollments.Add(enrollmentResponse);
                 }

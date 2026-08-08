@@ -12,6 +12,7 @@ namespace Courses.Repository
         Task<StudentCourseEnrollmentResponse?> GetEnrollment(Guid enrollmentId);
         Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByCourse(Guid courseId);
         Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByFamily(Guid familyId);
+        Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollmentsByGroup(Guid courseEnrollmentGroupId);
         Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment);
         Task<bool> UpdateEnrollmentStatus(Guid enrollmentId, EnrollmentStatus status);
         Task<StudentCourseEnrollmentResponse> GetStudentCourseEnrollment(Guid childId, Guid courseId);

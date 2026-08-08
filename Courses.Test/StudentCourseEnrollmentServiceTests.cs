@@ -184,12 +184,14 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 },
                 new UserInformationResponse
                 {
                     Email = "parent2@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
@@ -298,12 +300,14 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 },
                 new UserInformationResponse
                 {
                     Email = "parent2@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
@@ -1278,7 +1282,8 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 }
             });
 
@@ -1722,7 +1727,8 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
@@ -1920,12 +1926,14 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent1@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 },
                 new UserInformationResponse
                 {
                     Email = "parent2@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
@@ -2061,7 +2069,8 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "family1@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 }
             });
         userService
@@ -2071,7 +2080,8 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "family2@example.com",
-                    Relationship = Relationship.Father
+                    Relationship = Relationship.Father,
+                    IfTempUser = false
                 }
             });
 
@@ -2182,7 +2192,8 @@ public class StudentCourseEnrollmentServiceTests
                 new UserInformationResponse
                 {
                     Email = "parent@example.com",
-                    Relationship = Relationship.Mother
+                    Relationship = Relationship.Mother,
+                    IfTempUser = false
                 }
             });
 
@@ -2384,10 +2395,14 @@ public class StudentCourseEnrollmentServiceTests
         var familyId = Guid.NewGuid();
         var childId = Guid.NewGuid();
         var groupId = Guid.NewGuid();
+        var activeEnrollment = CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Enrolled);
+        var inactiveEnrollment = CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Enrolled);
+        inactiveEnrollment.IsActive = false;
+
         var repository = new Mock<IStudentCourseEnrollmentRepository>();
         repository
             .Setup(repo => repo.GetEnrollment(enrollmentId))
-            .ReturnsAsync(CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Enrolled));
+            .ReturnsAsync(activeEnrollment);
         repository
             .Setup(repo => repo.DeleteEnrollment(enrollmentId, false))
             .ReturnsAsync(true);
@@ -2395,7 +2410,7 @@ public class StudentCourseEnrollmentServiceTests
         var transactionService = new Mock<IStudentCourseTransactionService>();
         var transactionId = Guid.NewGuid();
         transactionService
-            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .SetupSequence(service => service.GetCourseTransactionsByFamily(courseId, familyId))
             .ReturnsAsync(new[]
             {
                 new StudentCourseTransactionResponse
@@ -2405,21 +2420,40 @@ public class StudentCourseEnrollmentServiceTests
                     TotalAmountPaid = 0m,
                     Enrollments = new List<StudentCourseEnrollmentResponse>
                     {
-                        CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Enrolled)
+                        activeEnrollment
+                    }
+                }
+            })
+            .ReturnsAsync(new[]
+            {
+                new StudentCourseTransactionResponse
+                {
+                    StudentCourseTransactionId = transactionId,
+                    FamilyId = familyId,
+                    TotalAmountPaid = 0m,
+                    PaymentCode = "PAY001",
+                    TransactionStatus = TransactionStatus.AwaitingPayment,
+                    RegistrationStatus = RegistrationStatus.Pending,
+                    IsActive = true,
+                    Enrollments = new List<StudentCourseEnrollmentResponse>
+                    {
+                        inactiveEnrollment
                     }
                 }
             });
         transactionService
-            .Setup(service => service.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(enrollmentId))
-            .ReturnsAsync(true);
-        transactionService
-            .Setup(service => service.DeleteTransaction(transactionId, true))
+            .Setup(service => service.UpdateTransaction(transactionId, It.IsAny<AddStudentCourseTransaction>()))
             .ReturnsAsync(true);
 
         var courseService = new Mock<ICourseService>();
         courseService
             .Setup(service => service.GetCourse(courseId))
             .ReturnsAsync(CreateCourse(courseId, groupId, 100, ifRegistrationOpen: false, courseIsRegistrationOpen: true));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
 
         var groupService = new Mock<ICourseEnrollmentGroupService>();
         groupService
@@ -2435,13 +2469,19 @@ public class StudentCourseEnrollmentServiceTests
             repository: repository,
             transactionService: transactionService,
             courseService: courseService,
+            policyService: policyService,
             groupService: groupService);
 
         var result = await service.DeleteEnrollment(enrollmentId, hardDelete: false, ifDeletedByAdmin: false);
 
         Assert.True(result);
         groupService.Verify(service => service.SetCourseGroupRegistrationStatus(groupId, true), Times.Once);
-        transactionService.Verify(service => service.DeleteTransaction(transactionId, true), Times.Once);
+        transactionService.Verify(service => service.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(enrollmentId), Times.Never);
+        transactionService.Verify(service => service.DeleteTransaction(It.IsAny<Guid>(), It.IsAny<bool>()), Times.Never);
+        transactionService.Verify(service => service.UpdateTransaction(transactionId, It.Is<AddStudentCourseTransaction>(transaction =>
+            transaction.TotalPayable == 0m &&
+            transaction.PayableFee == 0m &&
+            transaction.DayCareFee == 0m)), Times.Once);
     }
 
     private static StudentCourseEnrollmentService CreateEnrollmentService(
@@ -2463,12 +2503,14 @@ public class StudentCourseEnrollmentServiceTests
                     new UserInformationResponse
                     {
                         Email = "mother@example.com",
-                        Relationship = Relationship.Mother
+                        Relationship = Relationship.Mother,
+                        IfTempUser = false
                     },
                     new UserInformationResponse
                     {
                         Email = "father@example.com",
-                        Relationship = Relationship.Father
+                        Relationship = Relationship.Father,
+                        IfTempUser = false
                     }
                 });
         }
@@ -2522,6 +2564,7 @@ public class StudentCourseEnrollmentServiceTests
             CourseEnrollmentGroupId = groupId,
             CourseId = courseId,
             FamilyId = familyId ?? Guid.NewGuid(),
+            IsActive = true,
             EnrollmentStatus = status,
             ChildName = childName,
             WillUseDayCare = false,

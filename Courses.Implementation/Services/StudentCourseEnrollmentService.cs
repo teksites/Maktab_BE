@@ -57,6 +57,19 @@ namespace Courses.Implementation.Services
 
         private const string EnrollmentConfirmationSubject = "Confirmation de l'inscription / Confirmation of enrollment";
 
+        private static IReadOnlyList<StudentCourseEnrollmentResponse> GetActiveEnrollments(
+            StudentCourseTransactionResponse? transaction)
+        {
+            if (transaction?.Enrollments == null)
+            {
+                return Array.Empty<StudentCourseEnrollmentResponse>();
+            }
+
+            return transaction.Enrollments
+                .Where(enrollment => enrollment.IsActive)
+                .ToList();
+        }
+
         public async Task<StudentCourseEnrollmentResponse> AddEnrollment(AddStudentCourseEnrollment enrollment, bool ifAddedByAdmin = false)
         {
 
@@ -100,7 +113,9 @@ namespace Courses.Implementation.Services
             if (familyCourseTransaction.Any())// We have the transaction for the same course for same child or other child at the moment
             {
                 //var childEnrollments = await GetStudentCourseEnrollment(enrollment.ChildId, enrollment.CourseId).ConfigureAwait(false);
-                var childEnrollment = familyCourseTransaction.First().Enrollments.Where(childEnrollment => childEnrollment.ChildId == enrollment.ChildId);
+                var transaction = familyCourseTransaction.First();
+                var activeTransactionEnrollments = GetActiveEnrollments(transaction);
+                var childEnrollment = activeTransactionEnrollments.Where(childEnrollment => childEnrollment.ChildId == enrollment.ChildId);
                 var enrollmentForExistingChild = childEnrollment.Any(x => x.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
 
                 if (enrollmentForExistingChild)
@@ -108,15 +123,15 @@ namespace Courses.Implementation.Services
                     throw new Exception("The child is already registered to the selected course group");
                 }
 
-                var transaction = familyCourseTransaction.First();
-
                 //var newDayCareFee = (enrollment.WillUseDayCare ? selectedCourseEnrollmentGroup.DayCareFee : 0);
                 //decimal newCourseFee = 0;
 
                 //if there is any existing enrollment for the child in the same course for any course group. if it is the same course group then we will not allow registration
-                if (childEnrollment.Any()) // child is already registered for the same course in different course group
+                if (activeTransactionEnrollments.Any(existingEnrollment => existingEnrollment.ChildId == enrollment.ChildId)) // child is already registered for the same course in different course group
                 {
-                    enrollment.EnrollmentIndex = childEnrollment.Max(e => e.EnrollmentIndex);
+                    enrollment.EnrollmentIndex = activeTransactionEnrollments
+                        .Where(existingEnrollment => existingEnrollment.ChildId == enrollment.ChildId)
+                        .Max(existingEnrollment => existingEnrollment.EnrollmentIndex);
                     //newCourseFee = selectedCourseEnrollmentGroup.Fee;
                     //Now update the transaction to include the new enrollment
 
@@ -130,7 +145,7 @@ namespace Courses.Implementation.Services
                     //SiblingDiscountPolicy policy = JsonConvert.DeserializeObject<SiblingDiscountPolicy>(discountPolicy);
 
                     enrollment.EnrollmentIndex = familyTransactions
-                        .SelectMany(t => t.Enrollments)
+                        .SelectMany(GetActiveEnrollments)
                         .Select(e => e.EnrollmentIndex)
                         .DefaultIfEmpty(0)
                         .Max() + 1;
@@ -259,7 +274,8 @@ namespace Courses.Implementation.Services
             decimal dayCareFee = 0m;
             decimal courseFee = 0m;
 
-            var effectiveEnrollments = familyTransaction.Enrollments
+            var activeEnrollments = GetActiveEnrollments(familyTransaction);
+            var effectiveEnrollments = activeEnrollments
             .GroupBy(e => new { e.ChildId, e.CourseEnrollmentGroupId })
             .Select(g => g
                 .OrderByDescending(e => e.UpdatedOn)
@@ -423,13 +439,14 @@ namespace Courses.Implementation.Services
             addStudentCourseTransaction.DayCareFee = dayCareFee;
             addStudentCourseTransaction.PayableFee = courseFee;
             addStudentCourseTransaction.TotalAmountPaid = familyTransaction.TotalAmountPaid;
-            var recalculatedTotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + course.RegistrationFee) -
+            var registrationFeeToApply = activeEnrollments.Count > 0 ? course.RegistrationFee : 0m;
+            var recalculatedTotalPayable = (addStudentCourseTransaction.PayableFee + addStudentCourseTransaction.DayCareFee + registrationFeeToApply) -
                 (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount) +
                 Convert.ToDecimal(addStudentCourseTransaction.Surcharge);
             addStudentCourseTransaction.TotalPayable = recalculatedTotalPayable < 0m ? 0m : recalculatedTotalPayable;
             addStudentCourseTransaction.FeeInstallments = BuildFeeInstallments(
-                addStudentCourseTransaction.TotalPayable - course.RegistrationFee,
-                course.RegistrationFee,
+                Math.Max(addStudentCourseTransaction.TotalPayable - registrationFeeToApply, 0m),
+                registrationFeeToApply,
                 feePaymentPolicyFound,
                 feePolicy,
                 enrollmentGroupCountsByChild,
@@ -842,6 +859,9 @@ namespace Courses.Implementation.Services
         public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetAllEnrollments(Guid courseId)
             => _repository.GetAllEnrollmentsByCourse(courseId);
 
+        public Task<IEnumerable<StudentCourseEnrollmentResponse>> GetEnrollmentsByGroup(Guid courseEnrollmentGroupId)
+            => _repository.GetAllEnrollmentsByGroup(courseEnrollmentGroupId);
+
         public async Task<bool> UpdateEnrollment(Guid enrollmentId, AddStudentCourseEnrollment enrollment, bool ifUpdatedByAdmin = false)
         {
             var result = await UpdateEnrollmentInternal(
@@ -1120,12 +1140,21 @@ namespace Courses.Implementation.Services
 
         private async Task<List<string>> GetFamilyNotificationEmailAddressesAsync(Guid familyId)
         {
-            var familyUsers = await _userService.GetAllFamilyUsersInformation(familyId, true).ConfigureAwait(false);
+            var verifiedEmails = await _userService.GetVerifiedFamilyNotificationEmailAddresses(familyId).ConfigureAwait(false);
+            if (verifiedEmails?.Any() == true)
+            {
+                return verifiedEmails.ToList();
+            }
+
+            var familyUsers = await _userService.GetAllFamilyUsersInformation(familyId, true).ConfigureAwait(false)
+                ?? Enumerable.Empty<MaktabDataContracts.Responses.Users.UserInformationResponse>();
+
             return familyUsers
-                .Where(x => x.Relationship == Relationship.Mother ||
-                            x.Relationship == Relationship.Father ||
-                            x.Relationship == Relationship.Guardian)
-                .Select(x => x.Email)
+                .Where(x => !x.IfTempUser &&
+                            (x.Relationship == Relationship.Mother ||
+                             x.Relationship == Relationship.Father ||
+                             x.Relationship == Relationship.Guardian))
+                .Select(x => x.Email?.Trim() ?? string.Empty)
                 .Where(emailAddress => !string.IsNullOrWhiteSpace(emailAddress))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -1293,8 +1322,11 @@ namespace Courses.Implementation.Services
             var familyId = enrollmentDetails.FamilyId;
             var familyTransaction = (await _studentCourseTransactionService.GetCourseTransactionsByFamily(courseId, familyId).ConfigureAwait(false)).FirstOrDefault();
 
+            var activeEnrollmentCount = GetActiveEnrollments(familyTransaction).Count;
+            var shouldPreserveLastEnrollmentLink = !hardDelete && activeEnrollmentCount <= 1;
 
-            var ifDeleted = await _studentCourseTransactionService.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(enrollmentId).ConfigureAwait(false);
+            var ifDeleted = shouldPreserveLastEnrollmentLink ||
+                await _studentCourseTransactionService.DeleteStudentCourseTransactionEnrollmentByEnrollmentId(enrollmentId).ConfigureAwait(false);
             var ifEnrollmentDeleted = false;
 
             if (ifDeleted)
@@ -1315,10 +1347,9 @@ namespace Courses.Implementation.Services
                 await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
             }
 
-            if (familyTransaction.Enrollments.Count <= 1)
+            if (familyTransaction == null)
             {
-                var ifFeePaid = familyTransaction.TotalAmountPaid > 0;
-                return await _studentCourseTransactionService.DeleteTransaction(familyTransaction.StudentCourseTransactionId, !ifFeePaid).ConfigureAwait(false);
+                return true;
             }
 
             return await RecalculateCourseFee(courseId, familyId).ConfigureAwait(false);

@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Courses\Courses.csproj" />
     <ProjectReference Include="..\Application.Users.Repository\Users.Repository.csproj" />
     <ProjectReference Include="..\Application.Users\Users.csproj" />
     <ProjectReference Include="..\Email\Email.csproj" />

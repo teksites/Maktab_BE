@@ -127,6 +127,85 @@ namespace Helcim.Repository.Implementation
             await cmd.ExecuteNonQueryAsync();
         }
 
+        public async Task Update(AddHelcimTransactionDetails transactionDetails)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+
+            cmd.CommandText = @"
+                UPDATE helcim_transaction
+                SET
+                    PaymentCode = @PaymentCode,
+                    MaktabTransactionId = @MaktabTransactionId,
+                    UserIp = @UserIp,
+                    InvoiceId = @InvoiceId,
+                    InvoiceNumber = @InvoiceNumber,
+                    InvoiceToken = @InvoiceToken,
+                    CustomerId = @CustomerId,
+                    CustomerCode = @CustomerCode,
+                    CardBatchId = @CardBatchId,
+                    User = @User,
+                    ApprovalCode = @ApprovalCode,
+                    CardToken = @CardToken,
+                    CardNumber = @CardNumber,
+                    CardHolderName = @CardHolderName,
+                    CardType = @CardType,
+                    AvsResponse = @AvsResponse,
+                    CvvResponse = @CvvResponse,
+                    Warning = @Warning,
+                    Amount = @Amount,
+                    AmountPaid = @AmountPaid,
+                    Currency = @Currency,
+                    InvoiceStatus = @InvoiceStatus,
+                    CardTransactionStatus = @CardTransactionStatus,
+                    InvoiceType = @InvoiceType,
+                    CardTransactionType = @CardTransactionType,
+                    CreatedAt = @CreatedAt,
+                    UpdatedOn = @UpdatedOn,
+                    DatePaid = @DatePaid,
+                    IsActive = @IsActive,
+                    RawResponse = @RawResponse,
+                    TransactionResponse = @TransactionResponse,
+                    FamilyId = @FamilyId
+                WHERE TransactionId = @TransactionId";
+
+            cmd.AddParameter("@PaymentCode", transactionDetails.PaymentCode);
+            cmd.AddParameter("@MaktabTransactionId", transactionDetails.MaktabTransactionId.ToByteArray());
+            cmd.AddParameter("@UserIp", (object?)transactionDetails.UserIp ?? DBNull.Value);
+            cmd.AddParameter("@InvoiceId", transactionDetails.InvoiceId);
+            cmd.AddParameter("@InvoiceNumber", (object?)transactionDetails.InvoiceNumber ?? DBNull.Value);
+            cmd.AddParameter("@InvoiceToken", (object?)transactionDetails.InvoiceToken ?? DBNull.Value);
+            cmd.AddParameter("@CustomerId", transactionDetails.CustomerId);
+            cmd.AddParameter("@CustomerCode", (object?)transactionDetails.CustomerCode ?? DBNull.Value);
+            cmd.AddParameter("@TransactionId", transactionDetails.TransactionId);
+            cmd.AddParameter("@CardBatchId", transactionDetails.CardBatchId);
+            cmd.AddParameter("@User", (object?)transactionDetails.User ?? DBNull.Value);
+            cmd.AddParameter("@ApprovalCode", (object?)transactionDetails.ApprovalCode ?? DBNull.Value);
+            cmd.AddParameter("@CardToken", (object?)transactionDetails.CardToken ?? DBNull.Value);
+            cmd.AddParameter("@CardNumber", (object?)transactionDetails.CardNumber ?? DBNull.Value);
+            cmd.AddParameter("@CardHolderName", (object?)transactionDetails.CardHolderName ?? DBNull.Value);
+            cmd.AddParameter("@CardType", (object?)transactionDetails.CardType ?? DBNull.Value);
+            cmd.AddParameter("@AvsResponse", (object?)transactionDetails.AvsResponse ?? DBNull.Value);
+            cmd.AddParameter("@CvvResponse", (object?)transactionDetails.CvvResponse ?? DBNull.Value);
+            cmd.AddParameter("@Warning", (object?)transactionDetails.Warning ?? DBNull.Value);
+            cmd.AddParameter("@Amount", transactionDetails.Amount);
+            cmd.AddParameter("@AmountPaid", transactionDetails.AmountPaid);
+            cmd.AddParameter("@Currency", (int)transactionDetails.Currency);
+            cmd.AddParameter("@InvoiceStatus", (int)transactionDetails.InvoiceStatus);
+            cmd.AddParameter("@CardTransactionStatus", (int)transactionDetails.CardTransactionStatus);
+            cmd.AddParameter("@InvoiceType", (int)transactionDetails.InvoiceType);
+            cmd.AddParameter("@CardTransactionType", (int)transactionDetails.CardTransactionType);
+            cmd.AddParameter("@CreatedAt", (object?)transactionDetails.CreatedAt ?? DBNull.Value);
+            cmd.AddParameter("@UpdatedOn", (object?)transactionDetails.UpdatedOn ?? DBNull.Value);
+            cmd.AddParameter("@DatePaid", (object?)transactionDetails.DatePaid ?? DBNull.Value);
+            cmd.AddParameter("@IsActive", transactionDetails.IsActive);
+            cmd.AddParameter("@RawResponse", (object?)transactionDetails.RawResponse ?? DBNull.Value);
+            cmd.AddParameter("@TransactionResponse", (object?)transactionDetails.TransactionResponse ?? DBNull.Value);
+            cmd.AddParameter("@FamilyId", transactionDetails.FamilyId == Guid.Empty ? DBNull.Value : transactionDetails.FamilyId.ToByteArray());
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         public async Task<HelcimWebhookReservationResult> TryReserveWebhookProcessing(ReserveHelcimWebhookProcessing webhookProcessing)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
@@ -295,6 +374,9 @@ namespace Helcim.Repository.Implementation
 
         public Task<List<HelcimTransactionResponse>> GetByTransactionId(int transactionId)
             => GetByColumnAsync("TransactionId", transactionId);
+
+        public Task<List<HelcimTransactionResponseDetailed>> GetDetailedByTransactionId(int transactionId)
+            => GetDetailedByColumnAsync("TransactionId", transactionId);
 
         private async Task<List<HelcimTransactionResponse>> GetByColumnAsync(string columnName, object value)
         {
