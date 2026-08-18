@@ -6,6 +6,7 @@ namespace Users.Repository
     public interface ITempUserRepository
     {
         Task<UserInformation> AddTemporaryUser(UserRegistrationInformation userInformation);
+        Task<UserInformation> UpdateAdminUser(AdminUpdateUserInformation userInformation);
         Task<bool> VerifyTempUserVerificationCodes(UserVerification userVerification);
         Task<bool> DeleteTempUser(Guid userId);
         Task<UserInformation> GetTempUserInformation(Guid userId);

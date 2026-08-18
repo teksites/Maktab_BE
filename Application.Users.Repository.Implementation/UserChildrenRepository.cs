@@ -61,6 +61,110 @@ namespace Application.Users.Repository.Implementation
             return null;
         }
 
+        public async Task<bool> UpsertLinkedUserChild(Guid childId, Guid familyId, string firstName, string lastName, Gender gender, UserType userType, bool isActive)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
+            using var cmd = conn.CreateCommand();
+            cmd.Transaction = tx;
+
+            var now = DateTime.UtcNow;
+            var placeholderDate = new DateTime(1900, 1, 1);
+            var registrationNumber = await GetNextRegistrationNumber(conn, tx).ConfigureAwait(false);
+
+            cmd.CommandText = @"
+                INSERT INTO child_information
+                (
+                    ChildId,
+                    FamilyId,
+                    FirstName,
+                    LastName,
+                    ArabicName,
+                    OtherHealthConditions,
+                    HasAllergy,
+                    Allergies,
+                    AcedemicGroupType,
+                    DateOfBirth,
+                    Gender,
+                    RAMQExpiry,
+                    RAMQNumber,
+                    RAMQSequenceNumber,
+                    IsActive,
+                    CreatedAt,
+                    UpdatedOn,
+                    RegistrationNumber,
+                    Consent,
+                    UserType
+                )
+                VALUES
+                (
+                    @ChildId,
+                    @FamilyId,
+                    @FirstName,
+                    @LastName,
+                    @ArabicName,
+                    @OtherHealthConditions,
+                    @HasAllergy,
+                    @Allergies,
+                    @AcedemicGroupType,
+                    @DateOfBirth,
+                    @Gender,
+                    @RAMQExpiry,
+                    @RAMQNumber,
+                    @RAMQSequenceNumber,
+                    @IsActive,
+                    @CreatedAt,
+                    @UpdatedOn,
+                    @RegistrationNumber,
+                    @Consent,
+                    @UserType
+                )
+                ON DUPLICATE KEY UPDATE
+                    FamilyId = VALUES(FamilyId),
+                    FirstName = VALUES(FirstName),
+                    LastName = VALUES(LastName),
+                    AcedemicGroupType = VALUES(AcedemicGroupType),
+                    DateOfBirth = VALUES(DateOfBirth),
+                    Gender = VALUES(Gender),
+                    RAMQExpiry = VALUES(RAMQExpiry),
+                    IsActive = VALUES(IsActive),
+                    UpdatedOn = VALUES(UpdatedOn),
+                    Consent = VALUES(Consent),
+                    UserType = VALUES(UserType),
+                    RegistrationNumber = IFNULL(RegistrationNumber, VALUES(RegistrationNumber))";
+
+            cmd.AddParameter("@ChildId", childId.ToByteArray());
+            cmd.AddParameter("@FamilyId", familyId.ToByteArray());
+            cmd.AddParameter("@FirstName", firstName);
+            cmd.AddParameter("@LastName", lastName);
+            cmd.AddParameter("@ArabicName", string.Empty);
+            cmd.AddParameter("@OtherHealthConditions", string.Empty);
+            cmd.AddParameter("@HasAllergy", false);
+            cmd.AddParameter("@Allergies", string.Empty);
+            cmd.AddParameter("@AcedemicGroupType", (int)AcedemicGroupType.Adults);
+            cmd.AddParameter("@DateOfBirth", placeholderDate);
+            cmd.AddParameter("@Gender", (int)gender);
+            cmd.AddParameter("@RAMQExpiry", placeholderDate);
+            cmd.AddParameter("@RAMQNumber", string.Empty);
+            cmd.AddParameter("@RAMQSequenceNumber", 0);
+            cmd.AddParameter("@IsActive", isActive);
+            cmd.AddParameter("@CreatedAt", now);
+            cmd.AddParameter("@UpdatedOn", now);
+            cmd.AddParameter("@RegistrationNumber", registrationNumber);
+            cmd.AddParameter("@Consent", string.Empty);
+            cmd.AddParameter("@UserType", (int)userType);
+
+            var rows = await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            if (rows > 0)
+            {
+                await tx.CommitAsync().ConfigureAwait(false);
+                return true;
+            }
+
+            await tx.RollbackAsync().ConfigureAwait(false);
+            return false;
+        }
+
         public async Task<Child> UpdateChild(UpdateChildRequest child)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);

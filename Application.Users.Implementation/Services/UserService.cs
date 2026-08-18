@@ -170,6 +170,39 @@ namespace Application.Users.Implementation
             return null;
         }
 
+        public async Task<UserInformationResponse> AdminUpdateUser(Guid userId, AdminUpdateUserRequest userInformation)
+        {
+            ArgumentNullException.ThrowIfNull(userInformation);
+
+            var currentUser = await _repository.GetUserInformation(userId).ConfigureAwait(false);
+            var ifTempUser = currentUser == null;
+            currentUser ??= await _tempUserRepository.GetTempUserInformation(userId).ConfigureAwait(false);
+            if (currentUser == null)
+            {
+                return null;
+            }
+
+            var mergedUserInformation = await BuildAdminUpdateUserInformationAsync(userId, currentUser, userInformation, ifTempUser).ConfigureAwait(false);
+            UserInformation updatedUser;
+
+            if (ifTempUser)
+            {
+                updatedUser = await _tempUserRepository.UpdateAdminUser(mergedUserInformation).ConfigureAwait(false);
+            }
+            else
+            {
+                updatedUser = await _repository.UpdateAdminUser(mergedUserInformation).ConfigureAwait(false);
+                if (updatedUser != null)
+                {
+                    await SyncLinkedChildForVerifiedUserAsync(updatedUser).ConfigureAwait(false);
+                }
+            }
+
+            return updatedUser == null
+                ? null
+                : MapToUserInformationResponse(updatedUser, ifTempUser);
+        }
+
         public async Task<UserRoleType> GetUserRoles(Guid userId)
         {
             return await _repository.GetUserRoles(userId).ConfigureAwait(false);
@@ -520,6 +553,30 @@ namespace Application.Users.Implementation
             }
         }
 
+        private async Task SyncLinkedChildForVerifiedUserAsync(UserInformation userInformation)
+        {
+            if (TryMapRelationshipToUserType(userInformation.Relationship, out var userType))
+            {
+                var synced = await _userChildrenRepository.UpsertLinkedUserChild(
+                    userInformation.UserId,
+                    userInformation.FamilyId,
+                    userInformation.FirstName,
+                    userInformation.LastName,
+                    MapLinkedUserGender(userInformation.Relationship),
+                    userType,
+                    userInformation.IsActive).ConfigureAwait(false);
+
+                if (!synced)
+                {
+                    throw new InvalidOperationException("Failed to sync linked family member record.");
+                }
+
+                return;
+            }
+
+            await _userChildrenRepository.DeleteChild(userInformation.UserId, true).ConfigureAwait(false);
+        }
+
         private static bool TryMapRelationshipToUserType(Relationship relationship, out UserType userType)
         {
             switch (relationship)
@@ -572,6 +629,82 @@ namespace Application.Users.Implementation
             {
                 throw new InvalidOperationException(
                     $"{GetParentRelationshipDisplayName(relationship)} is already added and multiple same parents can't be added");
+            }
+        }
+
+        private async Task<AdminUpdateUserInformation> BuildAdminUpdateUserInformationAsync(
+            Guid userId,
+            UserInformation currentUser,
+            AdminUpdateUserRequest userInformation,
+            bool ifTempUser)
+        {
+            var mergedFirstName = NormalizeRequiredString(userInformation.FirstName, currentUser.FirstName, "First name");
+            var mergedLastName = NormalizeRequiredString(userInformation.LastName, currentUser.LastName, "Last name");
+            var mergedUserName = NormalizeRequiredString(userInformation.UserName, currentUser.UserName, "Username");
+            var mergedEmail = NormalizeRequiredString(userInformation.Email, currentUser.Email, "Email");
+            var mergedPhone = NormalizeRequiredString(userInformation.Phone, currentUser.Phone, "Phone");
+            var mergedFamilyId = userInformation.FamilyId ?? currentUser.FamilyId;
+            var mergedRelationship = userInformation.Relationship ?? currentUser.Relationship;
+            var mergedIsActive = userInformation.IsActive ?? currentUser.IsActive;
+            var mergedIsTempPassword = userInformation.IsTempPassword ?? currentUser.IsTempPassword;
+            var mergedUserRole = userInformation.UserRoles == null
+                ? currentUser.UserRole
+                : NormalizeUserRole(userInformation.UserRoles);
+            var mergedIsAdmin = ifTempUser
+                ? false
+                : userInformation.IsAdmin ?? currentUser.IsAdmin;
+
+            await EnsureParentRelationshipIsAvailableAsync(
+                mergedFamilyId,
+                mergedRelationship,
+                userId).ConfigureAwait(false);
+
+            await EnsureUniqueUserIdentityAsync(
+                userId,
+                mergedUserName,
+                mergedEmail).ConfigureAwait(false);
+
+            return new AdminUpdateUserInformation
+            {
+                UserId = userId,
+                FamilyId = mergedFamilyId,
+                FirstName = mergedFirstName,
+                LastName = mergedLastName,
+                UserName = mergedUserName,
+                Email = mergedEmail,
+                Phone = mergedPhone,
+                PasswordHash = currentUser.Password,
+                NewPassword = string.IsNullOrWhiteSpace(userInformation.NewPassword) ? null : userInformation.NewPassword,
+                Relationship = mergedRelationship,
+                IsActive = mergedIsActive,
+                IsAdmin = mergedIsAdmin,
+                IsTempPassword = mergedIsTempPassword,
+                UserRole = mergedUserRole
+            };
+        }
+
+        private async Task EnsureUniqueUserIdentityAsync(Guid excludedUserId, string userName, string email)
+        {
+            var usersTask = _repository.GetAllUsersInformation(false);
+            var tempUsersTask = _tempUserRepository.GetAllTempUsersInformation(false);
+
+            await Task.WhenAll(usersTask, tempUsersTask).ConfigureAwait(false);
+
+            var allUsers = (await usersTask.ConfigureAwait(false) ?? Enumerable.Empty<UserInformation>())
+                .Concat(await tempUsersTask.ConfigureAwait(false) ?? Enumerable.Empty<UserInformation>());
+
+            if (allUsers.Any(user =>
+                    user.UserId != excludedUserId &&
+                    string.Equals(user.UserName?.Trim(), userName, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException("Username is already added and duplicate usernames can't be added");
+            }
+
+            if (allUsers.Any(user =>
+                    user.UserId != excludedUserId &&
+                    string.Equals(user.Email?.Trim(), email, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException("Email is already added and duplicate emails can't be added");
             }
         }
 
@@ -669,6 +802,27 @@ namespace Application.Users.Implementation
                 Relationship.Father => "Father",
                 _ => relationship.ToString()
             };
+        }
+
+        private static string NormalizeRequiredString(string? requestedValue, string fallbackValue, string fieldName)
+        {
+            var value = string.IsNullOrWhiteSpace(requestedValue) ? fallbackValue : requestedValue;
+            value = value?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidOperationException($"{fieldName} is required.");
+            }
+
+            return value;
+        }
+
+        private static UserRoleType NormalizeUserRole(IEnumerable<string> userRoles)
+        {
+            var parsedUserRole = UserRoleHelper.FromStrings(userRoles?.ToList() ?? new List<string>());
+            return parsedUserRole == UserRoleType.None
+                ? UserRoleType.Normal
+                : parsedUserRole;
         }
 
         /*public async Task<MaktabApiResult<UserTransactionsDetails>> CreateUserTransaction(AddUserTransaction addUserTransactions)

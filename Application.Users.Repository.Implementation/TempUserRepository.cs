@@ -207,6 +207,56 @@ namespace Application.Users.Repository.Implementation
                 }
             }
         }
+
+        public async Task<UserInformation> UpdateAdminUser(AdminUpdateUserInformation userInformation)
+        {
+            using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"UPDATE temp_user_info
+                        SET FamilyId = @familyId,
+                            FirstName = @firstName,
+                            LastName = @lastName,
+                            Email = @email,
+                            Phone = @phone,
+                            UserName = @userName,
+                            Password = @password,
+                            IsActive = @isActive,
+                            UpdatedOn = @updatedOn,
+                            IsTempPassword = @isTempPassword,
+                            Relationship = @relationship,
+                            UserRole = @userRole
+                        WHERE UserId = @userId";
+
+                    cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
+                    cmd.AddParameter("@familyId", userInformation.FamilyId.ToByteArray());
+                    cmd.AddParameter("@firstName", userInformation.FirstName);
+                    cmd.AddParameter("@lastName", userInformation.LastName);
+                    cmd.AddParameter("@email", userInformation.Email);
+                    cmd.AddParameter("@phone", userInformation.Phone);
+                    cmd.AddParameter("@userName", userInformation.UserName);
+                    cmd.AddParameter(
+                        "@password",
+                        string.IsNullOrWhiteSpace(userInformation.NewPassword)
+                            ? userInformation.PasswordHash
+                            : PasswordHelper.HashPassword(userInformation.NewPassword));
+                    cmd.AddParameter("@isActive", userInformation.IsActive);
+                    cmd.AddParameter("@updatedOn", DateTime.UtcNow);
+                    cmd.AddParameter("@isTempPassword", userInformation.IsTempPassword);
+                    cmd.AddParameter("@relationship", (int)userInformation.Relationship);
+                    cmd.AddParameter("@userRole", (int)userInformation.UserRole);
+
+                    if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
+                    {
+                        return await GetTempUserInformation(userInformation.UserId).ConfigureAwait(false);
+                    }
+
+                    return null;
+                }
+            }
+        }
+
         public async Task<IEnumerable<UserInformation>> GetAllTempUsersInformation(bool ifOnlyActive = true)
         {
             var results = new List<UserInformation>();
