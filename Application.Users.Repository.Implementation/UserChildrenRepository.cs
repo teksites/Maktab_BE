@@ -165,7 +165,7 @@ namespace Application.Users.Repository.Implementation
             return false;
         }
 
-        public async Task<Child> UpdateChild(UpdateChildRequest child)
+        public async Task<Child> UpdateChild(Child child)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
             using var cmd = conn.CreateCommand();
@@ -197,7 +197,7 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@RAMQNumber", child.RAMQNumber);
             cmd.AddParameter("@RAMQSequenceNumber", child.RAMQSequenceNumber);
             cmd.AddParameter("@HasAllergy", child.HasAllergy);
-            cmd.AddParameter("@Consent", GetConsent(child));
+            cmd.AddParameter("@Consent", (object?)child.Consent ?? DBNull.Value);
             cmd.AddParameter("@UserType", (int)child.UserType);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
 
@@ -399,12 +399,6 @@ namespace Application.Users.Repository.Implementation
         {
             var ordinal = reader.GetOrdinal("RegistrationNumber");
             return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
-        }
-
-        private static object GetConsent(UpdateChildRequest child)
-        {
-            var consentProperty = child.GetType().GetProperty("Consent");
-            return consentProperty?.GetValue(child) ?? DBNull.Value;
         }
 
         private static string GetConsent(DbDataReader reader)

@@ -184,6 +184,65 @@ public class UserChildrenServiceTests
     }
 
     [Fact]
+    public async Task UpdateChild_PreservesExistingFieldsWhenRequestOmitsThem()
+    {
+        var childId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        Child? capturedChild = null;
+
+        var existingChild = new Child
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            FirstName = "Implicit",
+            LastName = "Mother",
+            ArabicName = "Existing Arabic",
+            UserType = UserType.Mother,
+            Gender = Gender.Female,
+            AcedemicGroup = AcedemicGroupType.Adults,
+            DateOfBirth = new DateTime(1900, 1, 1),
+            RAMQExpiry = new DateTime(1900, 1, 1),
+            RAMQNumber = string.Empty,
+            RAMQSequenceNumber = 0,
+            HasAllergy = false,
+            Allergies = string.Empty,
+            OtherHealthConditions = string.Empty,
+            Consent = string.Empty,
+            RegistrationNumber = "123",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow.AddDays(-2),
+            UpdatedOn = DateTime.UtcNow.AddDays(-1)
+        };
+
+        var repository = new Mock<IUserChildrenRepository>();
+        repository
+            .Setup(repo => repo.GetChild(childId))
+            .ReturnsAsync(existingChild);
+        repository
+            .Setup(repo => repo.UpdateChild(It.IsAny<Child>()))
+            .Callback<Child>(child => capturedChild = child)
+            .ReturnsAsync((Child child) => child);
+
+        var service = new UserChildrenService(Mock.Of<IConfiguration>(), repository.Object);
+
+        var result = await service.UpdateChild(new UpdateChildRequest
+        {
+            ChildId = childId,
+            ArabicName = "Updated Arabic"
+        });
+
+        Assert.NotNull(capturedChild);
+        Assert.Equal("Updated Arabic", capturedChild!.ArabicName);
+        Assert.Equal(new DateTime(1900, 1, 1), capturedChild.DateOfBirth);
+        Assert.Equal(UserType.Mother, capturedChild.UserType);
+        Assert.Equal(Gender.Female, capturedChild.Gender);
+        Assert.Equal(AcedemicGroupType.Adults, capturedChild.AcedemicGroup);
+        Assert.NotNull(result);
+        Assert.Equal(UserType.Mother, result!.Result.UserType);
+        Assert.Equal(new DateTime(1900, 1, 1), result.Result.DateOfBirth);
+    }
+
+    [Fact]
     public async Task GetUserChilds_WhenFetchAdultsIsFalse_ReturnsSupportedFamilyMemberTypes()
     {
         var familyId = Guid.NewGuid();
