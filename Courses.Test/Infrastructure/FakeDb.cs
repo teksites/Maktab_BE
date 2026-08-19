@@ -10,19 +10,25 @@ internal sealed class FakeDatabase : IDatabase
     private readonly Func<DbDataReader> _readerFactory;
     private readonly Action<DbCommand>? _onExecute;
     private readonly int _executeNonQueryResult;
+    private readonly Exception? _executeException;
 
-    public FakeDatabase(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute = null, int executeNonQueryResult = 0)
+    public FakeDatabase(
+        Func<DbDataReader> readerFactory,
+        Action<DbCommand>? onExecute = null,
+        int executeNonQueryResult = 0,
+        Exception? executeException = null)
     {
         _readerFactory = readerFactory;
         _onExecute = onExecute;
         _executeNonQueryResult = executeNonQueryResult;
+        _executeException = executeException;
     }
 
     public string ConnectionString => "Fake";
 
     public DbConnection CreateAndOpenConnection()
     {
-        var connection = new FakeDbConnection(_readerFactory, _onExecute, _executeNonQueryResult);
+        var connection = new FakeDbConnection(_readerFactory, _onExecute, _executeNonQueryResult, _executeException);
         connection.Open();
         return connection;
     }
@@ -31,7 +37,7 @@ internal sealed class FakeDatabase : IDatabase
         => Task.FromResult<DbConnection>(CreateAndOpenConnection());
 
     public DbCommand CreateCommand()
-        => new FakeDbCommand(_readerFactory, _onExecute, _executeNonQueryResult);
+        => new FakeDbCommand(_readerFactory, _onExecute, _executeNonQueryResult, _executeException);
 
     public DbCommand CreateCommand(string cmdText)
     {
@@ -70,13 +76,19 @@ internal sealed class FakeDbConnection : DbConnection
     private readonly Func<DbDataReader> _readerFactory;
     private readonly Action<DbCommand>? _onExecute;
     private readonly int _executeNonQueryResult;
+    private readonly Exception? _executeException;
     private ConnectionState _state;
 
-    public FakeDbConnection(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute, int executeNonQueryResult)
+    public FakeDbConnection(
+        Func<DbDataReader> readerFactory,
+        Action<DbCommand>? onExecute,
+        int executeNonQueryResult,
+        Exception? executeException)
     {
         _readerFactory = readerFactory;
         _onExecute = onExecute;
         _executeNonQueryResult = executeNonQueryResult;
+        _executeException = executeException;
     }
 
     public override string? ConnectionString { get; set; } = "Fake";
@@ -114,7 +126,7 @@ internal sealed class FakeDbConnection : DbConnection
 
     protected override DbCommand CreateDbCommand()
     {
-        var command = new FakeDbCommand(_readerFactory, _onExecute, _executeNonQueryResult)
+        var command = new FakeDbCommand(_readerFactory, _onExecute, _executeNonQueryResult, _executeException)
         {
             Connection = this
         };
@@ -128,13 +140,19 @@ internal sealed class FakeDbCommand : DbCommand
     private readonly Func<DbDataReader> _readerFactory;
     private readonly Action<DbCommand>? _onExecute;
     private readonly int _executeNonQueryResult;
+    private readonly Exception? _executeException;
     private readonly FakeDbParameterCollection _parameters = new();
 
-    public FakeDbCommand(Func<DbDataReader> readerFactory, Action<DbCommand>? onExecute, int executeNonQueryResult)
+    public FakeDbCommand(
+        Func<DbDataReader> readerFactory,
+        Action<DbCommand>? onExecute,
+        int executeNonQueryResult,
+        Exception? executeException)
     {
         _readerFactory = readerFactory;
         _onExecute = onExecute;
         _executeNonQueryResult = executeNonQueryResult;
+        _executeException = executeException;
     }
 
     public override string? CommandText { get; set; } = string.Empty;
@@ -160,6 +178,11 @@ internal sealed class FakeDbCommand : DbCommand
     public override int ExecuteNonQuery()
     {
         _onExecute?.Invoke(this);
+        if (_executeException != null)
+        {
+            throw _executeException;
+        }
+
         return _executeNonQueryResult;
     }
 
@@ -175,6 +198,11 @@ internal sealed class FakeDbCommand : DbCommand
     protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
     {
         _onExecute?.Invoke(this);
+        if (_executeException != null)
+        {
+            throw _executeException;
+        }
+
         return _readerFactory();
     }
 }
@@ -282,4 +310,12 @@ internal sealed class FakeDbParameterCollection : DbParameterCollection
 
     protected override void SetParameter(int index, DbParameter value)
         => _parameters[index] = value;
+}
+
+internal sealed class FakeDbException : DbException
+{
+    public FakeDbException(string message)
+        : base(message)
+    {
+    }
 }

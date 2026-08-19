@@ -1077,6 +1077,83 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
+    public async Task RefundAchTransaction_UsesStoredHelcimTransactionMappingWhenInvoiceMetadataIsMissing()
+    {
+        const int invoiceId = 63677015;
+        const int transactionId = 2040;
+        var studentTransactionId = Guid.Parse("aaaaaaaa-6666-6666-6666-666666666666");
+        var familyId = Guid.Parse("bbbbbbbb-6666-6666-6666-666666666666");
+
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository
+            .Setup(repo => repo.GetByTransactionId(transactionId))
+            .ReturnsAsync(new List<HelcimTransactionResponse>
+            {
+                new()
+                {
+                    TransactionId = transactionId,
+                    MaktabTransactionId = studentTransactionId,
+                    FamilyId = familyId,
+                    PaymentCode = string.Empty
+                }
+            });
+
+        var sender = new Mock<IWebMsgSenderService>();
+        var responses = new Queue<string>(new[]
+        {
+            $"{{\"transaction\":{{\"id\":{transactionId},\"orderId\":{invoiceId},\"statusAuth\":1,\"statusClearing\":1,\"statusBatch\":2,\"batchId\":5220,\"amount\":100.00,\"currency\":1,\"dateClosed\":\"2026-08-02 10:00:00\"}}}}",
+            $"{{\"invoiceId\":{invoiceId},\"invoiceNumber\":\"ORD-20260802-ACHREFUND\",\"token\":\"tok-1\",\"notes\":\"\",\"dateCreated\":\"2026-08-01 10:00:00\",\"dateUpdated\":\"2026-08-02 10:00:00\",\"datePaid\":\"2026-08-01 11:00:00\",\"status\":\"PAID\",\"customerId\":40499452,\"amount\":100.00,\"amountPaid\":100.00,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[]}}",
+            "[]"
+        });
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync(() => responses.Dequeue());
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Put))
+            .ReturnsAsync("{\"status\":\"accepted\"}");
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransaction(studentTransactionId))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                PaymentCode = "LOCALPAY",
+                Enrollments = new List<StudentCourseEnrollmentResponse>()
+            });
+
+        AddCoursePayment? capturedPayment = null;
+        var coursePaymentService = new Mock<ICoursePaymentService>();
+        coursePaymentService
+            .Setup(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()))
+            .Callback<AddCoursePayment>(payment => capturedPayment = payment)
+            .ReturnsAsync((new CoursePaymentResponse(), true));
+
+        var service = CreateService(
+            repository.Object,
+            sender.Object,
+            studentCourseTransactionService: studentCourseTransactionService.Object,
+            coursePaymentService: coursePaymentService.Object);
+
+        var result = await service.RefundAchTransaction(new RefundAchTransactionRequest
+        {
+            TransactionId = transactionId,
+            Amount = 25m,
+            IdempotencyKey = "stored-link-refund"
+        });
+
+        Assert.True(result.Success);
+        Assert.True(result.LocalRefundRecorded);
+        Assert.NotNull(capturedPayment);
+        Assert.Equal(PaymentType.Refund, capturedPayment!.PaymentType);
+        Assert.Equal(studentTransactionId, capturedPayment.StudentCourseTransactionId);
+        Assert.Equal(familyId, capturedPayment.FamilyId);
+        studentCourseTransactionService.Verify(service => service.GetTransaction(studentTransactionId), Times.Once);
+        studentCourseTransactionService.Verify(service => service.GetTransactionByPaymentCode(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
     public async Task GetAchRefundInvoices_WhenOnlyRefundable_ReturnsOnlyRefundablePurchaseTransactions()
     {
         const int refundableInvoiceId = 7001;

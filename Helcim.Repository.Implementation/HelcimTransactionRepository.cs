@@ -9,6 +9,9 @@ namespace Helcim.Repository.Implementation
 {
     public class HelcimTransactionRepository : DbRepository, IHelcimTransactionRepository
     {
+        private const string LegacyInvoicePrimaryKeyMigrationScript =
+            "Helcim.Repository.Implementation/Scripts/AlterHelcimTransactionPrimaryKeyToTransactionId.sql";
+
         public HelcimTransactionRepository(IDatabase database) : base(database) { }
 
         public async Task Add(AddHelcimTransactionDetails transactionDetails)
@@ -124,7 +127,19 @@ namespace Helcim.Repository.Implementation
             cmd.AddParameter("@TransactionResponse", (object?)transactionDetails.TransactionResponse ?? DBNull.Value);
             cmd.AddParameter("@FamilyId", transactionDetails.FamilyId == Guid.Empty ? DBNull.Value : transactionDetails.FamilyId.ToByteArray());
 
-            await cmd.ExecuteNonQueryAsync();
+            try
+            {
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (DbException ex) when (IsLegacyInvoicePrimaryKeyConflict(ex))
+            {
+                throw new InvalidOperationException(
+                    $"Unable to save Helcim transaction {transactionDetails.TransactionId} for invoice '{transactionDetails.InvoiceNumber}'. " +
+                    "The database is still keyed by InvoiceNumber, which blocks multiple Helcim transactions " +
+                    "for the same invoice during reconcile or refund flows. Apply migration script " +
+                    $"'{LegacyInvoicePrimaryKeyMigrationScript}' to switch helcim_transaction to a TransactionId primary key.",
+                    ex);
+            }
         }
 
         public async Task Update(AddHelcimTransactionDetails transactionDetails)
@@ -542,6 +557,13 @@ namespace Helcim.Repository.Implementation
                 DatePaid = reader.GetNullableDateTimeUtc("DatePaid"),
                 IsActive = reader.GetBoolean("IsActive")
             };
+        }
+
+        private static bool IsLegacyInvoicePrimaryKeyConflict(DbException exception)
+        {
+            var message = exception.Message ?? string.Empty;
+            return message.Contains("Duplicate entry", StringComparison.OrdinalIgnoreCase)
+                && message.Contains("helcim_transaction.PRIMARY", StringComparison.OrdinalIgnoreCase);
         }
 
         private sealed class HelcimWebhookLogRow

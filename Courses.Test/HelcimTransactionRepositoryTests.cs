@@ -2,6 +2,7 @@ using System.Data;
 using System.Data.Common;
 using Courses.Test.Infrastructure;
 using MaktabDataContracts.Enums.Helcim;
+using MaktabDataContracts.Requests.Helcim;
 using Helcim.Repository.Implementation;
 
 namespace Courses.Test;
@@ -65,6 +66,36 @@ public class HelcimTransactionRepositoryTests
         Assert.Equal(HelcimCardTransactionStatus.Approved, item.CardTransactionStatus);
         Assert.Equal(HelcimInvoiceType.Invoice, item.InvoiceType);
         Assert.Equal(HelcimCardTransactionType.Purchase, item.CardTransactionType);
+    }
+
+    [Fact]
+    public async Task Add_ThrowsActionableMessage_WhenLegacyInvoicePrimaryKeyBlocksInsert()
+    {
+        var database = new FakeDatabase(
+            CreateEmptyReader,
+            executeException: new FakeDbException("Duplicate entry 'INV-D95NCR-202607191225-1' for key 'helcim_transaction.PRIMARY'"));
+        var repository = new HelcimTransactionRepository(database);
+
+        var transactionDetails = new AddHelcimTransactionDetails
+        {
+            PaymentCode = "PAY001",
+            MaktabTransactionId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            InvoiceId = 63677011,
+            InvoiceNumber = "INV-D95NCR-202607191225-1",
+            TransactionId = 47889842,
+            Currency = HelcimCurrency.Cad,
+            InvoiceStatus = HelcimInvoiceStatus.Paid,
+            CardTransactionStatus = HelcimCardTransactionStatus.Approved,
+            InvoiceType = HelcimInvoiceType.Invoice,
+            CardTransactionType = HelcimCardTransactionType.Purchase,
+            IsActive = true
+        };
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.Add(transactionDetails));
+
+        Assert.Contains("keyed by InvoiceNumber", exception.Message);
+        Assert.Contains("AlterHelcimTransactionPrimaryKeyToTransactionId.sql", exception.Message);
+        Assert.IsType<FakeDbException>(exception.InnerException);
     }
 
     private static DbDataReader CreateEmptyReader()

@@ -98,7 +98,13 @@ namespace Application.Users.Implementation
         {
             ArgumentNullException.ThrowIfNull(child);
 
-            var updatedChild = await _repository.UpdateChild(child).ConfigureAwait(false);
+            var existingChild = await _repository.GetChild(child.ChildId).ConfigureAwait(false);
+            if (existingChild == null)
+            {
+                return null;
+            }
+
+            var updatedChild = await _repository.UpdateChild(MergeChild(existingChild, child)).ConfigureAwait(false);
             return MapToChildResponse(updatedChild);
         }
 
@@ -164,6 +170,34 @@ namespace Application.Users.Implementation
             {
                 Result = response,
                 Errors = new List<PartnerApiError> { }
+            };
+        }
+
+        private static Child MergeChild(Child existingChild, UpdateChildRequest child)
+        {
+            return new Child
+            {
+                ChildId = existingChild.ChildId,
+                FamilyId = existingChild.FamilyId,
+                FirstName = existingChild.FirstName,
+                LastName = existingChild.LastName,
+                ArabicName = child.ArabicName ?? existingChild.ArabicName,
+                HasSurahCatalogBeenProvided = existingChild.HasSurahCatalogBeenProvided,
+                DateOfBirth = child.DateOfBirth ?? existingChild.DateOfBirth,
+                Gender = child.Gender ?? existingChild.Gender,
+                RAMQNumber = child.RAMQNumber ?? existingChild.RAMQNumber,
+                RAMQExpiry = child.RAMQExpiry ?? existingChild.RAMQExpiry,
+                RAMQSequenceNumber = child.RAMQSequenceNumber ?? existingChild.RAMQSequenceNumber,
+                Allergies = child.Allergies ?? existingChild.Allergies,
+                OtherHealthConditions = child.OtherHealthConditions ?? existingChild.OtherHealthConditions,
+                IsActive = existingChild.IsActive,
+                CreatedAt = existingChild.CreatedAt,
+                UpdatedOn = DateTime.UtcNow,
+                AcedemicGroup = child.AcedemicGroup ?? existingChild.AcedemicGroup,
+                RegistrationNumber = existingChild.RegistrationNumber,
+                HasAllergy = child.HasAllergy ?? existingChild.HasAllergy,
+                Consent = child.Consent ?? existingChild.Consent,
+                UserType = child.UserType ?? existingChild.UserType,
             };
         }
 

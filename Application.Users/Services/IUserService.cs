@@ -10,6 +10,7 @@ namespace Users.Services
     {
         Task<UserInformationResponse> AddTemporaryUser(AddUserInformation userInformation);
         Task<bool> VerifyUserVerificationCodes(UserVerification userVerification);
+        Task<UserInformationResponse> AdminUpdateUser(Guid userId, AdminUpdateUserRequest userInformation);
         Task<UserInformationResponse> UpdateUser(UpdateUserPassword userInformation, bool ifTempPassword = false);
         Task<bool> DeleteUser(Guid userId, bool ifHardDelete);
         Task<UserInformationResponse> GetUserInformation(Guid userId);

@@ -157,6 +157,21 @@ namespace Maktab.Controllers
             return await _userService.LinkUserToAFamily(userId, familyId).ConfigureAwait(false);
         }
 
+        [Authorize]
+        [ApiAuthorize(false, false, MaktabDataContracts.Enums.UserRoleType.Admin | MaktabDataContracts.Enums.UserRoleType.SuperUser | MaktabDataContracts.Enums.UserRoleType.SchoolAdmin)]
+        [HttpPut("{userId:guid}/admin")]
+        [EnableCors("corspolicy")]
+        public async Task<ActionResult<UserInformationResponse>> AdminUpdateUser(Guid userId, AdminUpdateUserRequest userInformation)
+        {
+            var updatedUser = await _userService.AdminUpdateUser(userId, userInformation).ConfigureAwait(false);
+            if (updatedUser == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(updatedUser);
+        }
+
         [HttpPost("{userId:guid}/resetpassword")]
         [EnableCors("corspolicy")]
         public async Task<bool> ResetPassword(Guid userId, UpdateUserPasswordRequest userInformation)

@@ -140,7 +140,7 @@ namespace Helcim.Implementation.Services
             }
 
             var invoice = await GetInvoiceByInvoiceNumber(invoiceNumber).ConfigureAwait(false);
-            var localTransaction = await ResolveLocalTransactionAsync(invoice).ConfigureAwait(false);
+            var localTransaction = await ResolveLocalTransactionAsync(invoice, transactionId).ConfigureAwait(false);
 
             AddHelcimTransactionDetails transactionDetails;
             if (paymentFlow == "ach")
@@ -393,7 +393,7 @@ namespace Helcim.Implementation.Services
                         achTransaction,
                         achTransaction.OrderId,
                         achTransaction.InvoiceNumber).ConfigureAwait(false);
-                    localTransaction = await ResolveLocalTransactionAsync(invoice).ConfigureAwait(false);
+                    localTransaction = await ResolveLocalTransactionAsync(invoice, achTransaction.TransactionId).ConfigureAwait(false);
                 }
                 catch
                 {
@@ -468,7 +468,7 @@ namespace Helcim.Implementation.Services
                 achTransactionLookup.Transaction,
                 achTransactionLookup.Transaction.OrderId,
                 achTransactionLookup.Transaction.InvoiceNumber).ConfigureAwait(false);
-            var localTransaction = await ResolveLocalTransactionAsync(invoice).ConfigureAwait(false);
+            var localTransaction = await ResolveLocalTransactionAsync(invoice, request.TransactionId).ConfigureAwait(false);
 
             return await RefundAchTransactionInternal(
                 achTransactionLookup,
@@ -492,7 +492,6 @@ namespace Helcim.Implementation.Services
             }
 
             var invoice = await GetInvoiceByInvoiceId(request.InvoiceId).ConfigureAwait(false);
-            var localTransaction = await ResolveLocalTransactionAsync(invoice).ConfigureAwait(false);
             var refundableTransaction = (await GetAchTransactionsByInvoiceAsync(invoice).ConfigureAwait(false))
                 .Where(lookup => !IsAchRefundTransaction(lookup.Transaction))
                 .Where(lookup => IsAchRefundable(lookup.Transaction))
@@ -503,6 +502,10 @@ namespace Helcim.Implementation.Services
             {
                 throw new InvalidOperationException($"No refundable ACH transaction was found for invoiceId {request.InvoiceId}.");
             }
+
+            var localTransaction = await ResolveLocalTransactionAsync(
+                invoice,
+                refundableTransaction.Transaction.TransactionId).ConfigureAwait(false);
 
             return await RefundAchTransactionInternal(
                 refundableTransaction,
@@ -711,7 +714,7 @@ namespace Helcim.Implementation.Services
                     if (cardTransactionLookup != null)
                     {
                         var invoice = await GetInvoiceByInvoiceNumber(cardTransactionLookup.Transaction.InvoiceNumber ?? invoiceNumber ?? string.Empty).ConfigureAwait(false);
-                        var localTransaction = await ResolveLocalTransactionAsync(invoice).ConfigureAwait(false);
+                        var localTransaction = await ResolveLocalTransactionAsync(invoice, transactionId.Value).ConfigureAwait(false);
                         result = await SaveCardTransactionDetailsAsync(
                             invoice,
                             localTransaction,
@@ -728,7 +731,7 @@ namespace Helcim.Implementation.Services
                                 achTransactionLookup.Transaction,
                                 invoiceId,
                                 invoiceNumber).ConfigureAwait(false);
-                            var localTransaction = await ResolveLocalTransactionAsync(invoice).ConfigureAwait(false);
+                            var localTransaction = await ResolveLocalTransactionAsync(invoice, transactionId.Value).ConfigureAwait(false);
                             result = await SaveAchTransactionDetailsAsync(
                                 invoice,
                                 localTransaction,
@@ -810,7 +813,7 @@ namespace Helcim.Implementation.Services
             StudentCourseTransactionResponse? transaction = null,
             string? externalPaymentId = null)
         {
-            transaction ??= await ResolveLocalTransactionAsync(invoice).ConfigureAwait(false);
+            transaction ??= await ResolveLocalTransactionAsync(invoice, transactionId).ConfigureAwait(false);
 
             if (transaction == null)
             {
@@ -1260,19 +1263,26 @@ namespace Helcim.Implementation.Services
                 ?? throw new InvalidOperationException($"Unable to deserialize Helcim invoice response for invoiceId {invoiceId}. Raw response: {invoiceRaw}");
         }
 
-        private async Task<StudentCourseTransactionResponse?> ResolveLocalTransactionAsync(HelcimInvoiceResponse invoice)
+        private async Task<StudentCourseTransactionResponse?> ResolveLocalTransactionAsync(
+            HelcimInvoiceResponse invoice,
+            int? helcimTransactionId = null)
         {
+            if (helcimTransactionId.HasValue)
+            {
+                var transactionFromStoredHelcim = await ResolveLocalTransactionFromStoredHelcimAsync(helcimTransactionId.Value).ConfigureAwait(false);
+                if (transactionFromStoredHelcim != null)
+                {
+                    return transactionFromStoredHelcim;
+                }
+            }
+
             if (string.IsNullOrWhiteSpace(invoice.PaymentCode))
             {
                 var lineItemTransactionId = invoice.LineItems?.FirstOrDefault()?.MaktabTransactionId ?? Guid.Empty;
-                return lineItemTransactionId == Guid.Empty
-                    ? null
-                    : await _studentCourseTransactionService.GetTransaction(lineItemTransactionId).ConfigureAwait(false);
+                return await ResolveLocalTransactionByIdentifiersAsync(lineItemTransactionId, null).ConfigureAwait(false);
             }
 
-            var transaction = await _studentCourseTransactionService
-                .GetTransactionByPaymentCode(invoice.PaymentCode)
-                .ConfigureAwait(false);
+            var transaction = await ResolveLocalTransactionByIdentifiersAsync(Guid.Empty, invoice.PaymentCode).ConfigureAwait(false);
 
             if (transaction != null)
             {
@@ -1280,9 +1290,59 @@ namespace Helcim.Implementation.Services
             }
 
             var fallbackTransactionId = invoice.LineItems?.FirstOrDefault()?.MaktabTransactionId ?? Guid.Empty;
-            return fallbackTransactionId == Guid.Empty
-                ? null
-                : await _studentCourseTransactionService.GetTransaction(fallbackTransactionId).ConfigureAwait(false);
+            return await ResolveLocalTransactionByIdentifiersAsync(fallbackTransactionId, null).ConfigureAwait(false);
+        }
+
+        private async Task<StudentCourseTransactionResponse?> ResolveLocalTransactionFromStoredHelcimAsync(int helcimTransactionId)
+        {
+            var existingDetailedTransaction = await GetExistingDetailedTransactionAsync(helcimTransactionId).ConfigureAwait(false);
+            var resolvedTransaction = await ResolveLocalTransactionByIdentifiersAsync(
+                existingDetailedTransaction?.MaktabTransactionId ?? Guid.Empty,
+                existingDetailedTransaction?.PaymentCode).ConfigureAwait(false);
+
+            if (resolvedTransaction != null)
+            {
+                return resolvedTransaction;
+            }
+
+            var storedTransactions = await _repository.GetByTransactionId(helcimTransactionId).ConfigureAwait(false)
+                ?? new List<HelcimTransactionResponse>();
+            foreach (var storedTransaction in storedTransactions)
+            {
+                resolvedTransaction = await ResolveLocalTransactionByIdentifiersAsync(
+                    storedTransaction.MaktabTransactionId,
+                    storedTransaction.PaymentCode).ConfigureAwait(false);
+
+                if (resolvedTransaction != null)
+                {
+                    return resolvedTransaction;
+                }
+            }
+
+            return null;
+        }
+
+        private async Task<StudentCourseTransactionResponse?> ResolveLocalTransactionByIdentifiersAsync(
+            Guid maktabTransactionId,
+            string? paymentCode)
+        {
+            if (maktabTransactionId != Guid.Empty)
+            {
+                var transactionById = await _studentCourseTransactionService.GetTransaction(maktabTransactionId).ConfigureAwait(false);
+                if (transactionById != null)
+                {
+                    return transactionById;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(paymentCode))
+            {
+                return null;
+            }
+
+            return await _studentCourseTransactionService
+                .GetTransactionByPaymentCode(paymentCode)
+                .ConfigureAwait(false);
         }
 
         private async Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceNumberAsync(string invoiceNumber, string? webhookRawBody)

@@ -8,7 +8,8 @@ namespace Users.Repository
     public interface IUserChildrenRepository
     {
         Task<Child> AddChild(Child child);
-        Task<Child> UpdateChild(UpdateChildRequest child);
+        Task<bool> UpsertLinkedUserChild(Guid childId, Guid familyId, string firstName, string lastName, Gender gender, UserType userType, bool isActive);
+        Task<Child> UpdateChild(Child child);
         Task<bool> DeleteChild(Guid childId, bool ifHardDelete = false);
         Task<bool> DeleteFamilyChildren(Guid familyId, bool ifHardDelete = false);
         Task<Child> GetChild(Guid childId);

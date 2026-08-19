@@ -142,6 +142,267 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task AdminUpdateUser_UpdatesVerifiedUserAndSyncsLinkedAdultRecord()
+    {
+        var userId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var updatedFamilyId = Guid.NewGuid();
+        AdminUpdateUserInformation? capturedUpdate = null;
+
+        var currentUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = familyId,
+            FirstName = "Current",
+            LastName = "Mother",
+            Email = "current@example.com",
+            Phone = "1111111111",
+            UserName = "current-user",
+            Password = "existing-hash",
+            IsActive = true,
+            IsAdmin = false,
+            IsTempPassword = false,
+            Relationship = Relationship.Mother,
+            UserRole = UserRoleType.Normal
+        };
+
+        var updatedUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = updatedFamilyId,
+            FirstName = "Updated",
+            LastName = "Guardian",
+            Email = "updated@example.com",
+            Phone = "2222222222",
+            UserName = "updated-user",
+            Password = "existing-hash",
+            IsActive = false,
+            IsAdmin = true,
+            IsTempPassword = true,
+            Relationship = Relationship.Guardian,
+            UserRole = UserRoleType.Admin
+        };
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetUserInformation(userId))
+            .ReturnsAsync(currentUser);
+        userRepository
+            .Setup(repo => repo.GetAllFamilyUsersInformation(updatedFamilyId, true))
+            .ReturnsAsync(Array.Empty<UserInformation>());
+        userRepository
+            .Setup(repo => repo.GetAllUsersInformation(false))
+            .ReturnsAsync(new[] { currentUser });
+        userRepository
+            .Setup(repo => repo.UpdateAdminUser(It.IsAny<AdminUpdateUserInformation>()))
+            .Callback<AdminUpdateUserInformation>(request => capturedUpdate = request)
+            .ReturnsAsync(updatedUser);
+
+        var tempUserRepository = new Mock<ITempUserRepository>();
+        tempUserRepository
+            .Setup(repo => repo.GetAllTempUsersInformation(false))
+            .ReturnsAsync(Array.Empty<UserInformation>());
+
+        var childRepository = new Mock<IUserChildrenRepository>();
+        childRepository
+            .Setup(repo => repo.UpsertLinkedUserChild(
+                userId,
+                updatedFamilyId,
+                "Updated",
+                "Guardian",
+                Gender.Unknown,
+                UserType.Guardian,
+                false))
+            .ReturnsAsync(true);
+
+        var service = CreateUserService(
+            userRepository: userRepository,
+            tempUserRepository: tempUserRepository,
+            userChildrenRepository: childRepository);
+
+        var result = await service.AdminUpdateUser(userId, new AdminUpdateUserRequest
+        {
+            FamilyId = updatedFamilyId,
+            FirstName = "Updated",
+            LastName = "Guardian",
+            Email = "updated@example.com",
+            Phone = "2222222222",
+            UserName = "updated-user",
+            Relationship = Relationship.Guardian,
+            IsActive = false,
+            IsAdmin = true,
+            IsTempPassword = true,
+            UserRoles = new List<string> { UserRoleType.Admin.ToString() }
+        });
+
+        Assert.NotNull(result);
+        Assert.NotNull(capturedUpdate);
+        Assert.Equal(updatedFamilyId, capturedUpdate!.FamilyId);
+        Assert.Equal("Updated", capturedUpdate.FirstName);
+        Assert.Equal(Relationship.Guardian, capturedUpdate.Relationship);
+        Assert.Equal(UserRoleType.Admin, capturedUpdate.UserRole);
+        Assert.True(capturedUpdate.IsAdmin);
+        Assert.True(capturedUpdate.IsTempPassword);
+
+        childRepository.Verify(repo => repo.UpsertLinkedUserChild(
+            userId,
+            updatedFamilyId,
+            "Updated",
+            "Guardian",
+            Gender.Unknown,
+            UserType.Guardian,
+            false), Times.Once);
+    }
+
+    [Fact]
+    public async Task AdminUpdateUser_UpdatesTempUserWithoutSyncingLinkedAdultRecord()
+    {
+        var userId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        AdminUpdateUserInformation? capturedUpdate = null;
+
+        var tempUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = familyId,
+            FirstName = "Pending",
+            LastName = "User",
+            Email = "pending@example.com",
+            Phone = "3333333333",
+            UserName = "pending-user",
+            Password = "existing-hash",
+            IsActive = true,
+            Relationship = Relationship.Teacher,
+            UserRole = UserRoleType.Normal
+        };
+
+        var updatedTempUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = familyId,
+            FirstName = "Pending Updated",
+            LastName = "User",
+            Email = "pending.updated@example.com",
+            Phone = "4444444444",
+            UserName = "pending-updated-user",
+            Password = "existing-hash",
+            IsActive = true,
+            Relationship = Relationship.Teacher,
+            UserRole = UserRoleType.SchoolTeacher
+        };
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetUserInformation(userId))
+            .ReturnsAsync((UserInformation)null);
+        userRepository
+            .Setup(repo => repo.GetAllUsersInformation(false))
+            .ReturnsAsync(Array.Empty<UserInformation>());
+
+        var tempUserRepository = new Mock<ITempUserRepository>();
+        tempUserRepository
+            .Setup(repo => repo.GetTempUserInformation(userId))
+            .ReturnsAsync(tempUser);
+        tempUserRepository
+            .Setup(repo => repo.GetAllTempUsersInformation(false))
+            .ReturnsAsync(new[] { tempUser });
+        tempUserRepository
+            .Setup(repo => repo.UpdateAdminUser(It.IsAny<AdminUpdateUserInformation>()))
+            .Callback<AdminUpdateUserInformation>(request => capturedUpdate = request)
+            .ReturnsAsync(updatedTempUser);
+
+        var childRepository = new Mock<IUserChildrenRepository>();
+        var service = CreateUserService(
+            userRepository: userRepository,
+            tempUserRepository: tempUserRepository,
+            userChildrenRepository: childRepository);
+
+        var result = await service.AdminUpdateUser(userId, new AdminUpdateUserRequest
+        {
+            FirstName = "Pending Updated",
+            Email = "pending.updated@example.com",
+            Phone = "4444444444",
+            UserName = "pending-updated-user",
+            UserRoles = new List<string> { UserRoleType.SchoolTeacher.ToString() }
+        });
+
+        Assert.NotNull(result);
+        Assert.NotNull(capturedUpdate);
+        Assert.False(capturedUpdate!.IsAdmin);
+        Assert.Equal(UserRoleType.SchoolTeacher, capturedUpdate.UserRole);
+        childRepository.Verify(repo => repo.UpsertLinkedUserChild(
+            It.IsAny<Guid>(),
+            It.IsAny<Guid>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<Gender>(),
+            It.IsAny<UserType>(),
+            It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AdminUpdateUser_RejectsDuplicateEmailAcrossVerifiedAndPendingUsers()
+    {
+        var userId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+
+        var currentUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = familyId,
+            FirstName = "Current",
+            LastName = "User",
+            Email = "current@example.com",
+            Phone = "5555555555",
+            UserName = "current-user",
+            Password = "existing-hash",
+            IsActive = true,
+            Relationship = Relationship.Teacher,
+            UserRole = UserRoleType.Normal
+        };
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetUserInformation(userId))
+            .ReturnsAsync(currentUser);
+        userRepository
+            .Setup(repo => repo.GetAllUsersInformation(false))
+            .ReturnsAsync(new[] { currentUser });
+
+        var tempUserRepository = new Mock<ITempUserRepository>();
+        tempUserRepository
+            .Setup(repo => repo.GetAllTempUsersInformation(false))
+            .ReturnsAsync(new[]
+            {
+                new UserInformation
+                {
+                    UserId = Guid.NewGuid(),
+                    FamilyId = Guid.NewGuid(),
+                    FirstName = "Pending",
+                    LastName = "Duplicate",
+                    Email = "duplicate@example.com",
+                    Phone = "6666666666",
+                    UserName = "pending-duplicate",
+                    IsActive = true,
+                    Relationship = Relationship.Mother,
+                    UserRole = UserRoleType.Normal
+                }
+            });
+
+        var service = CreateUserService(
+            userRepository: userRepository,
+            tempUserRepository: tempUserRepository);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdminUpdateUser(userId, new AdminUpdateUserRequest
+        {
+            Email = "duplicate@example.com"
+        }));
+
+        Assert.Equal("Email is already added and duplicate emails can't be added", exception.Message);
+        userRepository.Verify(repo => repo.UpdateAdminUser(It.IsAny<AdminUpdateUserInformation>()), Times.Never);
+    }
+
+    [Fact]
     public async Task AddTemporaryUser_RejectsDuplicateMotherForFamily()
     {
         var familyId = Guid.NewGuid();
