@@ -1211,6 +1211,57 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
+    public async Task ReconcileTransactions_WhenAchListResponseIsEmpty_ReturnsZeroAchTransactions()
+    {
+        var repository = new Mock<IHelcimTransactionRepository>();
+        var sender = new Mock<IWebMsgSenderService>();
+        var responses = new Queue<string>(new[]
+        {
+            "[]",
+            string.Empty
+        });
+
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync(() => responses.Dequeue());
+
+        var service = CreateService(repository.Object, sender.Object);
+
+        var result = await service.ReconcileTransactions(new HelcimReconciliationRequest
+        {
+            StartDate = new DateTime(2026, 8, 14),
+            EndDate = new DateTime(2026, 8, 20)
+        });
+
+        Assert.Equal(0, result.CardTransactionsFetched);
+        Assert.Equal(0, result.AchTransactionsFetched);
+        Assert.Equal(0, result.StoredTransactions);
+        Assert.Equal("Helcim reconciliation completed.", result.Message);
+    }
+
+    [Fact]
+    public async Task GetAchRefundInvoices_WhenAchListResponseIsEmpty_ReturnsEmptyList()
+    {
+        var repository = new Mock<IHelcimTransactionRepository>();
+        var sender = new Mock<IWebMsgSenderService>();
+
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync(string.Empty);
+
+        var service = CreateService(repository.Object, sender.Object);
+
+        var result = await service.GetAchRefundInvoices(new GetAchRefundInvoicesRequest
+        {
+            StartDate = new DateTime(2026, 8, 14),
+            EndDate = new DateTime(2026, 8, 20),
+            IncludeRefundTransactions = true
+        });
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
     public async Task HandleWebhook_DoesNothingWhenTransactionAlreadyExists()
     {
         var repository = new Mock<IHelcimTransactionRepository>();

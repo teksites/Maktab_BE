@@ -1453,7 +1453,12 @@ namespace Helcim.Implementation.Services
             {
                 var achTransactionsEndpoint = BuildVersionedEndpoint(
                     $"/ach/transactions?startDate={searchStartDate:yyyy-MM-dd}&endDate={searchEndDate:yyyy-MM-dd}&page={page}&limit={_clientConfiguration.AchReconciliationPageSize}");
-                var achTransactionsRaw = await SendGetRequest(achTransactionsEndpoint).ConfigureAwait(false);
+                var achTransactionsRaw = await SendGetRequest(achTransactionsEndpoint, allowEmptyResponse: true).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(achTransactionsRaw))
+                {
+                    break;
+                }
+
                 var payload = JToken.Parse(achTransactionsRaw);
                 var pageTransactions = EnumerateAchTransactions(payload).ToList();
 
@@ -2164,7 +2169,12 @@ namespace Helcim.Implementation.Services
             {
                 var endpoint = BuildVersionedEndpoint(
                     $"/ach/transactions?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}&page={page}&limit={_clientConfiguration.AchReconciliationPageSize}");
-                var responseJson = await SendGetRequest(endpoint).ConfigureAwait(false);
+                var responseJson = await SendGetRequest(endpoint, allowEmptyResponse: true).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(responseJson))
+                {
+                    break;
+                }
+
                 var payload = JToken.Parse(responseJson);
                 var pageTransactions = EnumerateAchTransactions(payload)
                     .Select(transactionData => new AchTransactionLookup
@@ -2188,14 +2198,15 @@ namespace Helcim.Implementation.Services
             return transactions;
         }
 
-        private async Task<string> SendGetRequest(string endpoint)
-            => await SendJsonRequest(endpoint, HttpMethod.Get, null).ConfigureAwait(false);
+        private async Task<string> SendGetRequest(string endpoint, bool allowEmptyResponse = false)
+            => await SendJsonRequest(endpoint, HttpMethod.Get, null, allowEmptyResponse: allowEmptyResponse).ConfigureAwait(false);
 
         private async Task<string> SendJsonRequest(
             string endpoint,
             HttpMethod method,
             JToken? body,
-            IDictionary<string, string>? additionalHeaders = null)
+            IDictionary<string, string>? additionalHeaders = null,
+            bool allowEmptyResponse = false)
         {
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -2223,6 +2234,11 @@ namespace Helcim.Implementation.Services
             var responseJson = await _senderService.SendMessage(payload, _clientConfiguration, method).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(responseJson))
             {
+                if (allowEmptyResponse)
+                {
+                    return string.Empty;
+                }
+
                 throw new InvalidOperationException($"Helcim {method} request returned an empty response for endpoint {endpoint}.");
             }
 
