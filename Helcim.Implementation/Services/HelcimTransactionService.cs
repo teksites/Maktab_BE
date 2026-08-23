@@ -203,6 +203,16 @@ namespace Helcim.Implementation.Services
         public async Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceId(int invoiceId)
             => await SyncInvoicePaymentByInvoiceIdInternal(invoiceId, null).ConfigureAwait(false);
 
+        public async Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceNumber(string invoiceNumber)
+        {
+            if (string.IsNullOrWhiteSpace(invoiceNumber))
+            {
+                throw new ArgumentException("Invoice number is required.", nameof(invoiceNumber));
+            }
+
+            return await SyncInvoicePaymentByInvoiceNumberAsync(invoiceNumber.Trim(), null).ConfigureAwait(false);
+        }
+
         public async Task<HelcimReconciliationResponse> ReconcileTransactions(HelcimReconciliationRequest? request = null)
         {
             var endDate = (request?.EndDate ?? DateTime.UtcNow.Date).Date;
@@ -586,6 +596,13 @@ namespace Helcim.Implementation.Services
         private async Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceIdInternal(int invoiceId, string? webhookRawBody)
         {
             var invoice = await GetInvoiceByInvoiceId(invoiceId).ConfigureAwait(false);
+            return await SyncInvoicePaymentInternal(invoice, webhookRawBody).ConfigureAwait(false);
+        }
+
+        private async Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentInternal(
+            HelcimInvoiceResponse invoice,
+            string? webhookRawBody)
+        {
             var localTransaction = await ResolveLocalTransactionAsync(invoice).ConfigureAwait(false);
 
             if (!string.IsNullOrWhiteSpace(invoice.InvoiceNumber))
@@ -615,7 +632,7 @@ namespace Helcim.Implementation.Services
             }
 
             throw new InvalidOperationException(
-                $"No Helcim payment transaction could be found for invoiceId {invoiceId} (invoiceNumber: {invoice.InvoiceNumber}).");
+                $"No Helcim payment transaction could be found for invoiceId {invoice.InvoiceId} (invoiceNumber: {invoice.InvoiceNumber}).");
         }
 
         public Task AddTransactionDetails(AddHelcimTransactionDetails transactionDetails)
@@ -1348,7 +1365,7 @@ namespace Helcim.Implementation.Services
         private async Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceNumberAsync(string invoiceNumber, string? webhookRawBody)
         {
             var invoice = await GetInvoiceByInvoiceNumber(invoiceNumber).ConfigureAwait(false);
-            return await SyncInvoicePaymentByInvoiceIdInternal(invoice.InvoiceId, webhookRawBody).ConfigureAwait(false);
+            return await SyncInvoicePaymentInternal(invoice, webhookRawBody).ConfigureAwait(false);
         }
 
         private async Task<CardTransactionLookup?> TryGetCardTransactionById(int transactionId)

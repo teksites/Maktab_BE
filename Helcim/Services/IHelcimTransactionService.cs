@@ -8,6 +8,7 @@ namespace Helcim.Services
         Task<HelcimPayInitializeResponse> InitializePayment(InitiatePaymentRequest request);
         Task<HelcimPaymentCompletionResponse> CompleteHelcimPayPayment(CompleteHelcimPayPaymentRequest request);
         Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceId(int invoiceId);
+        Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceNumber(string invoiceNumber);
         Task<HelcimReconciliationResponse> ReconcileTransactions(HelcimReconciliationRequest? request = null);
         Task<IReadOnlyList<HelcimAchRefundInvoiceSummaryResponse>> GetAchRefundInvoices(GetAchRefundInvoicesRequest request);
         Task<HelcimAchRefundResponse> RefundAchTransaction(RefundAchTransactionRequest request);
