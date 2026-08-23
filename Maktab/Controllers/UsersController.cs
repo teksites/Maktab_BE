@@ -172,6 +172,21 @@ namespace Maktab.Controllers
             return Ok(updatedUser);
         }
 
+        [Authorize]
+        [ApiAuthorize(false, false, MaktabDataContracts.Enums.UserRoleType.Normal)]
+        [HttpPut("{userId:guid}")]
+        [EnableCors("corspolicy")]
+        public async Task<ActionResult<UserInformationResponse>> UpdateUserProfile(Guid userId, UpdateUserProfileRequest userInformation)
+        {
+            var updatedUser = await _userService.UpdateUserProfile(userId, userInformation).ConfigureAwait(false);
+            if (updatedUser == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(updatedUser);
+        }
+
         [HttpPost("{userId:guid}/resetpassword")]
         [EnableCors("corspolicy")]
         public async Task<bool> ResetPassword(Guid userId, UpdateUserPasswordRequest userInformation)

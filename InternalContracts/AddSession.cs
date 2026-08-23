@@ -9,6 +9,9 @@
         public DateTime TokenExpiry { get; set; }
         public string? IpAddress { get; set; }
         public bool IsActive { get; set; }
+        public bool RequiresTwoFactorVerification { get; set; }
+        public bool IsTwoFactorVerified { get; set; } = true;
+        public DateTime? TwoFactorVerifiedOn { get; set; }
         public DateTime LogInTime { get; set; }
         public DateTime? LogOutTime { get; set; }
     }

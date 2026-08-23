@@ -9,6 +9,7 @@ namespace Users.Repository
     {
         Task<UserInformation> AddUser(UserInformation userInformation);
         Task<UserInformation> UpdateAdminUser(AdminUpdateUserInformation userInformation);
+        Task<UserInformation> UpdateUserProfile(UpdateUserProfileInformation userInformation);
         Task<UserInformation> UpdateUser(UpdateUserPassword userInformation, bool ifTempPassword = false);
         Task<bool> DeleteUser(Guid userId, bool ifHardDelete = false);
         Task<UserInformation> GetUserInformation(Guid userId);

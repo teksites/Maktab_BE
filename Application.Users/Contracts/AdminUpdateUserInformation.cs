@@ -15,6 +15,7 @@ namespace Application.Users.Contracts
         public string? NewPassword { get; set; }
         public Relationship Relationship { get; set; }
         public bool IsActive { get; set; }
+        public bool IsMultiFactorLoginEnabled { get; set; }
         public bool IsAdmin { get; set; }
         public bool IsTempPassword { get; set; }
         public UserRoleType UserRole { get; set; }

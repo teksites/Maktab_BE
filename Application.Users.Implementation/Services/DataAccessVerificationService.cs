@@ -22,13 +22,15 @@ namespace Application.Users.Implementation
 
         public async Task<SessionAccessContext> GetSessionAccessContext(Guid sessionId)
         {
-            var userId = await _userLoginService.GetUserBySessionId(sessionId).ConfigureAwait(false);
-            if (userId == Guid.Empty)
+            var sessionState = await _userLoginService.GetSessionAuthenticationState(sessionId).ConfigureAwait(false);
+            if (sessionState == null
+                || !sessionState.IsActive
+                || (sessionState.RequiresTwoFactorVerification && !sessionState.IsTwoFactorVerified))
             {
                 return null;
             }
 
-            var userInfo = await _userService.GetUserInformation(userId).ConfigureAwait(false);
+            var userInfo = await _userService.GetUserInformation(sessionState.UserId).ConfigureAwait(false);
             if (userInfo == null)
             {
                 return null;
@@ -37,9 +39,11 @@ namespace Application.Users.Implementation
             return new SessionAccessContext
             {
                 SessionId = sessionId,
-                UserId = userId,
+                UserId = sessionState.UserId,
                 FamilyId = userInfo.FamilyId,
-                UserRoles = await _userService.GetUserRoles(userId).ConfigureAwait(false)
+                UserRoles = await _userService.GetUserRoles(sessionState.UserId).ConfigureAwait(false),
+                RequiresTwoFactorVerification = sessionState.RequiresTwoFactorVerification,
+                IsTwoFactorVerified = sessionState.IsTwoFactorVerified
             };
         }
 

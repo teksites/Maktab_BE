@@ -55,7 +55,8 @@ namespace Application.Users.Repository.Implementation
                             CreatedAt = userInformation.CreatedAt,
                             UpdatedOn = userInformation.CreatedAt,
                             Relationship = userInformation.Relationship,
-                            UserRole = userInformation.UserRole
+                            UserRole = userInformation.UserRole,
+                            IsMultiFactorLoginEnabled = false
                         };
                     }
                     else
@@ -179,7 +180,8 @@ namespace Application.Users.Repository.Implementation
                         IsTempPassword = isTempPassword,
                         IsAdmin = false,
                         Relationship = relationship,
-                        UserRole = userRole
+                        UserRole = userRole,
+                        IsMultiFactorLoginEnabled = false
                     };
                 }
             }
@@ -307,7 +309,8 @@ namespace Application.Users.Repository.Implementation
                             IsAdmin = false,
                             IsTempPassword = isTempPassword,
                             Relationship = relationship,
-                            UserRole = userRole
+                            UserRole = userRole,
+                            IsMultiFactorLoginEnabled = false
                         });
                     }
                 }
@@ -366,7 +369,8 @@ namespace Application.Users.Repository.Implementation
                             IsAdmin = false,
                             IsTempPassword = isTempPassword,
                             Relationship = relationship,
-                            UserRole = userRole
+                            UserRole = userRole,
+                            IsMultiFactorLoginEnabled = false
                         });
                     }
                 }
@@ -426,7 +430,8 @@ namespace Application.Users.Repository.Implementation
                         UserName = userNam,
                         IsTempPassword = isTempPassword,
                         Relationship = relationship,
-                        UserRole = userRole
+                        UserRole = userRole,
+                        IsMultiFactorLoginEnabled = false
                     };
                 }
             }
