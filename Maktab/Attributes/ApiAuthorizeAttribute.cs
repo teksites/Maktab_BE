@@ -16,13 +16,19 @@ namespace Maktab.Attributes
         private const string SessionAccessContextKey = "ApiAuthorize.SessionAccessContext";
         private readonly bool _allowTempUser;
         private readonly bool _ignoreHeaderCheck;
+        private readonly bool _allowPendingTwoFactor;
         private readonly UserRoleType _requiredRole;
 
-        public ApiAuthorizeAttribute(bool allowTempUser = false, bool ignoreHeaderCheck = false, UserRoleType requiredRole = UserRoleType.Normal)
+        public ApiAuthorizeAttribute(
+            bool allowTempUser = false,
+            bool ignoreHeaderCheck = false,
+            UserRoleType requiredRole = UserRoleType.Normal,
+            bool allowPendingTwoFactor = false)
         {
             _allowTempUser = allowTempUser;
             _ignoreHeaderCheck = ignoreHeaderCheck;
             _requiredRole = requiredRole;
+            _allowPendingTwoFactor = allowPendingTwoFactor;
         }
 
         public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
@@ -57,6 +63,21 @@ namespace Maktab.Attributes
                 if (!sessionActive)
                 {
                     context.Result = CreateUnauthorizedResult("No active session found");
+                    return;
+                }
+
+                var sessionState = await loginService.GetSessionAuthenticationState(sessionId).ConfigureAwait(false);
+                if (sessionState == null)
+                {
+                    context.Result = CreateUnauthorizedResult("No active session found");
+                    return;
+                }
+
+                if (!_allowPendingTwoFactor
+                    && sessionState.RequiresTwoFactorVerification
+                    && !sessionState.IsTwoFactorVerified)
+                {
+                    context.Result = CreateUnauthorizedResult("Two-factor verification required");
                     return;
                 }
             }

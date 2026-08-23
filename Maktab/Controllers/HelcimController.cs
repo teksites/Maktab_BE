@@ -35,9 +35,12 @@ public class HelcimController : ControllerBase
         => _service.CompleteHelcimPayPayment(request);
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
-    [HttpPost("byadmin/sync-invoice/{invoiceId:int}")]
-    public Task<HelcimPaymentCompletionResponse> SyncInvoicePayment(int invoiceId)
-        => _service.SyncInvoicePaymentByInvoiceId(invoiceId);
+    [HttpPost("byadmin/sync-invoice/{invoiceReference}")]
+    [HttpPost("byadmin/sync-invoice-number/{invoiceReference}")]
+    public Task<HelcimPaymentCompletionResponse> SyncInvoicePayment(string invoiceReference)
+        => int.TryParse(invoiceReference, out var invoiceId)
+            ? _service.SyncInvoicePaymentByInvoiceId(invoiceId)
+            : _service.SyncInvoicePaymentByInvoiceNumber(invoiceReference);
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpPost("byadmin/reconcile")]

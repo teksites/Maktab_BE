@@ -19,6 +19,7 @@ namespace Application.Users.Contracts
         public bool IsAdmin { get; set; } = false;
         public bool IsTempPassword { get; set; } = false;
         public bool IfTempUser { get; set; } = false;
+        public bool IsMultiFactorLoginEnabled { get; set; }
         public UserRoleType UserRole { get; set; } = UserRoleType.None;
     }
 }

@@ -1,4 +1,6 @@
 ﻿
+using Application.Users.Contracts;
+using MaktabDataContracts.Requests.Authentication;
 using MaktabDataContracts.Requests.Users;
 using MaktabDataContracts.Responses.Authentication;
 using Users.Contracts;
@@ -11,8 +13,11 @@ namespace Users.Services
         Task<AuthenticationResponse> Authenticate(string userName, string password, string ipAddress);
         Task<bool> LogOutSession(Guid sessionId);
         Task<bool> CheckIfSessionExistOrActive(Guid sessionId);
+        Task<SessionAuthenticationState> GetSessionAuthenticationState(Guid sessionId);
         Task<Guid> GetSessionByUserId(Guid userId);
         Task<Guid> GetUserBySessionId(Guid sessionId);
+        Task<TwoFactorLoginVerificationResponse> VerifyTwoFactorLogin(Guid sessionId, string userName, VerifyTwoFactorLoginRequest request);
+        Task<TwoFactorLoginVerificationResponse> ResendTwoFactorLogin(Guid sessionId, string userName);
         Task<bool> ForgotPassword(string email);
         Task<bool> ResetUserPassword(UpdateUserPassword updateUserPassword);
     }

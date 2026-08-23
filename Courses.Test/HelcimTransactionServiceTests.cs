@@ -969,6 +969,78 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
+    public async Task SyncInvoicePaymentByInvoiceNumber_ForCardInvoice_FetchesInvoiceByInvoiceNumber()
+    {
+        const string invoiceNumber = "INV-3D88SC-202607140353-1";
+        const int invoiceId = 67598829;
+        const int transactionId = 51506408;
+        const string paymentCode = "3D88SC";
+        var studentTransactionId = Guid.Parse("aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb");
+        var familyId = Guid.Parse("bbbbbbbb-1111-2222-3333-cccccccccccc");
+
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository
+            .Setup(repo => repo.GetByTransactionId(transactionId))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+
+        AddHelcimTransactionDetails? capturedDetails = null;
+        repository
+            .Setup(repo => repo.Add(It.IsAny<AddHelcimTransactionDetails>()))
+            .Callback<AddHelcimTransactionDetails>(details => capturedDetails = details)
+            .Returns(Task.CompletedTask);
+
+        var sender = new Mock<IWebMsgSenderService>();
+        var capturedEndpoints = new List<string>();
+        var responses = new Queue<string>(new[]
+        {
+            $"[{{\"invoiceId\":{invoiceId},\"invoiceNumber\":\"{invoiceNumber}\",\"token\":\"tok-3d88sc\",\"notes\":\"{paymentCode}\",\"dateCreated\":\"2026-07-14 11:13:30\",\"dateUpdated\":\"2026-07-14 11:13:31\",\"datePaid\":\"2026-07-14 11:13:31\",\"status\":\"PAID\",\"customerId\":40499452,\"amount\":290.00,\"amountPaid\":290.00,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"{studentTransactionId}\",\"description\":\"127.0.0.1\",\"quantity\":1,\"price\":290.00,\"total\":290.00}}]}}]",
+            $"[{{\"transactionId\":{transactionId},\"dateCreated\":\"2026-07-14 11:13:31\",\"cardBatchId\":6801809,\"status\":\"APPROVED\",\"user\":\"Helcim System\",\"type\":\"purchase\",\"amount\":290,\"currency\":\"CAD\",\"avsResponse\":\"Y\",\"cvvResponse\":\"M\",\"cardType\":\"MC\",\"invoiceNumber\":\"{invoiceNumber}\",\"customerCode\":\"CST1041\",\"approvalCode\":\"09951E\",\"cardToken\":\"v2cYjDvKSeG0RDp4aI11YA\",\"cardNumber\":\"5223034123\",\"cardHolderName\":\"mohamed aitbahmed\"}}]"
+        });
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .Callback<JsonMessageData, InternalContracts.IClientConfiguration, HttpMethod>((payload, _, _) => capturedEndpoints.Add(payload.ExternalEndpoint))
+            .ReturnsAsync(() => responses.Dequeue());
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransactionByPaymentCode(paymentCode))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                PaymentCode = paymentCode
+            });
+
+        AddCoursePayment? capturedPayment = null;
+        var coursePaymentService = new Mock<ICoursePaymentService>();
+        coursePaymentService
+            .Setup(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()))
+            .Callback<AddCoursePayment>(payment => capturedPayment = payment)
+            .ReturnsAsync((new CoursePaymentResponse(), true));
+
+        var service = CreateService(
+            repository.Object,
+            sender.Object,
+            studentCourseTransactionService: studentCourseTransactionService.Object,
+            coursePaymentService: coursePaymentService.Object);
+
+        var result = await service.SyncInvoicePaymentByInvoiceNumber(invoiceNumber);
+
+        Assert.True(result.Success);
+        Assert.False(result.Duplicate);
+        Assert.Equal(invoiceId, result.InvoiceId);
+        Assert.Equal(transactionId, result.TransactionId);
+        Assert.Equal("card", result.PaymentFlow);
+        Assert.Equal($"https://api.helcim.com/v2/invoices/?invoiceNumber={Uri.EscapeDataString(invoiceNumber)}", capturedEndpoints[0]);
+        Assert.Equal($"https://api.helcim.com/v2/card-transactions?invoiceNumber={Uri.EscapeDataString(invoiceNumber)}", capturedEndpoints[1]);
+        Assert.NotNull(capturedDetails);
+        Assert.Equal(paymentCode, capturedDetails!.PaymentCode);
+        Assert.NotNull(capturedPayment);
+        Assert.Equal(transactionId.ToString(), capturedPayment!.ExternalPaymentId);
+        Assert.Equal(PaymentMode.Helcim, capturedPayment.PaymentMode);
+    }
+
+    [Fact]
     public async Task RefundAchTransaction_ForClosedApprovedTransaction_SendsPutRequestWithIdempotencyKey()
     {
         var repository = new Mock<IHelcimTransactionRepository>();

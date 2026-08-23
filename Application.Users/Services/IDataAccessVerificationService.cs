@@ -18,6 +18,8 @@ namespace Users.Services
         public Guid UserId { get; set; }
         public Guid FamilyId { get; set; }
         public UserRoleType UserRoles { get; set; } = UserRoleType.None;
+        public bool RequiresTwoFactorVerification { get; set; }
+        public bool IsTwoFactorVerified { get; set; }
     }
 
     public class DataAccessVerificationResult

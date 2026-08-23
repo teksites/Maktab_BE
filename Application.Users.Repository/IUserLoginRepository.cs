@@ -1,5 +1,7 @@
 ﻿using Application.Users.Contracts;
-using InternalContracts;
+using AddSession = InternalContracts.AddSession;
+using AddSessionTwoFactorCode = InternalContracts.AddSessionTwoFactorCode;
+using SessionTwoFactorCode = InternalContracts.SessionTwoFactorCode;
 
 namespace Users.Repository
 {
@@ -14,5 +16,12 @@ namespace Users.Repository
         Task<bool> DeleteInActiveSessions();
         Task<Guid> GetSessionByUserId(Guid userId);
         Task<Guid> GetUserBySessionId(Guid sessionId);
+        Task<SessionAuthenticationState> GetSessionAuthenticationState(Guid sessionId);
+        Task<bool> AddSessionTwoFactorCode(AddSessionTwoFactorCode addSessionTwoFactorCode);
+        Task<SessionTwoFactorCode> GetActiveSessionTwoFactorCode(Guid sessionId);
+        Task<bool> DeactivateSessionTwoFactorCodes(Guid sessionId);
+        Task<bool> IncrementSessionTwoFactorAttemptCount(Guid sessionTwoFactorCodeId);
+        Task<bool> MarkSessionTwoFactorCodeVerified(Guid sessionTwoFactorCodeId, DateTime verifiedOn);
+        Task<bool> MarkSessionTwoFactorVerified(Guid sessionId, DateTime verifiedOn);
     }
 }

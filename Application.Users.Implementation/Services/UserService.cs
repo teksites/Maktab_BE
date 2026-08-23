@@ -203,6 +203,30 @@ namespace Application.Users.Implementation
                 : MapToUserInformationResponse(updatedUser, ifTempUser);
         }
 
+        public async Task<UserInformationResponse> UpdateUserProfile(Guid userId, UpdateUserProfileRequest userInformation)
+        {
+            ArgumentNullException.ThrowIfNull(userInformation);
+
+            var currentUser = await _repository.GetUserInformation(userId).ConfigureAwait(false);
+            if (currentUser == null)
+            {
+                return null;
+            }
+
+            var updatedUser = await _repository.UpdateUserProfile(new UpdateUserProfileInformation
+            {
+                UserId = userId,
+                FirstName = NormalizePartialString(userInformation.FirstName, currentUser.FirstName, "First name"),
+                LastName = NormalizePartialString(userInformation.LastName, currentUser.LastName, "Last name"),
+                Phone = NormalizePartialString(userInformation.Phone, currentUser.Phone, "Phone"),
+                IsMultiFactorLoginEnabled = userInformation.IsMultiFactorLoginEnabled ?? currentUser.IsMultiFactorLoginEnabled
+            }).ConfigureAwait(false);
+
+            return updatedUser == null
+                ? null
+                : MapToUserInformationResponse(updatedUser, false);
+        }
+
         public async Task<UserRoleType> GetUserRoles(Guid userId)
         {
             return await _repository.GetUserRoles(userId).ConfigureAwait(false);
@@ -374,6 +398,7 @@ namespace Application.Users.Implementation
                 LastName = userInformation.LastName,
                 Relationship = userInformation.Relationship,
                 IsActive = true,
+                IsMultiFactorLoginEnabled = !ifTempUser && userInformation.IsMultiFactorLoginEnabled,
                 CreatedAt = userInformation.CreatedAt,
                 UpdatedOn = userInformation.UpdatedOn,
                 IfTempUser = ifTempUser,
@@ -653,6 +678,9 @@ namespace Application.Users.Implementation
             var mergedIsAdmin = ifTempUser
                 ? false
                 : userInformation.IsAdmin ?? currentUser.IsAdmin;
+            var mergedIsMultiFactorLoginEnabled = ifTempUser
+                ? false
+                : userInformation.IsMultiFactorLoginEnabled ?? currentUser.IsMultiFactorLoginEnabled;
 
             await EnsureParentRelationshipIsAvailableAsync(
                 mergedFamilyId,
@@ -677,6 +705,7 @@ namespace Application.Users.Implementation
                 NewPassword = string.IsNullOrWhiteSpace(userInformation.NewPassword) ? null : userInformation.NewPassword,
                 Relationship = mergedRelationship,
                 IsActive = mergedIsActive,
+                IsMultiFactorLoginEnabled = mergedIsMultiFactorLoginEnabled,
                 IsAdmin = mergedIsAdmin,
                 IsTempPassword = mergedIsTempPassword,
                 UserRole = mergedUserRole
@@ -809,6 +838,22 @@ namespace Application.Users.Implementation
             var value = string.IsNullOrWhiteSpace(requestedValue) ? fallbackValue : requestedValue;
             value = value?.Trim() ?? string.Empty;
 
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidOperationException($"{fieldName} is required.");
+            }
+
+            return value;
+        }
+
+        private static string NormalizePartialString(string? requestedValue, string fallbackValue, string fieldName)
+        {
+            if (requestedValue == null)
+            {
+                return fallbackValue;
+            }
+
+            var value = requestedValue.Trim();
             if (string.IsNullOrWhiteSpace(value))
             {
                 throw new InvalidOperationException($"{fieldName} is required.");

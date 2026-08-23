@@ -1181,6 +1181,144 @@ public class UserServiceTests
         Assert.Equal(familyId, result.FamilyAddress[0].ConnectedId);
     }
 
+    [Fact]
+    public async Task UpdateUserProfile_UpdatesOnlyProvidedFieldsAndMfaFlag()
+    {
+        var userId = Guid.NewGuid();
+        UpdateUserProfileInformation? capturedUpdate = null;
+
+        var currentUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = Guid.NewGuid(),
+            FirstName = "Current",
+            LastName = "User",
+            Email = "current@example.com",
+            Phone = "1111111111",
+            UserName = "current-user",
+            Password = "existing-hash",
+            IsActive = true,
+            Relationship = Relationship.Mother,
+            UserRole = UserRoleType.Normal,
+            IsMultiFactorLoginEnabled = false
+        };
+
+        var updatedUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = currentUser.FamilyId,
+            FirstName = "Current",
+            LastName = "User",
+            Email = "current@example.com",
+            Phone = "2222222222",
+            UserName = "current-user",
+            Password = "existing-hash",
+            IsActive = true,
+            Relationship = Relationship.Mother,
+            UserRole = UserRoleType.Normal,
+            IsMultiFactorLoginEnabled = true
+        };
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetUserInformation(userId))
+            .ReturnsAsync(currentUser);
+        userRepository
+            .Setup(repo => repo.UpdateUserProfile(It.IsAny<UpdateUserProfileInformation>()))
+            .Callback<UpdateUserProfileInformation>(request => capturedUpdate = request)
+            .ReturnsAsync(updatedUser);
+
+        var service = CreateUserService(userRepository: userRepository);
+
+        var result = await service.UpdateUserProfile(userId, new UpdateUserProfileRequest
+        {
+            Phone = "2222222222",
+            IsMultiFactorLoginEnabled = true
+        });
+
+        Assert.NotNull(result);
+        Assert.NotNull(capturedUpdate);
+        Assert.Equal("Current", capturedUpdate!.FirstName);
+        Assert.Equal("User", capturedUpdate.LastName);
+        Assert.Equal("2222222222", capturedUpdate.Phone);
+        Assert.True(capturedUpdate.IsMultiFactorLoginEnabled);
+        Assert.True(result.IsMultiFactorLoginEnabled);
+    }
+
+    [Fact]
+    public async Task AdminUpdateUser_IgnoresMfaFlagForTempUser()
+    {
+        var userId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        AdminUpdateUserInformation? capturedUpdate = null;
+
+        var tempUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = familyId,
+            FirstName = "Pending",
+            LastName = "User",
+            Email = "pending@example.com",
+            Phone = "3333333333",
+            UserName = "pending-user",
+            Password = "existing-hash",
+            IsActive = true,
+            Relationship = Relationship.Teacher,
+            UserRole = UserRoleType.Normal,
+            IsMultiFactorLoginEnabled = false
+        };
+
+        var updatedTempUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = familyId,
+            FirstName = "Pending",
+            LastName = "User",
+            Email = "pending@example.com",
+            Phone = "3333333333",
+            UserName = "pending-user",
+            Password = "existing-hash",
+            IsActive = true,
+            Relationship = Relationship.Teacher,
+            UserRole = UserRoleType.Normal,
+            IsMultiFactorLoginEnabled = false
+        };
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetUserInformation(userId))
+            .ReturnsAsync((UserInformation)null);
+        userRepository
+            .Setup(repo => repo.GetAllUsersInformation(false))
+            .ReturnsAsync(Array.Empty<UserInformation>());
+
+        var tempUserRepository = new Mock<ITempUserRepository>();
+        tempUserRepository
+            .Setup(repo => repo.GetTempUserInformation(userId))
+            .ReturnsAsync(tempUser);
+        tempUserRepository
+            .Setup(repo => repo.GetAllTempUsersInformation(false))
+            .ReturnsAsync(new[] { tempUser });
+        tempUserRepository
+            .Setup(repo => repo.UpdateAdminUser(It.IsAny<AdminUpdateUserInformation>()))
+            .Callback<AdminUpdateUserInformation>(request => capturedUpdate = request)
+            .ReturnsAsync(updatedTempUser);
+
+        var service = CreateUserService(
+            userRepository: userRepository,
+            tempUserRepository: tempUserRepository);
+
+        var result = await service.AdminUpdateUser(userId, new AdminUpdateUserRequest
+        {
+            IsMultiFactorLoginEnabled = true
+        });
+
+        Assert.NotNull(result);
+        Assert.NotNull(capturedUpdate);
+        Assert.False(capturedUpdate!.IsMultiFactorLoginEnabled);
+        Assert.False(result.IsMultiFactorLoginEnabled);
+    }
+
     private static UserService CreateUserService(
         Mock<IUserRepository>? userRepository = null,
         Mock<ITempUserRepository>? tempUserRepository = null,

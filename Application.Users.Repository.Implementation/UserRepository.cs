@@ -22,8 +22,8 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"insert into user_info (UserId, FamilyId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, Relationship, UserRole)"
-                    + "Values(@userId, @familyId, @firstName, @lastName, @email, @phone, @userName, @password, @isActive, @createdAt, @updatedOn, @isAdmin, @relationship, @userRole)";
+                    cmd.CommandText = @"insert into user_info (UserId, FamilyId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, Relationship, UserRole, IsMultiFactorLoginEnabled)"
+                    + "Values(@userId, @familyId, @firstName, @lastName, @email, @phone, @userName, @password, @isActive, @createdAt, @updatedOn, @isAdmin, @relationship, @userRole, @isMultiFactorLoginEnabled)";
 
                     //var password = PasswordHelper.HashPassword(userInformation.Password);
                     cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
@@ -40,6 +40,7 @@ namespace Application.Users.Repository.Implementation
                     cmd.AddParameter("@isAdmin", userInformation.IsAdmin);
                     cmd.AddParameter("@relationship", userInformation.Relationship);
                     cmd.AddParameter("@userRole", userInformation.UserRole);
+                    cmd.AddParameter("@isMultiFactorLoginEnabled", userInformation.IsMultiFactorLoginEnabled);
 
                     if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
                     {
@@ -59,6 +60,7 @@ namespace Application.Users.Repository.Implementation
                             IsAdmin = userInformation.IsAdmin,
                             Relationship = userInformation.Relationship,
                             UserRole = userInformation.UserRole,
+                            IsMultiFactorLoginEnabled = userInformation.IsMultiFactorLoginEnabled
                         };
                     }
                     else
@@ -178,7 +180,7 @@ namespace Application.Users.Repository.Implementation
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId, Relationship, UserRole from user_info";
+                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId, Relationship, UserRole, IsMultiFactorLoginEnabled from user_info";
 
                     if (ifOnlyActive)
                     {
@@ -204,6 +206,7 @@ namespace Application.Users.Repository.Implementation
                         var familyId = reader.GetGuidFromByteArray(12);
                         var relationship = (Relationship)reader.GetInt32(13);
                         var userRole = (UserRoleType)reader.GetInt32(14);
+                        var isMultiFactorLoginEnabled = reader.GetBoolean(15);
 
                         results.Add(new UserInformation
                         {
@@ -221,7 +224,8 @@ namespace Application.Users.Repository.Implementation
                             IsAdmin = isAdmin,
                             IsTempPassword = isTempPassword,
                             Relationship = relationship,
-                            UserRole = userRole
+                            UserRole = userRole,
+                            IsMultiFactorLoginEnabled = isMultiFactorLoginEnabled
                         });
                     }
                 }
@@ -253,7 +257,8 @@ SELECT
     FamilyId,
     Relationship,
     UserRole,
-    IfTempUser
+    IfTempUser,
+    IsMultiFactorLoginEnabled
 FROM
 (
     SELECT
@@ -272,7 +277,8 @@ FROM
         ui.FamilyId,
         ui.Relationship,
         ui.UserRole,
-        0 AS IfTempUser
+        0 AS IfTempUser,
+        ui.IsMultiFactorLoginEnabled
     FROM user_info ui
     WHERE ui.FamilyId = @familyId
 
@@ -294,7 +300,8 @@ FROM
         tui.FamilyId,
         tui.Relationship,
         tui.UserRole,
-        1 AS IfTempUser
+        1 AS IfTempUser,
+        0 AS IsMultiFactorLoginEnabled
     FROM temp_user_info tui
     WHERE tui.FamilyId = @familyId
 ) u";
@@ -325,7 +332,8 @@ FROM
                         FamilyId = reader.GetGuidFromByteArray(12),
                         Relationship = (Relationship)reader.GetInt32(13),
                         UserRole = (UserRoleType)reader.GetInt32(14),
-                        IfTempUser = reader.GetBoolean(15)
+                        IfTempUser = reader.GetBoolean(15),
+                        IsMultiFactorLoginEnabled = reader.GetBoolean(16)
                     });
                 }
             }
@@ -401,7 +409,7 @@ FROM
             {
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId, Relationship, UserRole from user_info" +
+                    cmd.CommandText = @"Select UserId, FirstName, LastName, Email, Phone, UserName, Password, IsActive, CreatedAt, UpdatedOn, IsAdmin, IsTempPassword, FamilyId, Relationship, UserRole, IsMultiFactorLoginEnabled from user_info" +
                         " where UserId = @userId";
 
                     cmd.AddParameter("@userId", userId.ToByteArray());
@@ -427,6 +435,7 @@ FROM
                     var familyId = reader.GetGuidFromByteArray(12);
                     var relationship = (Relationship)reader.GetInt32(13);
                     var userRole = (UserRoleType)reader.GetInt32(14);
+                    var isMultiFactorLoginEnabled = reader.GetBoolean(15);
 
                     return new UserInformation
                     {
@@ -444,8 +453,40 @@ FROM
                         IsAdmin = isAdmin,
                         IsTempPassword = isTempPassword,
                         Relationship = relationship,
-                        UserRole = userRole
+                        UserRole = userRole,
+                        IsMultiFactorLoginEnabled = isMultiFactorLoginEnabled
                     };
+                }
+            }
+        }
+
+        public async Task<UserInformation> UpdateUserProfile(UpdateUserProfileInformation userInformation)
+        {
+            using (var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false))
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"UPDATE user_info
+                        SET FirstName = @firstName,
+                            LastName = @lastName,
+                            Phone = @phone,
+                            IsMultiFactorLoginEnabled = @isMultiFactorLoginEnabled,
+                            UpdatedOn = @updatedOn
+                        WHERE UserId = @userId";
+
+                    cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
+                    cmd.AddParameter("@firstName", userInformation.FirstName);
+                    cmd.AddParameter("@lastName", userInformation.LastName);
+                    cmd.AddParameter("@phone", userInformation.Phone);
+                    cmd.AddParameter("@isMultiFactorLoginEnabled", userInformation.IsMultiFactorLoginEnabled);
+                    cmd.AddParameter("@updatedOn", DateTime.UtcNow);
+
+                    if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
+                    {
+                        return await GetUserInformation(userInformation.UserId).ConfigureAwait(false);
+                    }
+
+                    return null;
                 }
             }
         }
@@ -492,7 +533,8 @@ FROM
                             IsAdmin = @isAdmin,
                             IsTempPassword = @isTempPassword,
                             Relationship = @relationship,
-                            UserRole = @userRole
+                            UserRole = @userRole,
+                            IsMultiFactorLoginEnabled = @isMultiFactorLoginEnabled
                         WHERE UserId = @userId";
 
                     cmd.AddParameter("@userId", userInformation.UserId.ToByteArray());
@@ -513,6 +555,7 @@ FROM
                     cmd.AddParameter("@isTempPassword", userInformation.IsTempPassword);
                     cmd.AddParameter("@relationship", (int)userInformation.Relationship);
                     cmd.AddParameter("@userRole", (int)userInformation.UserRole);
+                    cmd.AddParameter("@isMultiFactorLoginEnabled", userInformation.IsMultiFactorLoginEnabled);
 
                     if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
                     {
@@ -554,7 +597,7 @@ FROM
                 {
                     // 1. Fetch full user info including password hash
                     cmd.CommandText = @"
-                    SELECT UserId, FirstName, LastName, Email, Phone, UserName, IsAdmin, IsTempPassword, Password, FamilyId, Relationship, UserRole
+                    SELECT UserId, FirstName, LastName, Email, Phone, UserName, IsAdmin, IsTempPassword, Password, FamilyId, Relationship, UserRole, IsMultiFactorLoginEnabled
                     FROM user_info
                     WHERE (UPPER(UserName) = UPPER(@userName) OR UPPER(Email) = UPPER(@userName)) 
                       AND IsActive = TRUE";
@@ -581,6 +624,7 @@ FROM
                     var familyId = reader.GetGuidFromByteArray(9);
                     var relationship = (Relationship)reader.GetInt32(10);
                     var userRole = (UserRoleType)reader.GetInt32(11);
+                    var isMultiFactorLoginEnabled = reader.GetBoolean(12);
 
                     // 3. If password check is requested, verify hash
                     if (!ifForgotPassword && !PasswordHelper.VerifyPassword(password, storedPasswordHash))
@@ -601,7 +645,8 @@ FROM
                         IsTempPassword = isTempPassword,
                         IsActive = true,
                         Relationship = relationship,
-                        UserRole = userRole
+                        UserRole = userRole,
+                        IsMultiFactorLoginEnabled = isMultiFactorLoginEnabled
                     };
                 }
             }
