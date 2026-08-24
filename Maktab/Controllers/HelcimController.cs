@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Helcim.Services;
 using Helcim;
@@ -37,10 +38,21 @@ public class HelcimController : ControllerBase
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpPost("byadmin/sync-invoice/{invoiceReference}")]
     [HttpPost("byadmin/sync-invoice-number/{invoiceReference}")]
-    public Task<HelcimPaymentCompletionResponse> SyncInvoicePayment(string invoiceReference)
-        => int.TryParse(invoiceReference, out var invoiceId)
-            ? _service.SyncInvoicePaymentByInvoiceId(invoiceId)
-            : _service.SyncInvoicePaymentByInvoiceNumber(invoiceReference);
+    public async Task<ActionResult<HelcimPaymentCompletionResponse>> SyncInvoicePayment(string invoiceReference)
+    {
+        try
+        {
+            return Ok(await _service.SyncInvoicePayment(invoiceReference).ConfigureAwait(false));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpPost("byadmin/reconcile")]

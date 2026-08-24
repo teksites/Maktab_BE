@@ -763,6 +763,52 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
+    public async Task SyncInvoicePayment_WhenTransactionAlreadyStored_ReturnsDuplicateWithoutAddingPayment()
+    {
+        var invoiceId = 63677012;
+        var transactionId = 47889843;
+        var invoiceNumber = "ORD-20260503-PAID";
+
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository
+            .Setup(repo => repo.GetByTransactionId(transactionId))
+            .ReturnsAsync(new List<HelcimTransactionResponse>
+            {
+                new()
+                {
+                    TransactionId = transactionId,
+                    InvoiceNumber = invoiceNumber
+                }
+            });
+
+        var sender = new Mock<IWebMsgSenderService>();
+        var responses = new Queue<string>(new[]
+        {
+            $"{{\"invoiceId\":{invoiceId},\"invoiceNumber\":\"{invoiceNumber}\",\"token\":\"cca8a4d3e05f1d91c28e94\",\"notes\":\"HELPAID\",\"dateCreated\":\"2026-05-03 11:42:08\",\"dateUpdated\":\"2026-05-03 11:42:09\",\"datePaid\":\"2026-05-03 11:42:09\",\"status\":\"PAID\",\"customerId\":40499452,\"amount\":99,\"amountPaid\":99,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"aaaaaaaa-1111-1111-1111-111111111111\",\"description\":\"127.0.0.1\",\"quantity\":1,\"price\":99,\"total\":99}}]}}",
+            $"[{{\"transactionId\":{transactionId},\"dateCreated\":\"2026-05-03 11:42:09\",\"cardBatchId\":6429263,\"status\":\"APPROVED\",\"user\":\"Helcim System\",\"type\":\"purchase\",\"amount\":99,\"currency\":\"CAD\",\"avsResponse\":\"X\",\"cvvResponse\":\"M\",\"cardType\":\"MC\",\"invoiceNumber\":\"{invoiceNumber}\",\"customerCode\":\"CST1010\",\"approvalCode\":\"T8E7ST\",\"cardToken\":\"zbsEjBVPQMmRs9I7EZTLEQ\",\"cardNumber\":\"5413330011\",\"cardHolderName\":\"malik ten\",\"warning\":\"\"}}]"
+        });
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync(() => responses.Dequeue());
+
+        var coursePaymentService = new Mock<ICoursePaymentService>();
+        var service = CreateService(
+            repository.Object,
+            sender.Object,
+            coursePaymentService: coursePaymentService.Object);
+
+        var result = await service.SyncInvoicePayment(invoiceId.ToString());
+
+        Assert.True(result.Success);
+        Assert.True(result.Duplicate);
+        Assert.Equal(invoiceId, result.InvoiceId);
+        Assert.Equal(transactionId, result.TransactionId);
+        Assert.Equal(invoiceNumber, result.InvoiceNumber);
+        repository.Verify(repo => repo.Add(It.IsAny<AddHelcimTransactionDetails>()), Times.Never);
+        coursePaymentService.Verify(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()), Times.Never);
+    }
+
+    [Fact]
     public async Task SyncInvoicePaymentByInvoiceId_ForAchInvoice_FetchesAchTransactionAndSavesPayment()
     {
         var invoiceId = 63677015;
@@ -1033,6 +1079,89 @@ public class HelcimTransactionServiceTests
         Assert.Equal("card", result.PaymentFlow);
         Assert.Equal($"https://api.helcim.com/v2/invoices/?invoiceNumber={Uri.EscapeDataString(invoiceNumber)}", capturedEndpoints[0]);
         Assert.Equal($"https://api.helcim.com/v2/card-transactions?invoiceNumber={Uri.EscapeDataString(invoiceNumber)}", capturedEndpoints[1]);
+        Assert.NotNull(capturedDetails);
+        Assert.Equal(paymentCode, capturedDetails!.PaymentCode);
+        Assert.NotNull(capturedPayment);
+        Assert.Equal(transactionId.ToString(), capturedPayment!.ExternalPaymentId);
+        Assert.Equal(PaymentMode.Helcim, capturedPayment.PaymentMode);
+    }
+
+    [Fact]
+    public async Task SyncInvoicePayment_WhenReferenceIsPaymentCode_ResolvesLatestInvoiceAndSyncsPayment()
+    {
+        const string paymentCode = "4B7SKG";
+        const int invoiceId = 71234001;
+        const int transactionId = 53000123;
+        const string invoiceNumber = "INV-4B7SKG-202608231830-1";
+        var studentTransactionId = Guid.Parse("cccccccc-1111-2222-3333-444444444444");
+        var familyId = Guid.Parse("dddddddd-1111-2222-3333-444444444444");
+
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository
+            .Setup(repo => repo.GetByPaymentCode(paymentCode))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+        repository
+            .Setup(repo => repo.GetByTransactionId(transactionId))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+
+        AddHelcimTransactionDetails? capturedDetails = null;
+        repository
+            .Setup(repo => repo.Add(It.IsAny<AddHelcimTransactionDetails>()))
+            .Callback<AddHelcimTransactionDetails>(details => capturedDetails = details)
+            .Returns(Task.CompletedTask);
+
+        var sender = new Mock<IWebMsgSenderService>();
+        var capturedEndpoints = new List<string>();
+        var responses = new Queue<string>(new[]
+        {
+            "[]",
+            $"[{{\"transactionId\":{transactionId},\"dateCreated\":\"2026-08-23 18:35:00\",\"cardBatchId\":6801809,\"status\":\"APPROVED\",\"user\":\"Helcim System\",\"type\":\"purchase\",\"amount\":150,\"currency\":\"CAD\",\"avsResponse\":\"Y\",\"cvvResponse\":\"M\",\"cardType\":\"VI\",\"invoiceNumber\":\"{invoiceNumber}\",\"customerCode\":\"CST1001\",\"approvalCode\":\"APPROVED1\",\"cardToken\":\"token-1\",\"cardNumber\":\"4111111111\",\"cardHolderName\":\"test user\"}}]",
+            "[]",
+            $"[{{\"invoiceId\":{invoiceId},\"invoiceNumber\":\"{invoiceNumber}\",\"token\":\"tok-4b7skg\",\"notes\":\"{paymentCode}\",\"dateCreated\":\"2026-08-23 18:30:00\",\"dateUpdated\":\"2026-08-23 18:35:01\",\"datePaid\":\"2026-08-23 18:35:01\",\"status\":\"PAID\",\"customerId\":40499452,\"amount\":150.00,\"amountPaid\":150.00,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"{studentTransactionId}\",\"description\":\"127.0.0.1\",\"quantity\":1,\"price\":150.00,\"total\":150.00}}]}}]",
+            $"[{{\"transactionId\":{transactionId},\"dateCreated\":\"2026-08-23 18:35:00\",\"cardBatchId\":6801809,\"status\":\"APPROVED\",\"user\":\"Helcim System\",\"type\":\"purchase\",\"amount\":150,\"currency\":\"CAD\",\"avsResponse\":\"Y\",\"cvvResponse\":\"M\",\"cardType\":\"VI\",\"invoiceNumber\":\"{invoiceNumber}\",\"customerCode\":\"CST1001\",\"approvalCode\":\"APPROVED1\",\"cardToken\":\"token-1\",\"cardNumber\":\"4111111111\",\"cardHolderName\":\"test user\"}}]"
+        });
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .Callback<JsonMessageData, InternalContracts.IClientConfiguration, HttpMethod>((payload, _, _) => capturedEndpoints.Add(payload.ExternalEndpoint))
+            .ReturnsAsync(() => responses.Dequeue());
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransactionByPaymentCode(paymentCode))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                PaymentCode = paymentCode,
+                CreatedAt = new DateTime(2026, 8, 23, 18, 20, 0, DateTimeKind.Utc)
+            });
+
+        AddCoursePayment? capturedPayment = null;
+        var coursePaymentService = new Mock<ICoursePaymentService>();
+        coursePaymentService
+            .Setup(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()))
+            .Callback<AddCoursePayment>(payment => capturedPayment = payment)
+            .ReturnsAsync((new CoursePaymentResponse(), true));
+
+        var service = CreateService(
+            repository.Object,
+            sender.Object,
+            studentCourseTransactionService: studentCourseTransactionService.Object,
+            coursePaymentService: coursePaymentService.Object);
+
+        var result = await service.SyncInvoicePayment(paymentCode);
+
+        Assert.True(result.Success);
+        Assert.False(result.Duplicate);
+        Assert.Equal(invoiceId, result.InvoiceId);
+        Assert.Equal(transactionId, result.TransactionId);
+        Assert.Equal(invoiceNumber, result.InvoiceNumber);
+        Assert.Equal("card", result.PaymentFlow);
+        Assert.Equal($"https://api.helcim.com/v2/invoices/?invoiceNumber={Uri.EscapeDataString(paymentCode)}", capturedEndpoints[0]);
+        Assert.Contains("/card-transactions?dateFrom=2026-08-22", capturedEndpoints[1]);
+        Assert.Contains("/ach/transactions?startDate=2026-08-22", capturedEndpoints[2]);
+        Assert.Equal($"https://api.helcim.com/v2/invoices/?invoiceNumber={Uri.EscapeDataString(invoiceNumber)}", capturedEndpoints[3]);
+        Assert.Equal($"https://api.helcim.com/v2/card-transactions?invoiceNumber={Uri.EscapeDataString(invoiceNumber)}", capturedEndpoints[4]);
         Assert.NotNull(capturedDetails);
         Assert.Equal(paymentCode, capturedDetails!.PaymentCode);
         Assert.NotNull(capturedPayment);
@@ -1777,6 +1906,23 @@ public class HelcimTransactionServiceTests
         SetupWebhookProcessingDefaults(repository);
         repository
             .SetupSequence(repo => repo.GetByTransactionId(transactionId))
+            .ReturnsAsync(new List<HelcimTransactionResponse>())
+            .ReturnsAsync(new List<HelcimTransactionResponse>
+            {
+                new()
+                {
+                    TransactionId = transactionId,
+                    InvoiceNumber = "ORD-20260503-RACE"
+                }
+            })
+            .ReturnsAsync(new List<HelcimTransactionResponse>
+            {
+                new()
+                {
+                    TransactionId = transactionId,
+                    InvoiceNumber = "ORD-20260503-RACE"
+                }
+            })
             .ReturnsAsync(new List<HelcimTransactionResponse>())
             .ReturnsAsync(new List<HelcimTransactionResponse>
             {

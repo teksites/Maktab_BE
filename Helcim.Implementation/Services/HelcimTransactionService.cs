@@ -124,8 +124,7 @@ namespace Helcim.Implementation.Services
             }
 
             var paymentFlow = IsAchTransactionResponse(responseData) ? "ach" : "card";
-            var existingTransactions = await _repository.GetByTransactionId(transactionId).ConfigureAwait(false)
-                ?? new List<HelcimTransactionResponse>();
+            var existingTransactions = await GetStoredTransactionsByIdAsync(transactionId).ConfigureAwait(false);
             if (existingTransactions.Any())
             {
                 return new HelcimPaymentCompletionResponse
@@ -203,6 +202,19 @@ namespace Helcim.Implementation.Services
         public async Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceId(int invoiceId)
             => await SyncInvoicePaymentByInvoiceIdInternal(invoiceId, null).ConfigureAwait(false);
 
+        public async Task<HelcimPaymentCompletionResponse> SyncInvoicePayment(string invoiceReference)
+        {
+            if (string.IsNullOrWhiteSpace(invoiceReference))
+            {
+                throw new ArgumentException("Invoice reference is required.", nameof(invoiceReference));
+            }
+
+            var normalizedReference = invoiceReference.Trim();
+            return int.TryParse(normalizedReference, out var invoiceId)
+                ? await SyncInvoicePaymentByInvoiceId(invoiceId).ConfigureAwait(false)
+                : await SyncInvoicePaymentByInvoiceNumber(normalizedReference).ConfigureAwait(false);
+        }
+
         public async Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceNumber(string invoiceNumber)
         {
             if (string.IsNullOrWhiteSpace(invoiceNumber))
@@ -247,8 +259,7 @@ namespace Helcim.Implementation.Services
 
                 foreach (var cardTransaction in cardTransactions)
                 {
-                    var existingTransactions = await _repository.GetByTransactionId(cardTransaction.TransactionId).ConfigureAwait(false)
-                        ?? new List<HelcimTransactionResponse>();
+                    var existingTransactions = await GetStoredTransactionsByIdAsync(cardTransaction.TransactionId).ConfigureAwait(false);
                     if (HasCompletedTransactionDetails(existingTransactions))
                     {
                         response.SkippedDuplicates++;
@@ -296,8 +307,7 @@ namespace Helcim.Implementation.Services
 
                 foreach (var achLookup in achTransactions)
                 {
-                    var existingTransactions = await _repository.GetByTransactionId(achLookup.Transaction.TransactionId).ConfigureAwait(false)
-                        ?? new List<HelcimTransactionResponse>();
+                    var existingTransactions = await GetStoredTransactionsByIdAsync(achLookup.Transaction.TransactionId).ConfigureAwait(false);
                     if (HasCompletedTransactionDetails(existingTransactions))
                     {
                         response.SkippedDuplicates++;
@@ -698,8 +708,7 @@ namespace Helcim.Implementation.Services
             {
                 if (transactionId.HasValue)
                 {
-                    var existingTransactions = await _repository.GetByTransactionId(transactionId.Value).ConfigureAwait(false)
-                        ?? new List<HelcimTransactionResponse>();
+                    var existingTransactions = await GetStoredTransactionsByIdAsync(transactionId.Value).ConfigureAwait(false);
                     if (HasCompletedTransactionDetails(existingTransactions))
                     {
                         await UpdateWebhookProcessing(
@@ -1322,8 +1331,7 @@ namespace Helcim.Implementation.Services
                 return resolvedTransaction;
             }
 
-            var storedTransactions = await _repository.GetByTransactionId(helcimTransactionId).ConfigureAwait(false)
-                ?? new List<HelcimTransactionResponse>();
+            var storedTransactions = await GetStoredTransactionsByIdAsync(helcimTransactionId).ConfigureAwait(false);
             foreach (var storedTransaction in storedTransactions)
             {
                 resolvedTransaction = await ResolveLocalTransactionByIdentifiersAsync(
@@ -1364,8 +1372,145 @@ namespace Helcim.Implementation.Services
 
         private async Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceNumberAsync(string invoiceNumber, string? webhookRawBody)
         {
-            var invoice = await GetInvoiceByInvoiceNumber(invoiceNumber).ConfigureAwait(false);
+            var invoice = await ResolveInvoiceByReferenceAsync(invoiceNumber).ConfigureAwait(false);
             return await SyncInvoicePaymentInternal(invoice, webhookRawBody).ConfigureAwait(false);
+        }
+
+        private async Task<HelcimInvoiceResponse> ResolveInvoiceByReferenceAsync(string invoiceReference)
+        {
+            var directInvoice = await TryGetInvoiceByInvoiceNumber(invoiceReference).ConfigureAwait(false);
+            if (directInvoice != null)
+            {
+                return directInvoice;
+            }
+
+            var invoiceFromPaymentCode = await TryResolveInvoiceByPaymentCodeAsync(invoiceReference).ConfigureAwait(false);
+            if (invoiceFromPaymentCode != null)
+            {
+                return invoiceFromPaymentCode;
+            }
+
+            throw new InvalidOperationException(
+                $"No Helcim invoice could be found for reference {invoiceReference}. The value must be a valid invoice id, invoice number, or payment code.");
+        }
+
+        private async Task<HelcimInvoiceResponse?> TryGetInvoiceByInvoiceNumber(string invoiceNumber)
+        {
+            try
+            {
+                return await GetInvoiceByInvoiceNumber(invoiceNumber).ConfigureAwait(false);
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+        }
+
+        private async Task<HelcimInvoiceResponse?> TryResolveInvoiceByPaymentCodeAsync(string paymentCode)
+        {
+            if (string.IsNullOrWhiteSpace(paymentCode))
+            {
+                return null;
+            }
+
+            var normalizedPaymentCode = paymentCode.Trim();
+            var storedInvoiceNumber = await TryResolveStoredInvoiceNumberByPaymentCodeAsync(normalizedPaymentCode).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(storedInvoiceNumber))
+            {
+                return await GetInvoiceByInvoiceNumber(storedInvoiceNumber).ConfigureAwait(false);
+            }
+
+            var localTransaction = await _studentCourseTransactionService
+                .GetTransactionByPaymentCode(normalizedPaymentCode)
+                .ConfigureAwait(false);
+            if (localTransaction == null)
+            {
+                return null;
+            }
+
+            var matchingInvoiceNumber = await TryResolveLiveInvoiceNumberByPaymentCodeAsync(
+                normalizedPaymentCode,
+                localTransaction.CreatedAt).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(matchingInvoiceNumber))
+            {
+                return null;
+            }
+
+            return await GetInvoiceByInvoiceNumber(matchingInvoiceNumber).ConfigureAwait(false);
+        }
+
+        private async Task<string?> TryResolveStoredInvoiceNumberByPaymentCodeAsync(string paymentCode)
+        {
+            var storedTransactions = await _repository.GetByPaymentCode(paymentCode).ConfigureAwait(false)
+                ?? new List<HelcimTransactionResponse>();
+
+            return storedTransactions
+                .Where(transaction => MatchesPaymentCodeInvoiceNumber(transaction.InvoiceNumber, paymentCode))
+                .OrderByDescending(transaction => transaction.TransactionId)
+                .ThenByDescending(transaction => transaction.CreatedAt ?? DateTime.MinValue)
+                .Select(transaction => transaction.InvoiceNumber)
+                .FirstOrDefault(invoiceNumber => !string.IsNullOrWhiteSpace(invoiceNumber));
+        }
+
+        private async Task<string?> TryResolveLiveInvoiceNumberByPaymentCodeAsync(string paymentCode, DateTime transactionCreatedAt)
+        {
+            var startDate = ResolvePaymentCodeSearchStartDate(transactionCreatedAt);
+            var endDate = DateTime.UtcNow.Date;
+
+            var cardTransactions = await GetCardTransactionsForReconciliation(startDate, endDate).ConfigureAwait(false);
+            var latestCardTransaction = cardTransactions
+                .Where(transaction => MatchesPaymentCodeInvoiceNumber(transaction.InvoiceNumber, paymentCode))
+                .OrderByDescending(transaction => transaction.TransactionId)
+                .ThenByDescending(transaction => transaction.DateCreated ?? DateTime.MinValue)
+                .FirstOrDefault();
+
+            var achTransactions = await GetAchTransactionsForReconciliation(startDate, endDate).ConfigureAwait(false);
+            var latestAchTransaction = achTransactions
+                .Where(transaction => MatchesPaymentCodeInvoiceNumber(
+                    transaction.Transaction.InvoiceNumber ?? transaction.Transaction.OrderNumber,
+                    paymentCode))
+                .OrderByDescending(transaction => transaction.Transaction.TransactionId)
+                .ThenByDescending(transaction => transaction.Transaction.DateCreated ?? DateTime.MinValue)
+                .FirstOrDefault();
+
+            if (latestCardTransaction == null && latestAchTransaction == null)
+            {
+                return null;
+            }
+
+            if (latestCardTransaction != null
+                && (latestAchTransaction == null
+                    || latestCardTransaction.TransactionId >= latestAchTransaction.Transaction.TransactionId))
+            {
+                return latestCardTransaction.InvoiceNumber;
+            }
+
+            return latestAchTransaction?.Transaction.InvoiceNumber
+                ?? latestAchTransaction?.Transaction.OrderNumber;
+        }
+
+        private static DateTime ResolvePaymentCodeSearchStartDate(DateTime transactionCreatedAt)
+        {
+            if (transactionCreatedAt == default)
+            {
+                return DateTime.UtcNow.Date.AddDays(-90);
+            }
+
+            return transactionCreatedAt.Kind == DateTimeKind.Utc
+                ? transactionCreatedAt.Date.AddDays(-1)
+                : transactionCreatedAt.ToUniversalTime().Date.AddDays(-1);
+        }
+
+        private static bool MatchesPaymentCodeInvoiceNumber(string? invoiceNumber, string paymentCode)
+        {
+            if (string.IsNullOrWhiteSpace(invoiceNumber) || string.IsNullOrWhiteSpace(paymentCode))
+            {
+                return false;
+            }
+
+            var normalizedPaymentCode = paymentCode.Trim();
+            return invoiceNumber.StartsWith($"INV-{normalizedPaymentCode}-", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(invoiceNumber, normalizedPaymentCode, StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<CardTransactionLookup?> TryGetCardTransactionById(int transactionId)
@@ -1604,8 +1749,7 @@ namespace Helcim.Implementation.Services
             HelcimCardTransactionResponse cardTransaction,
             string? webhookRawBody)
         {
-            var existingTransactions = await _repository.GetByTransactionId(cardTransaction.TransactionId).ConfigureAwait(false)
-                ?? new List<HelcimTransactionResponse>();
+            var existingTransactions = await GetStoredTransactionsByIdAsync(cardTransaction.TransactionId).ConfigureAwait(false);
             if (HasCompletedTransactionDetails(existingTransactions))
             {
                 return CreatePaymentCompletionResponse(invoice, cardTransaction.TransactionId, "card", duplicate: true);
@@ -1625,7 +1769,11 @@ namespace Helcim.Implementation.Services
                 webhookRawBody,
                 existingDetailedTransaction);
 
-            await SaveTransactionDetailsAsync(transactionDetails, existingTransactions.Any()).ConfigureAwait(false);
+            var duplicateDetected = await SaveTransactionDetailsAsync(transactionDetails, existingTransactions.Any()).ConfigureAwait(false);
+            if (duplicateDetected)
+            {
+                return CreatePaymentCompletionResponse(invoice, cardTransaction.TransactionId, "card", duplicate: true);
+            }
 
             return CreatePaymentCompletionResponse(invoice, cardTransaction.TransactionId, "card", duplicate: false);
         }
@@ -1638,8 +1786,7 @@ namespace Helcim.Implementation.Services
             HelcimAchTransactionResponse achTransaction,
             string? webhookRawBody)
         {
-            var existingTransactions = await _repository.GetByTransactionId(achTransaction.TransactionId).ConfigureAwait(false)
-                ?? new List<HelcimTransactionResponse>();
+            var existingTransactions = await GetStoredTransactionsByIdAsync(achTransaction.TransactionId).ConfigureAwait(false);
             if (HasCompletedTransactionDetails(existingTransactions))
             {
                 return CreatePaymentCompletionResponse(invoice, achTransaction.TransactionId, "ach", duplicate: true);
@@ -1666,7 +1813,11 @@ namespace Helcim.Implementation.Services
                 webhookRawBody,
                 existingDetailedTransaction);
 
-            await SaveTransactionDetailsAsync(transactionDetails, existingTransactions.Any()).ConfigureAwait(false);
+            var duplicateDetected = await SaveTransactionDetailsAsync(transactionDetails, existingTransactions.Any()).ConfigureAwait(false);
+            if (duplicateDetected)
+            {
+                return CreatePaymentCompletionResponse(invoice, achTransaction.TransactionId, "ach", duplicate: true);
+            }
 
             return CreatePaymentCompletionResponse(invoice, achTransaction.TransactionId, "ach", duplicate: false);
         }
@@ -1868,8 +2019,7 @@ namespace Helcim.Implementation.Services
             string? invoiceNumber,
             bool isAch)
         {
-            var existingTransactions = await _repository.GetByTransactionId(transactionId).ConfigureAwait(false)
-                ?? new List<HelcimTransactionResponse>();
+            var existingTransactions = await GetStoredTransactionsByIdAsync(transactionId).ConfigureAwait(false);
             if (HasCompletedTransactionDetails(existingTransactions))
             {
                 return;
@@ -1916,25 +2066,75 @@ namespace Helcim.Implementation.Services
             await SaveTransactionDetailsAsync(placeholder, existingTransactions.Any()).ConfigureAwait(false);
         }
 
+        private async Task<List<HelcimTransactionResponse>> GetStoredTransactionsByIdAsync(int transactionId)
+        {
+            var getTransactionsTask = _repository.GetByTransactionId(transactionId);
+            if (getTransactionsTask == null)
+            {
+                return new List<HelcimTransactionResponse>();
+            }
+
+            return await getTransactionsTask.ConfigureAwait(false) ?? new List<HelcimTransactionResponse>();
+        }
+
         private async Task<HelcimTransactionResponseDetailed?> GetExistingDetailedTransactionAsync(int transactionId)
         {
-            var transactions = await _repository.GetDetailedByTransactionId(transactionId).ConfigureAwait(false);
+            var getDetailedTask = _repository.GetDetailedByTransactionId(transactionId);
+            if (getDetailedTask == null)
+            {
+                return null;
+            }
+
+            var transactions = await getDetailedTask.ConfigureAwait(false);
             return transactions?.FirstOrDefault();
         }
 
-        private async Task SaveTransactionDetailsAsync(AddHelcimTransactionDetails transactionDetails, bool updateExisting)
+        private async Task<bool> SaveTransactionDetailsAsync(AddHelcimTransactionDetails transactionDetails, bool updateExisting)
         {
             if (updateExisting)
             {
                 await _repository.Update(transactionDetails).ConfigureAwait(false);
-                return;
+                return false;
             }
 
-            await _repository.Add(transactionDetails).ConfigureAwait(false);
+            try
+            {
+                await _repository.Add(transactionDetails).ConfigureAwait(false);
+                return false;
+            }
+            catch (Exception ex) when (LooksLikeDuplicateTransactionInsert(ex))
+            {
+                var existingTransactions = await GetStoredTransactionsByIdAsync(transactionDetails.TransactionId).ConfigureAwait(false);
+                if (HasCompletedTransactionDetails(existingTransactions))
+                {
+                    return true;
+                }
+
+                throw;
+            }
         }
 
         private static bool HasCompletedTransactionDetails(IEnumerable<HelcimTransactionResponse> existingTransactions)
             => existingTransactions.Any(transaction => !IsPlaceholderTransaction(transaction));
+
+        private static bool LooksLikeDuplicateTransactionInsert(Exception exception)
+        {
+            var current = exception;
+            while (current != null)
+            {
+                var message = current.Message ?? string.Empty;
+                if (message.Contains("Duplicate", StringComparison.OrdinalIgnoreCase)
+                    || message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase)
+                    || message.Contains("PRIMARY", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                current = current.InnerException!;
+            }
+
+            return false;
+        }
 
         private static bool IsPlaceholderTransaction(HelcimTransactionResponse transaction)
             => string.Equals(transaction.CardType, RawWebhookPlaceholderCardType, StringComparison.OrdinalIgnoreCase)
