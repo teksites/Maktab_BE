@@ -629,16 +629,13 @@ namespace Helcim.Implementation.Services
                 }
             }
 
-            var achTransactionLookup = await TryGetAchTransactionByInvoiceId(invoice).ConfigureAwait(false);
-            if (achTransactionLookup != null)
+            var achCompletion = await TrySyncAchTransactionsByInvoiceAsync(
+                invoice,
+                localTransaction,
+                webhookRawBody).ConfigureAwait(false);
+            if (achCompletion != null)
             {
-                return await SaveAchTransactionDetailsAsync(
-                    invoice,
-                    localTransaction,
-                    achTransactionLookup.TransactionData,
-                    achTransactionLookup.TransactionRaw,
-                    achTransactionLookup.Transaction,
-                    webhookRawBody).ConfigureAwait(false);
+                return achCompletion;
             }
 
             throw new InvalidOperationException(
@@ -1239,8 +1236,7 @@ namespace Helcim.Implementation.Services
                 && ShouldApplyInvoicePayment(invoice, MapPaymentType(cardTransaction.Type));
 
         private static bool ShouldApplyAchPayment(HelcimInvoiceResponse invoice, HelcimAchTransactionResponse achTransaction)
-            => IsAchSettled(achTransaction)
-                && ShouldApplyInvoicePayment(invoice, MapAchPaymentType(achTransaction));
+            => IsAchSettled(achTransaction);
 
         private static bool ShouldApplyInvoicePayment(HelcimInvoiceResponse invoice, PaymentType paymentType)
             => paymentType == PaymentType.Refund
@@ -1601,6 +1597,64 @@ namespace Helcim.Implementation.Services
                 Transaction = achTransaction,
                 TransactionData = singleTransactionData,
                 TransactionRaw = achTransactionRaw
+            };
+        }
+
+        private async Task<HelcimPaymentCompletionResponse?> TrySyncAchTransactionsByInvoiceAsync(
+            HelcimInvoiceResponse invoice,
+            StudentCourseTransactionResponse? localTransaction,
+            string? webhookRawBody)
+        {
+            var matchedTransactions = await GetAchTransactionsByInvoiceAsync(invoice).ConfigureAwait(false);
+            if (matchedTransactions.Count == 0)
+            {
+                return null;
+            }
+
+            var orderedTransactions = matchedTransactions
+                .OrderBy(lookup => lookup.Transaction.DateCreated ?? lookup.Transaction.DateClosed ?? DateTime.MinValue)
+                .ThenBy(lookup => IsAchRefundTransaction(lookup.Transaction) ? 1 : 0)
+                .ThenBy(lookup => lookup.Transaction.TransactionId)
+                .ToList();
+
+            HelcimPaymentCompletionResponse? lastCompletion = null;
+            var anyStored = false;
+
+            foreach (var transactionLookup in orderedTransactions)
+            {
+                var detailedLookup = await TryGetAchTransactionByTransactionId(transactionLookup.Transaction.TransactionId).ConfigureAwait(false)
+                    ?? transactionLookup;
+
+                var completion = await SaveAchTransactionDetailsAsync(
+                    invoice,
+                    localTransaction,
+                    detailedLookup.TransactionData,
+                    detailedLookup.TransactionRaw,
+                    detailedLookup.Transaction,
+                    webhookRawBody).ConfigureAwait(false);
+
+                anyStored |= !completion.Duplicate;
+                lastCompletion = completion;
+            }
+
+            if (lastCompletion == null)
+            {
+                return null;
+            }
+
+            if (anyStored || !lastCompletion.Duplicate)
+            {
+                return lastCompletion;
+            }
+
+            return new HelcimPaymentCompletionResponse
+            {
+                Success = lastCompletion.Success,
+                Duplicate = true,
+                InvoiceId = lastCompletion.InvoiceId,
+                TransactionId = lastCompletion.TransactionId,
+                InvoiceNumber = lastCompletion.InvoiceNumber,
+                PaymentFlow = lastCompletion.PaymentFlow
             };
         }
 
