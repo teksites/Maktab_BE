@@ -690,7 +690,9 @@ namespace Application.Users.Implementation
             await EnsureUniqueUserIdentityAsync(
                 userId,
                 mergedUserName,
-                mergedEmail).ConfigureAwait(false);
+                mergedEmail,
+                currentUser.UserName,
+                currentUser.Email).ConfigureAwait(false);
 
             return new AdminUpdateUserInformation
             {
@@ -712,8 +714,20 @@ namespace Application.Users.Implementation
             };
         }
 
-        private async Task EnsureUniqueUserIdentityAsync(Guid excludedUserId, string userName, string email)
+        private async Task EnsureUniqueUserIdentityAsync(
+            Guid excludedUserId,
+            string userName,
+            string email,
+            string? currentUserName = null,
+            string? currentEmail = null)
         {
+            var shouldValidateUserName = !AreSameIdentityValue(userName, currentUserName);
+            var shouldValidateEmail = !AreSameIdentityValue(email, currentEmail);
+            if (!shouldValidateUserName && !shouldValidateEmail)
+            {
+                return;
+            }
+
             var usersTask = _repository.GetAllUsersInformation(false);
             var tempUsersTask = _tempUserRepository.GetAllTempUsersInformation(false);
 
@@ -722,20 +736,26 @@ namespace Application.Users.Implementation
             var allUsers = (await usersTask.ConfigureAwait(false) ?? Enumerable.Empty<UserInformation>())
                 .Concat(await tempUsersTask.ConfigureAwait(false) ?? Enumerable.Empty<UserInformation>());
 
-            if (allUsers.Any(user =>
+            if (shouldValidateUserName && allUsers.Any(user =>
                     user.UserId != excludedUserId &&
                     string.Equals(user.UserName?.Trim(), userName, StringComparison.OrdinalIgnoreCase)))
             {
                 throw new InvalidOperationException("Username is already added and duplicate usernames can't be added");
             }
 
-            if (allUsers.Any(user =>
+            if (shouldValidateEmail && allUsers.Any(user =>
                     user.UserId != excludedUserId &&
                     string.Equals(user.Email?.Trim(), email, StringComparison.OrdinalIgnoreCase)))
             {
                 throw new InvalidOperationException("Email is already added and duplicate emails can't be added");
             }
         }
+
+        private static bool AreSameIdentityValue(string newValue, string? currentValue)
+            => string.Equals(
+                newValue?.Trim(),
+                currentValue?.Trim(),
+                StringComparison.OrdinalIgnoreCase);
 
         private static IEnumerable<UserInformation> ApplyParentRelationshipPrecedence(IEnumerable<UserInformation> familyUsers)
         {

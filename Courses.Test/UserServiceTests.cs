@@ -403,6 +403,93 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task AdminUpdateUser_AllowsUnchangedEmailWhenPendingDuplicateRecordExists()
+    {
+        var userId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        AdminUpdateUserInformation? capturedUpdate = null;
+
+        var currentUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = familyId,
+            FirstName = "Current",
+            LastName = "User",
+            Email = "current@example.com",
+            Phone = "5555555555",
+            UserName = "current-user",
+            Password = "existing-hash",
+            IsActive = true,
+            Relationship = Relationship.Teacher,
+            UserRole = UserRoleType.Normal
+        };
+
+        var updatedUser = new UserInformation
+        {
+            UserId = userId,
+            FamilyId = familyId,
+            FirstName = "Updated",
+            LastName = "User",
+            Email = "current@example.com",
+            Phone = "7777777777",
+            UserName = "current-user",
+            Password = "existing-hash",
+            IsActive = true,
+            Relationship = Relationship.Teacher,
+            UserRole = UserRoleType.Normal
+        };
+
+        var userRepository = new Mock<IUserRepository>();
+        userRepository
+            .Setup(repo => repo.GetUserInformation(userId))
+            .ReturnsAsync(currentUser);
+        userRepository
+            .Setup(repo => repo.GetAllUsersInformation(false))
+            .ReturnsAsync(new[] { currentUser });
+        userRepository
+            .Setup(repo => repo.UpdateAdminUser(It.IsAny<AdminUpdateUserInformation>()))
+            .Callback<AdminUpdateUserInformation>(request => capturedUpdate = request)
+            .ReturnsAsync(updatedUser);
+
+        var tempUserRepository = new Mock<ITempUserRepository>();
+        tempUserRepository
+            .Setup(repo => repo.GetAllTempUsersInformation(false))
+            .ReturnsAsync(new[]
+            {
+                new UserInformation
+                {
+                    UserId = Guid.NewGuid(),
+                    FamilyId = familyId,
+                    FirstName = "Pending",
+                    LastName = "Duplicate",
+                    Email = "current@example.com",
+                    Phone = "6666666666",
+                    UserName = "pending-duplicate",
+                    IsActive = true,
+                    Relationship = Relationship.Mother,
+                    UserRole = UserRoleType.Normal
+                }
+            });
+
+        var service = CreateUserService(
+            userRepository: userRepository,
+            tempUserRepository: tempUserRepository);
+
+        var result = await service.AdminUpdateUser(userId, new AdminUpdateUserRequest
+        {
+            FirstName = "Updated",
+            Phone = "7777777777"
+        });
+
+        Assert.NotNull(result);
+        Assert.NotNull(capturedUpdate);
+        Assert.Equal("current@example.com", capturedUpdate!.Email);
+        Assert.Equal("current-user", capturedUpdate.UserName);
+        Assert.Equal("7777777777", capturedUpdate.Phone);
+        userRepository.Verify(repo => repo.UpdateAdminUser(It.IsAny<AdminUpdateUserInformation>()), Times.Once);
+    }
+
+    [Fact]
     public async Task AddTemporaryUser_RejectsDuplicateMotherForFamily()
     {
         var familyId = Guid.NewGuid();

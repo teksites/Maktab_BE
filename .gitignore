@@ -215,6 +215,12 @@
 /.tmp-cloudflared-new-out.log
 /.tmp-host-fetchAdults-err.log
 /.tmp-host-fetchAdults-out.log
+/reports/
+/weekly_tasks/
+/weekly-task/
+/redmine/
+/blog_posts/
+/blog-posts/
 /Zeffy/bin/Debug/net8.0/Zeffy.deps.json
 /Zeffy/bin/Debug/net8.0/Zeffy.deps.json
 /Helcim.Repository.Implementation/Scripts/AlterHelcimTransactionPrimaryKeyToTransactionId.sql
