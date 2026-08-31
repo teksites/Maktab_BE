@@ -91,22 +91,16 @@ namespace Courses.Implementation.Services
                 throw new Exception("Course enrollment group not found");
             }
 
+            if (!enrollmentGroupState.IfRegistrationOpen)
+            {
+                throw new Exception("The registration is closed. Contact Admin please");
+            }
+
             var occupiedSeatCount = GetOccupiedSeatCount(enrollmentGroupState.EnrollmentStatusCount);
 
             var canRegister = !course.IsManualEnrollment &&
-                enrollmentGroupState.IfRegistrationOpen &&
                 occupiedSeatCount < enrollmentGroupState.MaxStudents;
             enrollment.EnrollmentStatus = canRegister ? EnrollmentStatus.Enrolled : EnrollmentStatus.Awaiting;
-            
-            if (ifAddedByAdmin)
-            {
-                canRegister = true;
-            }
-
-            if (canRegister && enrollmentGroupState.IfRegistrationOpen && occupiedSeatCount + 1 >= enrollmentGroupState.MaxStudents)
-            {
-                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroupState.CourseEnrollmentGroupId, false).ConfigureAwait(false);
-            }
 
             var selectedCourseEnrollmentGroup = course.CourseEnrollmentGroups.FirstOrDefault(g => g.CourseEnrollmentGroupId == enrollment.CourseEnrollmentGroupId);
 
@@ -212,7 +206,10 @@ namespace Courses.Implementation.Services
                     (addStudentCourseTransaction.FeeAmountDiscount + addStudentCourseTransaction.DayCareDiscount) +
                     Convert.ToDecimal(addStudentCourseTransaction.Surcharge);
                 var activePolicies = await _policyService.GetAllPolicies(course.InstituteId).ConfigureAwait(false);
-                var activeFeePaymentPolicy = activePolicies.FirstOrDefault(p => p.IsActive && p.PolicyType == PolicyType.CourseFeePayment);
+                var activeFeePaymentPolicy = activePolicies.FirstOrDefault(
+                    p => p.IsActive &&
+                         p.PolicyType == PolicyType.CourseFeePayment &&
+                         p.CourseId == course.CourseId);
                 var (feePolicy, feePaymentPolicyFound) = ParseValidatedFeePaymentPolicy(activeFeePaymentPolicy?.Details);
                 addStudentCourseTransaction.FeeInstallments = BuildFeeInstallments(
                     addStudentCourseTransaction.TotalPayable - course.RegistrationFee,// exclude registration fee from installments
@@ -986,28 +983,6 @@ namespace Courses.Implementation.Services
                 return new EnrollmentUpdateExecutionResult { Success = false };
             }
 
-            if (isMovingIntoSeatHoldingStatus && enrollmentGroup != null)
-            {
-                var enrollmentGroupState = await GetCourseEnrollmentGroupInformation(enrollmentDetails.CourseEnrollmentGroupId).ConfigureAwait(false);
-                if (enrollmentGroupState != null)
-                {
-                    var occupiedSeatCount = GetOccupiedSeatCount(enrollmentGroupState.EnrollmentStatusCount);
-                    if (enrollmentGroupState.IfRegistrationOpen && occupiedSeatCount >= enrollmentGroupState.MaxStudents)
-                    {
-                        await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, false).ConfigureAwait(false);
-                    }
-                }
-            }
-
-            if (HoldsSeat(enrollmentStatus) &&
-                !HoldsSeat(enrollment.EnrollmentStatus) &&
-                enrollment.EnrollmentStatus != enrollmentStatus &&
-                enrollmentGroup != null &&
-                !enrollmentGroup.IfRegistrationOpen)
-            {
-                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
-            }
-
             var statusChanged = enrollment.EnrollmentStatus != enrollmentStatus;
             var result = new EnrollmentUpdateExecutionResult
             {
@@ -1337,14 +1312,6 @@ namespace Courses.Implementation.Services
             if (!ifDeleted || !ifEnrollmentDeleted)
             {
                 return false;
-            }
-
-            // If a confirmed-seat enrollment is removed, reopen the group when it had been closed for capacity.
-            if (enrollmentGroup != null &&
-                HoldsSeat(previousEnrollmentStatus) &&
-                !enrollmentGroup.IfRegistrationOpen)
-            {
-                await _courseEnrollmentGroupService.SetCourseGroupRegistrationStatus(enrollmentGroup.CourseEnrollmentGroupId, true).ConfigureAwait(false);
             }
 
             if (familyTransaction == null)

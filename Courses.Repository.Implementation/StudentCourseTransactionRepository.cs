@@ -261,6 +261,7 @@ namespace Courses.Repository.Implementation
                     ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.ArabicName AS ChildArabicName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
                     ci.DateOfBirth AS ChildDateOfBirth,
                     ci.Gender AS ChildGender,
@@ -355,6 +356,7 @@ namespace Courses.Repository.Implementation
                     ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.ArabicName AS ChildArabicName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
                     ci.DateOfBirth AS ChildDateOfBirth,
                     ci.Gender AS ChildGender,
@@ -582,6 +584,7 @@ namespace Courses.Repository.Implementation
                     ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.ArabicName AS ChildArabicName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
                     ci.DateOfBirth AS ChildDateOfBirth,
                     ci.Gender AS ChildGender,
@@ -677,6 +680,7 @@ namespace Courses.Repository.Implementation
                     ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.ArabicName AS ChildArabicName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
                     ci.DateOfBirth AS ChildDateOfBirth,
                     ci.Gender AS ChildGender,
@@ -764,6 +768,7 @@ namespace Courses.Repository.Implementation
                     ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.ArabicName AS ChildArabicName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
                     ci.DateOfBirth AS ChildDateOfBirth,
                     ci.Gender AS ChildGender,
@@ -854,6 +859,7 @@ namespace Courses.Repository.Implementation
                     ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.ArabicName AS ChildArabicName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
                     ci.DateOfBirth AS ChildDateOfBirth,
                     ci.Gender AS ChildGender,
@@ -944,6 +950,7 @@ namespace Courses.Repository.Implementation
                     ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.ArabicName AS ChildArabicName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
                     ci.DateOfBirth AS ChildDateOfBirth,
                     ci.Gender AS ChildGender,
@@ -1031,6 +1038,7 @@ namespace Courses.Repository.Implementation
                     ceg.GroupIndex AS GroupIndex,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.ArabicName AS ChildArabicName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
                     ci.DateOfBirth AS ChildDateOfBirth,
                     ci.Gender AS ChildGender,
@@ -1196,6 +1204,7 @@ namespace Courses.Repository.Implementation
                     ins.Name AS InstituteName,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.ArabicName AS ChildArabicName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
                     ci.DateOfBirth AS ChildDateOfBirth,
                     ci.Gender AS ChildGender,
@@ -1235,6 +1244,7 @@ namespace Courses.Repository.Implementation
                     CourseName = reader.GetStringOrDefault("CourseName"),
                     CourseNameFr = reader.GetStringOrDefault("CourseNameFr"),
                     ChildName = $"{reader.GetString("ChildFirstName")} {reader.GetString("ChildLastName")}".Trim(),
+                    ArabicName = reader.GetStringOrDefault("ChildArabicName"),
                     RegistrationNumber = reader.GetStringOrDefault("ChildRegistrationNumber"),
                     DateOfBirth = reader.GetDateTimeUtcOrDefault("ChildDateOfBirth", DateTime.MinValue),
                     Gender = (Gender)reader.GetIntOrDefault("ChildGender", (int)Gender.Unknown),
@@ -1484,6 +1494,7 @@ namespace Courses.Repository.Implementation
             var ordGroupIndex = reader.GetOrdinal("GroupIndex");
             var ordChildFirstName = reader.GetOrdinal("ChildFirstName");
             var ordChildLastName = reader.GetOrdinal("ChildLastName");
+            var ordChildArabicName = reader.GetOrdinal("ChildArabicName");
             var ordChildRegistrationNumber = reader.GetOrdinal("ChildRegistrationNumber");
             var ordChildDateOfBirth = reader.GetOrdinal("ChildDateOfBirth");
             var ordChildGender = reader.GetOrdinal("ChildGender");
@@ -1566,6 +1577,7 @@ namespace Courses.Repository.Implementation
                         CourseName = reader.IsDBNull(ordCourseName) ? string.Empty : reader.GetString(ordCourseName),
                         CourseNameFr = reader.IsDBNull(ordCourseNameFr) ? string.Empty : reader.GetString(ordCourseNameFr),
                         ChildName = childName,
+                        ArabicName = reader.IsDBNull(ordChildArabicName) ? string.Empty : reader.GetString(ordChildArabicName),
                         RegistrationNumber = reader.IsDBNull(ordChildRegistrationNumber) ? string.Empty : reader.GetString(ordChildRegistrationNumber),
                         DateOfBirth = reader.GetDateTime(ordChildDateOfBirth),
                         Gender = (Gender)reader.GetInt32(ordChildGender),

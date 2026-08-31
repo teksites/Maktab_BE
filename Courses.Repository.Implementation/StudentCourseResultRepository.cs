@@ -143,6 +143,7 @@ namespace Courses.Repository.Implementation
                     c.Name AS CourseName,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
+                    ci.ArabicName AS ChildArabicName,
                     ci.RegistrationNumber
                 FROM student_course_results scr
                 INNER JOIN courses c ON c.CourseId = scr.CourseId
@@ -164,6 +165,7 @@ namespace Courses.Repository.Implementation
                     InstituteId = reader.GetGuidFromByteArray("InstituteId"),
                     CourseName = reader.GetStringOrDefault("CourseName", string.Empty),
                     ChildName = $"{reader.GetStringOrDefault("ChildFirstName", string.Empty)} {reader.GetStringOrDefault("ChildLastName", string.Empty)}".Trim(),
+                    ArabicName = reader.GetStringOrDefault("ChildArabicName", string.Empty),
                     RegistrationNumber = reader.GetStringOrDefault("RegistrationNumber", string.Empty),
                     AttendancePercentage = reader.IsDBNull("AttendancePercentage")
                         ? null

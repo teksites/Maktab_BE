@@ -80,7 +80,16 @@ namespace Courses.Repository.Implementation
         {
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT * FROM courses WHERE CourseId = @CourseId";
+            cmd.CommandText = @"
+                SELECT
+                    c.*,
+                    i.Name AS InstituteName,
+                    i.NameFr AS InstituteNameFr,
+                    i.Email AS InstituteEmail,
+                    i.Phone AS InstitutePhone
+                FROM courses c
+                LEFT JOIN institutes i ON i.InstituteId = c.InstituteId
+                WHERE c.CourseId = @CourseId";
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
 
             using var reader = await cmd.ExecuteReaderAsync();
@@ -125,31 +134,40 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
 
-            var sql = new StringBuilder("SELECT * FROM courses WHERE 1=1");
+            var sql = new StringBuilder(@"
+                SELECT
+                    c.*,
+                    i.Name AS InstituteName,
+                    i.NameFr AS InstituteNameFr,
+                    i.Email AS InstituteEmail,
+                    i.Phone AS InstitutePhone
+                FROM courses c
+                LEFT JOIN institutes i ON i.InstituteId = c.InstituteId
+                WHERE 1=1");
             var loadCourseType = NormalizeLoadCourseType(options);
 
             if (options.IsActive.HasValue)
             {
-                sql.Append(" AND IsActive=@IsActive");
+                sql.Append(" AND c.IsActive=@IsActive");
                 cmd.AddParameter("@IsActive", options.IsActive.Value);
             }
 
             if (IncludesLoadCourseType(loadCourseType, NormalCourseTypeFlag) &&
                 !IncludesLoadCourseType(loadCourseType, EventCourseTypeFlag))
             {
-                sql.Append(" AND IsCourseAnEvent=@IsCourseAnEvent");
+                sql.Append(" AND c.IsCourseAnEvent=@IsCourseAnEvent");
                 cmd.AddParameter("@IsCourseAnEvent", false);
             }
             else if (!IncludesLoadCourseType(loadCourseType, NormalCourseTypeFlag) &&
                      IncludesLoadCourseType(loadCourseType, EventCourseTypeFlag))
             {
-                sql.Append(" AND IsCourseAnEvent=@IsCourseAnEvent");
+                sql.Append(" AND c.IsCourseAnEvent=@IsCourseAnEvent");
                 cmd.AddParameter("@IsCourseAnEvent", true);
             }
 
             if (options.InstituteIds?.Any() == true)
             {
-                sql.Append(" AND InstituteId IN (");
+                sql.Append(" AND c.InstituteId IN (");
                 for (int i = 0; i < options.InstituteIds.Count; i++)
                 {
                     var param = $"@InstituteId{i}";
@@ -162,20 +180,20 @@ namespace Courses.Repository.Implementation
 
             if (options.OfferedFromDate.HasValue)
             {
-                sql.Append(" AND StartDate>=@OfferedFromDate");
+                sql.Append(" AND c.StartDate>=@OfferedFromDate");
                 cmd.AddParameter("@OfferedFromDate", options.OfferedFromDate.Value);
             }
 
             if (options.OfferedToDate.HasValue)
             {
-                sql.Append(" AND EndDate<=@OfferedToDate");
+                sql.Append(" AND c.EndDate<=@OfferedToDate");
                 cmd.AddParameter("@OfferedToDate", options.OfferedToDate.Value);
             }
 
             if (options.AcedemicGroups?.Any() == true)
             {
                 int groupMask = (int)AcedemicGroupHelper.FromStrings(options.AcedemicGroups);
-                sql.Append(@" AND CourseId IN (
+                sql.Append(@" AND c.CourseId IN (
                                 SELECT DISTINCT CourseId
                                 FROM course_enrollment_groups
                                 WHERE AcedemicGroup & @AcedemicGroupMask > 0
@@ -300,6 +318,10 @@ namespace Courses.Repository.Implementation
             {
                 CourseId = courseId,
                 InstituteId = reader.GetGuidFromByteArray("InstituteId"),
+                InstituteName = ReadStringColumn(reader, "InstituteName"),
+                InstituteNameFr = ReadStringColumn(reader, "InstituteNameFr"),
+                InstituteEmail = ReadStringColumn(reader, "InstituteEmail"),
+                InstitutePhone = ReadStringColumn(reader, "InstitutePhone"),
                 Name = reader.GetString("Name"),
                 NameFr = reader.GetString("NameFr"),
                 Description = reader.IsDBNull("Description") ? string.Empty : reader.GetString("Description"),
@@ -370,6 +392,14 @@ namespace Courses.Repository.Implementation
         {
             var ordinal = FindColumn(reader, columnName);
             return ordinal.HasValue && !reader.IsDBNull(ordinal.Value) && reader.GetBoolean(ordinal.Value);
+        }
+
+        private static string ReadStringColumn(DbDataReader reader, string columnName)
+        {
+            var ordinal = FindColumn(reader, columnName);
+            return ordinal.HasValue && !reader.IsDBNull(ordinal.Value)
+                ? Convert.ToString(reader.GetValue(ordinal.Value)) ?? string.Empty
+                : string.Empty;
         }
 
         // ✅ FIXED: prevents duplicates + returns deterministic EnrollmentGroupActive
