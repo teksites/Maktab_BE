@@ -392,6 +392,7 @@ namespace Courses.Repository.Implementation
             ci.Allergies AS ChildAllergies,
             ci.OtherHealthConditions AS ChildOtherHealthConditions,
             ci.Consent AS ChildConsent,
+            ci.ArabicName AS ChildArabicName,
             ui.UserId,
             ui.FirstName AS UserFirstName,
             ui.LastName AS UserLastName,
