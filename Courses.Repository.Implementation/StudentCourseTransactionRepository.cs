@@ -268,7 +268,10 @@ namespace Courses.Repository.Implementation
                     ci.RAMQExpiry AS ChildRamqExpiry,
                     ci.Allergies AS ChildAllergies,
                     ci.OtherHealthConditions AS ChildOtherHealthConditions,
-                                        fi.ContactId AS ParentUserId,
+                    crcs.Name AS CourseName,
+                    crcs.NameFr AS CourseNameFr,
+                    ins.Name AS InstituteName,
+                    fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
@@ -289,6 +292,8 @@ namespace Courses.Repository.Implementation
                 {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
+                JOIN institutes ins
+                    ON crcs.InstituteId = ins.InstituteId
 
                 WHERE LOWER(sct.PaymentCode) = LOWER(@PaymentCode)
                   AND sct.IsActive = TRUE
@@ -357,7 +362,10 @@ namespace Courses.Repository.Implementation
                     ci.RAMQExpiry AS ChildRamqExpiry,
                     ci.Allergies AS ChildAllergies,
                     ci.OtherHealthConditions AS ChildOtherHealthConditions,
-                                        fi.ContactId AS ParentUserId,
+                    crcs.Name AS CourseName,
+                    crcs.NameFr AS CourseNameFr,
+                    ins.Name AS InstituteName,
+                    fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
@@ -378,6 +386,8 @@ namespace Courses.Repository.Implementation
                 {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
+                JOIN institutes ins
+                    ON crcs.InstituteId = ins.InstituteId
 
                 WHERE sct.StudentCourseTransactionId = @TransactionId
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
@@ -579,7 +589,10 @@ namespace Courses.Repository.Implementation
                     ci.RAMQExpiry AS ChildRamqExpiry,
                     ci.Allergies AS ChildAllergies,
                     ci.OtherHealthConditions AS ChildOtherHealthConditions,
-                                        fi.ContactId AS ParentUserId,
+                    crcs.Name AS CourseName,
+                    crcs.NameFr AS CourseNameFr,
+                    ins.Name AS InstituteName,
+                    fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
@@ -600,6 +613,8 @@ namespace Courses.Repository.Implementation
                 {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
+                JOIN institutes ins
+                    ON crcs.InstituteId = ins.InstituteId
                 WHERE
                     sct.FamilyId = @FamilyId
                     AND crcs.InstituteId = @InstituteId
@@ -669,7 +684,10 @@ namespace Courses.Repository.Implementation
                     ci.RAMQExpiry AS ChildRamqExpiry,
                     ci.Allergies AS ChildAllergies,
                     ci.OtherHealthConditions AS ChildOtherHealthConditions,
-                                        fi.ContactId AS ParentUserId,
+                    crcs.Name AS CourseName,
+                    crcs.NameFr AS CourseNameFr,
+                    ins.Name AS InstituteName,
+                    fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
@@ -690,6 +708,8 @@ namespace Courses.Repository.Implementation
                 {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
+                JOIN institutes ins
+                    ON crcs.InstituteId = ins.InstituteId
 
                 WHERE sct.FamilyId = @FamilyId
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
@@ -751,7 +771,10 @@ namespace Courses.Repository.Implementation
                     ci.RAMQExpiry AS ChildRamqExpiry,
                     ci.Allergies AS ChildAllergies,
                     ci.OtherHealthConditions AS ChildOtherHealthConditions,
-                                        fi.ContactId AS ParentUserId,
+                    crcs.Name AS CourseName,
+                    crcs.NameFr AS CourseNameFr,
+                    ins.Name AS InstituteName,
+                    fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
@@ -772,6 +795,8 @@ namespace Courses.Repository.Implementation
                 {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
+                JOIN institutes ins
+                    ON crcs.InstituteId = ins.InstituteId
 
                 WHERE sct.FamilyId = @FamilyId
                   AND crcs.InstituteId = @InstituteId
@@ -836,7 +861,10 @@ namespace Courses.Repository.Implementation
                     ci.RAMQExpiry AS ChildRamqExpiry,
                     ci.Allergies AS ChildAllergies,
                     ci.OtherHealthConditions AS ChildOtherHealthConditions,
-                                        fi.ContactId AS ParentUserId,
+                    crcs.Name AS CourseName,
+                    crcs.NameFr AS CourseNameFr,
+                    ins.Name AS InstituteName,
+                    fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
@@ -857,6 +885,8 @@ namespace Courses.Repository.Implementation
                 {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
+                JOIN institutes ins
+                    ON crcs.InstituteId = ins.InstituteId
 
                 WHERE sct.FamilyId = @FamilyId
                   AND sce.CourseId = @CourseId
@@ -921,7 +951,10 @@ namespace Courses.Repository.Implementation
                     ci.RAMQExpiry AS ChildRamqExpiry,
                     ci.Allergies AS ChildAllergies,
                     ci.OtherHealthConditions AS ChildOtherHealthConditions,
-                                        fi.ContactId AS ParentUserId,
+                    crcs.Name AS CourseName,
+                    crcs.NameFr AS CourseNameFr,
+                    ins.Name AS InstituteName,
+                    fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
@@ -942,6 +975,8 @@ namespace Courses.Repository.Implementation
                 {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
+                JOIN institutes ins
+                    ON crcs.InstituteId = ins.InstituteId
 
                 WHERE sce.CourseId = @CourseId
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
@@ -1003,7 +1038,10 @@ namespace Courses.Repository.Implementation
                     ci.RAMQExpiry AS ChildRamqExpiry,
                     ci.Allergies AS ChildAllergies,
                     ci.OtherHealthConditions AS ChildOtherHealthConditions,
-                                        fi.ContactId AS ParentUserId,
+                    crcs.Name AS CourseName,
+                    crcs.NameFr AS CourseNameFr,
+                    ins.Name AS InstituteName,
+                    fi.ContactId AS ParentUserId,
                     fi.FirstName AS ParentFirstName,
                     fi.LastName AS ParentLastName,
                     fi.Email AS ParentEmail,
@@ -1024,6 +1062,8 @@ namespace Courses.Repository.Implementation
                 {FamilyInformationJoinSql}
                 JOIN courses crcs
                     ON ceg.CourseId = crcs.CourseId
+                JOIN institutes ins
+                    ON crcs.InstituteId = ins.InstituteId
 
                 WHERE crcs.InstituteId = @InstituteId
                 ORDER BY sct.CreatedAt DESC, sce.CreatedAt;
@@ -1148,7 +1188,12 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 SELECT
                     sce.*,
+                    ceg.GroupTitle AS GroupTitle,
+                    ceg.GroupTitleFr AS GroupTitleFr,
                     ceg.GroupIndex AS GroupIndex,
+                    c.Name AS CourseName,
+                    c.NameFr AS CourseNameFr,
+                    ins.Name AS InstituteName,
                     ci.FirstName AS ChildFirstName,
                     ci.LastName AS ChildLastName,
                     ci.RegistrationNumber AS ChildRegistrationNumber,
@@ -1164,6 +1209,10 @@ namespace Courses.Repository.Implementation
                     ON scte.StudentCourseEnrollmentId = sce.StudentCourseEnrollmentId
                 JOIN course_enrollment_groups ceg
                     ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+                JOIN courses c
+                    ON sce.CourseId = c.CourseId
+                JOIN institutes ins
+                    ON c.InstituteId = ins.InstituteId
                 JOIN child_information ci
                     ON sce.ChildId = ci.ChildId
                 WHERE scte.StudentCourseTransactionId = @TransactionId
@@ -1182,6 +1231,9 @@ namespace Courses.Repository.Implementation
                     CourseId = reader.GetGuidFromByteArray("CourseId"),
                     FamilyId = reader.GetGuidFromByteArray("FamilyId"),
                     ChildId = reader.GetGuidFromByteArray("ChildId"),
+                    InstituteName = reader.GetStringOrDefault("InstituteName"),
+                    CourseName = reader.GetStringOrDefault("CourseName"),
+                    CourseNameFr = reader.GetStringOrDefault("CourseNameFr"),
                     ChildName = $"{reader.GetString("ChildFirstName")} {reader.GetString("ChildLastName")}".Trim(),
                     RegistrationNumber = reader.GetStringOrDefault("ChildRegistrationNumber"),
                     DateOfBirth = reader.GetDateTimeUtcOrDefault("ChildDateOfBirth", DateTime.MinValue),
@@ -1198,7 +1250,11 @@ namespace Courses.Repository.Implementation
                     UpdatedOn = reader.GetDateTime("UpdatedOn"),
                     GroupIndex = reader.GetInt32("GroupIndex"),
                     EnrollmentIndex = reader.GetInt32("EnrollmentIndex"),
-                    EnrollmentStatus = (EnrollmentStatus)reader.GetInt32("EnrollmentStatus")
+                    EnrollmentStatus = (EnrollmentStatus)reader.GetInt32("EnrollmentStatus"),
+                    CourseEnrollmentGroupName = reader.GetStringOrDefault("GroupTitle"),
+                    CourseEnrollmentGroupNameFr = reader.GetStringOrDefault("GroupTitleFr"),
+                    GroupTitle = reader.GetStringOrDefault("GroupTitle"),
+                    GroupTitleFr = reader.GetStringOrDefault("GroupTitleFr")
                 });
             }
 
@@ -1411,6 +1467,9 @@ namespace Courses.Repository.Implementation
             var ordEnrollmentId = reader.GetOrdinal("StudentCourseEnrollmentId");
             var ordGroupId = reader.GetOrdinal("CourseEnrollmentGroupId");
             var ordCourseId = reader.GetOrdinal("CourseId");
+            var ordInstituteName = reader.GetOrdinal("InstituteName");
+            var ordCourseName = reader.GetOrdinal("CourseName");
+            var ordCourseNameFr = reader.GetOrdinal("CourseNameFr");
             var ordEnrollmentFamilyId = reader.GetOrdinal("EnrollmentFamilyId");
             var ordChildId = reader.GetOrdinal("ChildId");
             var ordEnrollmentIsActive = reader.GetOrdinal("EnrollmentIsActive");
@@ -1503,6 +1562,9 @@ namespace Courses.Repository.Implementation
                         CourseId = reader.GetGuidFromByteArray(ordCourseId),
                         FamilyId = reader.GetGuidFromByteArray(ordEnrollmentFamilyId),
                         ChildId = reader.GetGuidFromByteArray(ordChildId),
+                        InstituteName = reader.IsDBNull(ordInstituteName) ? string.Empty : reader.GetString(ordInstituteName),
+                        CourseName = reader.IsDBNull(ordCourseName) ? string.Empty : reader.GetString(ordCourseName),
+                        CourseNameFr = reader.IsDBNull(ordCourseNameFr) ? string.Empty : reader.GetString(ordCourseNameFr),
                         ChildName = childName,
                         RegistrationNumber = reader.IsDBNull(ordChildRegistrationNumber) ? string.Empty : reader.GetString(ordChildRegistrationNumber),
                         DateOfBirth = reader.GetDateTime(ordChildDateOfBirth),
@@ -1519,6 +1581,8 @@ namespace Courses.Repository.Implementation
                         GroupIndex = reader.GetInt32(ordGroupIndex),
                         EnrollmentIndex = reader.GetInt32(ordEnrollmentIndex),
                         EnrollmentStatus = (EnrollmentStatus)reader.GetInt32(ordEnrollmentStatus),
+                        CourseEnrollmentGroupName = reader.IsDBNull(ordGroupTitle) ? string.Empty : reader.GetString(ordGroupTitle),
+                        CourseEnrollmentGroupNameFr = reader.IsDBNull(ordGroupTitleFr) ? string.Empty : reader.GetString(ordGroupTitleFr),
                         GroupTitle = reader.IsDBNull(ordGroupTitle) ? string.Empty : reader.GetString(ordGroupTitle),
                         GroupTitleFr = reader.IsDBNull(ordGroupTitleFr) ? string.Empty : reader.GetString(ordGroupTitleFr)
                     };

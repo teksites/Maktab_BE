@@ -251,6 +251,37 @@ public class StudentCourseTransactionRepositoryTests
         Assert.Equal(expectedRamqExpiry, enrollment.RAMQExpiry);
         Assert.Equal("Sesame", enrollment.Allergies);
         Assert.Equal("Asthma", enrollment.OtherHealthConditions);
+        Assert.Equal("ICC Brossard", enrollment.InstituteName);
+        Assert.Equal("Evening Quran", enrollment.CourseName);
+        Assert.Equal("Coran du soir", enrollment.CourseNameFr);
+        Assert.Equal("Group A", enrollment.CourseEnrollmentGroupName);
+        Assert.Equal("Groupe A", enrollment.CourseEnrollmentGroupNameFr);
+    }
+
+    [Fact]
+    public async Task GetAllTransactionsByCourse_MapsInstituteCourseAndEnrollmentGroupNamesOntoEnrollments()
+    {
+        var database = new FakeDatabase(() => CreateCourseTransactionEnrollmentReader(
+            new DateTime(2018, 4, 15, 0, 0, 0, DateTimeKind.Utc),
+            Gender.Female,
+            "RAMQ-12345",
+            new DateTime(2027, 12, 31, 0, 0, 0, DateTimeKind.Utc),
+            "Peanuts",
+            "Asthma"));
+
+        var repository = new StudentCourseTransactionRepository(database);
+
+        var result = (await repository.GetAllTransactionsByCourse(Guid.NewGuid())).ToList();
+
+        var transaction = Assert.Single(result);
+        var enrollment = Assert.Single(transaction.Enrollments);
+        Assert.Equal("ICC Brossard", enrollment.InstituteName);
+        Assert.Equal("Evening Quran", enrollment.CourseName);
+        Assert.Equal("Coran du soir", enrollment.CourseNameFr);
+        Assert.Equal("Morning Group", enrollment.CourseEnrollmentGroupName);
+        Assert.Equal("Groupe du matin", enrollment.CourseEnrollmentGroupNameFr);
+        Assert.Equal("Morning Group", enrollment.GroupTitle);
+        Assert.Equal("Groupe du matin", enrollment.GroupTitleFr);
     }
 
     private static DbDataReader CreateSingleTransactionReader(string feeInstallmentsJson, decimal totalAmountPaid)
@@ -449,6 +480,11 @@ public class StudentCourseTransactionRepositoryTests
         table.Columns.Add("CourseEnrollmentGroupId", typeof(byte[]));
         table.Columns.Add("CourseId", typeof(byte[]));
         table.Columns.Add("FamilyId", typeof(byte[]));
+        table.Columns.Add("InstituteName", typeof(string));
+        table.Columns.Add("CourseName", typeof(string));
+        table.Columns.Add("CourseNameFr", typeof(string));
+        table.Columns.Add("GroupTitle", typeof(string));
+        table.Columns.Add("GroupTitleFr", typeof(string));
         table.Columns.Add("ChildId", typeof(byte[]));
         table.Columns.Add("IsActive", typeof(bool));
         table.Columns.Add("WillUseDayCare", typeof(bool));
@@ -474,6 +510,11 @@ public class StudentCourseTransactionRepositoryTests
             Guid.NewGuid().ToByteArray(),
             Guid.NewGuid().ToByteArray(),
             Guid.NewGuid().ToByteArray(),
+            "ICC Brossard",
+            "Evening Quran",
+            "Coran du soir",
+            "Group A",
+            "Groupe A",
             Guid.NewGuid().ToByteArray(),
             true,
             false,
@@ -527,6 +568,9 @@ public class StudentCourseTransactionRepositoryTests
         table.Columns.Add("StudentCourseEnrollmentId", typeof(byte[]));
         table.Columns.Add("CourseEnrollmentGroupId", typeof(byte[]));
         table.Columns.Add("CourseId", typeof(byte[]));
+        table.Columns.Add("InstituteName", typeof(string));
+        table.Columns.Add("CourseName", typeof(string));
+        table.Columns.Add("CourseNameFr", typeof(string));
         table.Columns.Add("EnrollmentFamilyId", typeof(byte[]));
         table.Columns.Add("ChildId", typeof(byte[]));
         table.Columns.Add("EnrollmentIsActive", typeof(bool));
@@ -579,6 +623,9 @@ public class StudentCourseTransactionRepositoryTests
             Guid.NewGuid().ToByteArray(),
             Guid.NewGuid().ToByteArray(),
             Guid.NewGuid().ToByteArray(),
+            "ICC Brossard",
+            "Evening Quran",
+            "Coran du soir",
             Guid.NewGuid().ToByteArray(),
             Guid.NewGuid().ToByteArray(),
             true,
