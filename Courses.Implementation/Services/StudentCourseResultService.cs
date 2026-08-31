@@ -174,6 +174,7 @@ namespace Courses.Implementation.Services
                     InstituteId = existingResult?.InstituteId ?? course.InstituteId,
                     CourseName = existingResult?.CourseName ?? course.Name,
                     ChildName = existingResult?.ChildName ?? candidateEnrollment?.ChildName ?? string.Empty,
+                    ArabicName = existingResult?.ArabicName ?? candidateEnrollment?.ArabicName ?? string.Empty,
                     RegistrationNumber = existingResult?.RegistrationNumber ?? candidateEnrollment?.RegistrationNumber ?? string.Empty,
                     AttendancePercentage = attendancePercentage,
                     HasAttendanceRecords = hasAttendanceRecords,

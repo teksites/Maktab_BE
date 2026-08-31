@@ -167,6 +167,7 @@ public class StudentCourseResultServiceTests
                     InstituteId = instituteId,
                     CourseName = "Quran",
                     ChildName = "Student One",
+                    ArabicName = "طالب واحد",
                     RegistrationNumber = "REG-1",
                     AttendancePercentage = 100m,
                     HasAttendanceRecords = true,
@@ -189,6 +190,7 @@ public class StudentCourseResultServiceTests
                     FamilyId = familyOneId,
                     CourseId = courseId,
                     ChildName = "Student One",
+                    ArabicName = "طالب واحد",
                     RegistrationNumber = "REG-1",
                     EnrollmentStatus = EnrollmentStatus.Enrolled,
                     EnrollmentIndex = 1,
@@ -201,6 +203,7 @@ public class StudentCourseResultServiceTests
                     FamilyId = familyTwoId,
                     CourseId = courseId,
                     ChildName = "Student Two",
+                    ArabicName = "طالب اثنان",
                     RegistrationNumber = "REG-2",
                     EnrollmentStatus = EnrollmentStatus.Registered,
                     EnrollmentIndex = 1,
@@ -245,8 +248,8 @@ public class StudentCourseResultServiceTests
         var results = (await service.GetCourseResults(userId, UserRoleType.SchoolAdmin, courseId)).ToList();
 
         Assert.Equal(2, results.Count);
-        Assert.Contains(results, result => result.ChildId == childWithResultId && result.HasResult && result.AttendancePercentage == 100m);
-        Assert.Contains(results, result => result.ChildId == childWithoutResultId && !result.HasResult && result.AttendancePercentage == 75m);
+        Assert.Contains(results, result => result.ChildId == childWithResultId && result.HasResult && result.AttendancePercentage == 100m && result.ArabicName == "طالب واحد");
+        Assert.Contains(results, result => result.ChildId == childWithoutResultId && !result.HasResult && result.AttendancePercentage == 75m && result.ArabicName == "طالب اثنان");
     }
 
     [Fact]
