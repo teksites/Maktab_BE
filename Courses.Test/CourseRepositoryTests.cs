@@ -25,6 +25,10 @@ public class CourseRepositoryTests
         var course = await repository.GetCourse(courseId);
 
         Assert.NotNull(course);
+        Assert.Equal("Main Campus", course!.InstituteName);
+        Assert.Equal("Campus Principal", course.InstituteNameFr);
+        Assert.Equal("school@example.com", course.InstituteEmail);
+        Assert.Equal("514-555-0100", course.InstitutePhone);
         Assert.True(course!.IsManualEnrollment);
         Assert.True(course.IsCourseHasPrequisite);
         Assert.True(course.IsCourseAnEvent);
@@ -50,7 +54,7 @@ public class CourseRepositoryTests
         await repository.GetAllCourses(new MaktabDataContracts.Requests.Course.GetCourseOptions());
 
         Assert.NotNull(executedCommand);
-        Assert.Contains("IsCourseAnEvent=@IsCourseAnEvent", executedCommand!.CommandText);
+        Assert.Contains("c.IsCourseAnEvent=@IsCourseAnEvent", executedCommand!.CommandText);
         Assert.False(GetBooleanParameter(executedCommand, "@IsCourseAnEvent"));
     }
 
@@ -66,7 +70,7 @@ public class CourseRepositoryTests
         });
 
         Assert.NotNull(executedCommand);
-        Assert.Contains("IsCourseAnEvent=@IsCourseAnEvent", executedCommand!.CommandText);
+        Assert.Contains("c.IsCourseAnEvent=@IsCourseAnEvent", executedCommand!.CommandText);
         Assert.True(GetBooleanParameter(executedCommand, "@IsCourseAnEvent"));
     }
 
@@ -82,7 +86,7 @@ public class CourseRepositoryTests
         });
 
         Assert.NotNull(executedCommand);
-        Assert.DoesNotContain("IsCourseAnEvent=@IsCourseAnEvent", executedCommand!.CommandText);
+        Assert.DoesNotContain("c.IsCourseAnEvent=@IsCourseAnEvent", executedCommand!.CommandText);
         Assert.DoesNotContain(executedCommand.Parameters.Cast<DbParameter>(), parameter => parameter.ParameterName == "@IsCourseAnEvent");
     }
 
@@ -115,6 +119,10 @@ public class CourseRepositoryTests
         table.Columns.Add("RegistrationFee", typeof(int));
         table.Columns.Add("OfferDaycare", typeof(bool));
         table.Columns.Add("TerminalId", typeof(string));
+        table.Columns.Add("InstituteName", typeof(string));
+        table.Columns.Add("InstituteNameFr", typeof(string));
+        table.Columns.Add("InstituteEmail", typeof(string));
+        table.Columns.Add("InstitutePhone", typeof(string));
 
         table.Rows.Add(
             courseId.ToByteArray(),
@@ -142,7 +150,11 @@ public class CourseRepositoryTests
             (byte)0,
             100,
             true,
-            terminalId);
+            terminalId,
+            "Main Campus",
+            "Campus Principal",
+            "school@example.com",
+            "514-555-0100");
 
         return table.CreateDataReader();
     }

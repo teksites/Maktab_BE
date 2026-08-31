@@ -163,6 +163,7 @@ namespace Courses.Repository.Implementation
             ceg.GroupIndex AS GroupIndex,
             ci.FirstName AS ChildFirstName,
             ci.LastName AS ChildLastName,
+            ci.ArabicName AS ChildArabicName,
             ci.RegistrationNumber AS ChildRegistrationNumber,
             ci.DateOfBirth AS ChildDateOfBirth,
             ci.Gender AS ChildGender,
@@ -442,6 +443,7 @@ namespace Courses.Repository.Implementation
                 CourseNameFr = reader.GetStringOrDefault("CourseNameFr"),
 
                 ChildName = $"{reader.GetString("ChildFirstName")} {reader.GetString("ChildLastName")}",
+                ArabicName = reader.GetStringOrDefault("ChildArabicName"),
                 RegistrationNumber = reader.GetStringOrDefault("ChildRegistrationNumber"),
                 DateOfBirth = reader.GetDateTimeUtcOrDefault("ChildDateOfBirth", DateTime.MinValue),
                 Gender = (Gender)reader.GetIntOrDefault("ChildGender", (int)Gender.Unknown),

@@ -201,6 +201,7 @@ public class StudentCourseTransactionRepositoryTests
         var enrollment = Assert.Single(result);
         Assert.Equal(expectedDateOfBirth, enrollment.DateOfBirth);
         Assert.Equal(Gender.Male, enrollment.Gender);
+        Assert.Equal("طفل واحد", enrollment.ArabicName);
         Assert.Equal("RAMQ-ENROLL-01", enrollment.RAMQNumber);
         Assert.Equal(expectedRamqExpiry, enrollment.RAMQExpiry);
         Assert.Equal("Pollen", enrollment.Allergies);
@@ -245,6 +246,7 @@ public class StudentCourseTransactionRepositoryTests
 
         var enrollment = Assert.Single(result);
         Assert.Equal("Child One", enrollment.ChildName);
+        Assert.Equal("طفل واحد", enrollment.ArabicName);
         Assert.Equal(expectedDateOfBirth, enrollment.DateOfBirth);
         Assert.Equal(Gender.Female, enrollment.Gender);
         Assert.Equal("RAMQ-TX-01", enrollment.RAMQNumber);
@@ -275,6 +277,7 @@ public class StudentCourseTransactionRepositoryTests
 
         var transaction = Assert.Single(result);
         var enrollment = Assert.Single(transaction.Enrollments);
+        Assert.Equal("سارة", enrollment.ArabicName);
         Assert.Equal("ICC Brossard", enrollment.InstituteName);
         Assert.Equal("Evening Quran", enrollment.CourseName);
         Assert.Equal("Coran du soir", enrollment.CourseNameFr);
@@ -390,7 +393,8 @@ public class StudentCourseTransactionRepositoryTests
         string ramqNumber = "",
         DateTime? ramqExpiry = null,
         string allergies = "",
-        string otherHealthConditions = "")
+        string otherHealthConditions = "",
+        string arabicName = "طفل واحد")
     {
         var table = new DataTable();
         table.Columns.Add("StudentCourseEnrollmentId", typeof(byte[]));
@@ -413,6 +417,7 @@ public class StudentCourseTransactionRepositoryTests
         table.Columns.Add("GroupIndex", typeof(int));
         table.Columns.Add("ChildFirstName", typeof(string));
         table.Columns.Add("ChildLastName", typeof(string));
+        table.Columns.Add("ChildArabicName", typeof(string));
         table.Columns.Add("ChildRegistrationNumber", typeof(string));
         table.Columns.Add("ChildDateOfBirth", typeof(DateTime));
         table.Columns.Add("ChildGender", typeof(int));
@@ -449,6 +454,7 @@ public class StudentCourseTransactionRepositoryTests
             1,
             "Child",
             "One",
+            arabicName,
             "REG-CHILD-01",
             dateOfBirth ?? DateTime.MinValue,
             (int)gender,
@@ -473,7 +479,8 @@ public class StudentCourseTransactionRepositoryTests
         string ramqNumber,
         DateTime ramqExpiry,
         string allergies,
-        string otherHealthConditions)
+        string otherHealthConditions,
+        string arabicName = "طفل واحد")
     {
         var table = new DataTable();
         table.Columns.Add("StudentCourseEnrollmentId", typeof(byte[]));
@@ -496,6 +503,7 @@ public class StudentCourseTransactionRepositoryTests
         table.Columns.Add("EnrollmentStatus", typeof(int));
         table.Columns.Add("ChildFirstName", typeof(string));
         table.Columns.Add("ChildLastName", typeof(string));
+        table.Columns.Add("ChildArabicName", typeof(string));
         table.Columns.Add("ChildRegistrationNumber", typeof(string));
         table.Columns.Add("ChildDateOfBirth", typeof(DateTime));
         table.Columns.Add("ChildGender", typeof(int));
@@ -526,6 +534,7 @@ public class StudentCourseTransactionRepositoryTests
             (int)EnrollmentStatus.Enrolled,
             "Child",
             "One",
+            arabicName,
             "REG-TX-01",
             dateOfBirth,
             (int)gender,
@@ -544,7 +553,8 @@ public class StudentCourseTransactionRepositoryTests
         string ramqNumber,
         DateTime ramqExpiry,
         string allergies,
-        string otherHealthConditions)
+        string otherHealthConditions,
+        string arabicName = "سارة")
     {
         var table = new DataTable();
         table.Columns.Add("StudentCourseTransactionId", typeof(byte[]));
@@ -585,6 +595,7 @@ public class StudentCourseTransactionRepositoryTests
         table.Columns.Add("GroupIndex", typeof(int));
         table.Columns.Add("ChildFirstName", typeof(string));
         table.Columns.Add("ChildLastName", typeof(string));
+        table.Columns.Add("ChildArabicName", typeof(string));
         table.Columns.Add("ChildRegistrationNumber", typeof(string));
         table.Columns.Add("ChildDateOfBirth", typeof(DateTime));
         table.Columns.Add("ChildGender", typeof(int));
@@ -640,6 +651,7 @@ public class StudentCourseTransactionRepositoryTests
             1,
             "Sara",
             "Ali",
+            arabicName,
             "REG-001",
             dateOfBirth,
             (int)gender,
