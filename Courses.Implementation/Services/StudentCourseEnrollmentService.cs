@@ -965,7 +965,7 @@ namespace Courses.Implementation.Services
                 HoldsSeat(enrollment.EnrollmentStatus) &&
                 enrollment.EnrollmentStatus != enrollmentStatus;
 
-            if (isMovingIntoSeatHoldingStatus)
+            if (isMovingIntoSeatHoldingStatus && !ifUpdatedByAdmin)
             {
                 var enrollmentGroupState = await GetCourseEnrollmentGroupInformation(enrollmentDetails.CourseEnrollmentGroupId).ConfigureAwait(false);
                 if (enrollmentGroupState == null)

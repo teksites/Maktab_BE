@@ -208,6 +208,24 @@ public class StudentCourseTransactionRepositoryTests
     }
 
     [Fact]
+    public async Task GetAllEnrollmentsByFamily_MapsInstituteCourseAndEnrollmentGroupNames()
+    {
+        var database = new FakeDatabase(() => CreateEnrollmentListReader());
+        var repository = new StudentCourseEnrollmentRepository(database);
+
+        var result = (await repository.GetAllEnrollmentsByFamily(Guid.NewGuid())).ToList();
+
+        var enrollment = Assert.Single(result);
+        Assert.Equal("ICC Brossard", enrollment.InstituteName);
+        Assert.Equal("Evening Quran", enrollment.CourseName);
+        Assert.Equal("Coran du soir", enrollment.CourseNameFr);
+        Assert.Equal("Group A", enrollment.CourseEnrollmentGroupName);
+        Assert.Equal("Groupe A", enrollment.CourseEnrollmentGroupNameFr);
+        Assert.Equal("Group A", enrollment.GroupTitle);
+        Assert.Equal("Groupe A", enrollment.GroupTitleFr);
+    }
+
+    [Fact]
     public async Task GetEnrollmentsForTransaction_MapsChildProfileFieldsWhenAvailable()
     {
         var expectedDateOfBirth = new DateTime(2019, 2, 20, 0, 0, 0, DateTimeKind.Utc);
@@ -349,6 +367,11 @@ public class StudentCourseTransactionRepositoryTests
         table.Columns.Add("CourseId", typeof(byte[]));
         table.Columns.Add("ChildId", typeof(byte[]));
         table.Columns.Add("FamilyId", typeof(byte[]));
+        table.Columns.Add("InstituteName", typeof(string));
+        table.Columns.Add("CourseName", typeof(string));
+        table.Columns.Add("CourseNameFr", typeof(string));
+        table.Columns.Add("GroupTitle", typeof(string));
+        table.Columns.Add("GroupTitleFr", typeof(string));
         table.Columns.Add("WillUseDayCare", typeof(bool));
         table.Columns.Add("DayCareDays", typeof(int));
         table.Columns.Add("IsActive", typeof(bool));
@@ -380,6 +403,11 @@ public class StudentCourseTransactionRepositoryTests
             Guid.NewGuid().ToByteArray(),
             Guid.NewGuid().ToByteArray(),
             Guid.NewGuid().ToByteArray(),
+            "ICC Brossard",
+            "Evening Quran",
+            "Coran du soir",
+            "Group A",
+            "Groupe A",
             false,
             0,
             true,

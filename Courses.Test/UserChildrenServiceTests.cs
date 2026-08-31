@@ -243,6 +243,63 @@ public class UserChildrenServiceTests
     }
 
     [Fact]
+    public async Task UpdateChild_UpdatesFirstAndLastNameWhenProvided()
+    {
+        var childId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        Child? capturedChild = null;
+
+        var existingChild = new Child
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            FirstName = "Old",
+            LastName = "Name",
+            ArabicName = "Existing Arabic",
+            UserType = UserType.Child,
+            Gender = Gender.Female,
+            AcedemicGroup = AcedemicGroupType.None,
+            DateOfBirth = new DateTime(2017, 1, 2),
+            RAMQExpiry = new DateTime(2030, 1, 1),
+            RAMQNumber = "RAMQ-1",
+            RAMQSequenceNumber = 7,
+            HasAllergy = false,
+            Allergies = string.Empty,
+            OtherHealthConditions = string.Empty,
+            Consent = string.Empty,
+            RegistrationNumber = "123",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow.AddDays(-2),
+            UpdatedOn = DateTime.UtcNow.AddDays(-1)
+        };
+
+        var repository = new Mock<IUserChildrenRepository>();
+        repository
+            .Setup(repo => repo.GetChild(childId))
+            .ReturnsAsync(existingChild);
+        repository
+            .Setup(repo => repo.UpdateChild(It.IsAny<Child>()))
+            .Callback<Child>(child => capturedChild = child)
+            .ReturnsAsync((Child child) => child);
+
+        var service = new UserChildrenService(Mock.Of<IConfiguration>(), repository.Object);
+
+        var result = await service.UpdateChild(new UpdateChildRequest
+        {
+            ChildId = childId,
+            FirstName = "New",
+            LastName = "Student"
+        });
+
+        Assert.NotNull(capturedChild);
+        Assert.Equal("New", capturedChild!.FirstName);
+        Assert.Equal("Student", capturedChild.LastName);
+        Assert.NotNull(result);
+        Assert.Equal("New", result!.Result.FirstName);
+        Assert.Equal("Student", result.Result.LastName);
+    }
+
+    [Fact]
     public async Task GetUserChilds_WhenFetchAdultsIsFalse_ReturnsSupportedFamilyMemberTypes()
     {
         var familyId = Guid.NewGuid();

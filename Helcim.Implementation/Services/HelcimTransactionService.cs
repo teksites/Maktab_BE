@@ -32,6 +32,14 @@ namespace Helcim.Implementation.Services
         private static readonly TimeSpan WebhookProcessingReservationTimeout = TimeSpan.FromMinutes(15);
         private static readonly SemaphoreSlim ReconciliationExecutionGate = new(1, 1);
         private const string RawWebhookPlaceholderCardType = "WEBHOOK_RAW";
+        private const int AchStatusAuthApproved = 1;
+        private const int AchStatusAuthDeclined = 2;
+        private const int AchStatusAuthCancelled = 4;
+        private const int AchStatusAuthPending = 5;
+        private const int AchStatusClearingApproved = 1;
+        private const int AchStatusClearingDeclined = 4;
+        private const int AchStatusBatchOpen = 1;
+        private const int AchStatusBatchClosed = 2;
 
         private readonly IHelcimTransactionRepository _repository;
         private readonly IHelcimClientConfiguration _clientConfiguration;
@@ -307,13 +315,6 @@ namespace Helcim.Implementation.Services
 
                 foreach (var achLookup in achTransactions)
                 {
-                    var existingTransactions = await GetStoredTransactionsByIdAsync(achLookup.Transaction.TransactionId).ConfigureAwait(false);
-                    if (HasCompletedTransactionDetails(existingTransactions))
-                    {
-                        response.SkippedDuplicates++;
-                        continue;
-                    }
-
                     if (!IsAchEligibleForStorage(achLookup.Transaction))
                     {
                         response.SkippedPendingAchTransactions++;
@@ -468,6 +469,43 @@ namespace Helcim.Implementation.Services
                 .ToList();
         }
 
+        public async Task<HelcimTransactionAdjustmentResponse> RefundTransaction(RefundTransactionRequest request)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            if (request.TransactionId <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(request.TransactionId), "Helcim transactionId must be a positive value.");
+            }
+
+            if (request.Amount.HasValue && request.Amount.Value <= 0m)
+            {
+                throw new ArgumentOutOfRangeException(nameof(request.Amount), "Refund amount must be greater than zero when provided.");
+            }
+
+            var cardTransactionLookup = await TryGetCardTransactionById(request.TransactionId, requireInvoiceNumber: false).ConfigureAwait(false);
+            if (cardTransactionLookup != null)
+            {
+                var cardResult = await RefundCardTransactionInternal(
+                    cardTransactionLookup,
+                    request.Amount,
+                    request.IpAddress,
+                    request.IdempotencyKey).ConfigureAwait(false);
+                return MapAdjustmentResponse(cardResult);
+            }
+
+            var achTransactionLookup = await TryGetAchTransactionByTransactionId(request.TransactionId).ConfigureAwait(false);
+            if (achTransactionLookup != null)
+            {
+                var achResult = await AdjustAchTransactionFromLookup(
+                    achTransactionLookup,
+                    request.Amount,
+                    request.IdempotencyKey).ConfigureAwait(false);
+                return MapAdjustmentResponse(achResult);
+            }
+
+            throw new InvalidOperationException($"Unable to find Helcim transaction {request.TransactionId}.");
+        }
+
         public async Task<HelcimAchRefundResponse> RefundAchTransaction(RefundAchTransactionRequest request)
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -476,24 +514,11 @@ namespace Helcim.Implementation.Services
                 throw new ArgumentOutOfRangeException(nameof(request.TransactionId), "ACH transactionId must be a positive value.");
             }
 
-            if (request.Amount <= 0m)
-            {
-                throw new ArgumentOutOfRangeException(nameof(request.Amount), "Refund amount must be greater than zero.");
-            }
-
             var achTransactionLookup = await TryGetAchTransactionByTransactionId(request.TransactionId).ConfigureAwait(false)
                 ?? throw new InvalidOperationException($"Unable to find Helcim ACH transaction {request.TransactionId}.");
 
-            var invoice = await ResolveInvoiceForAchTransactionAsync(
-                achTransactionLookup.Transaction,
-                achTransactionLookup.Transaction.OrderId,
-                achTransactionLookup.Transaction.InvoiceNumber).ConfigureAwait(false);
-            var localTransaction = await ResolveLocalTransactionAsync(invoice, request.TransactionId).ConfigureAwait(false);
-
-            return await RefundAchTransactionInternal(
+            return await AdjustAchTransactionFromLookup(
                 achTransactionLookup,
-                invoice,
-                localTransaction,
                 request.Amount,
                 request.IdempotencyKey).ConfigureAwait(false);
         }
@@ -506,86 +531,293 @@ namespace Helcim.Implementation.Services
                 throw new ArgumentOutOfRangeException(nameof(request.InvoiceId), "InvoiceId must be a positive value.");
             }
 
-            if (request.Amount <= 0m)
-            {
-                throw new ArgumentOutOfRangeException(nameof(request.Amount), "Refund amount must be greater than zero.");
-            }
-
             var invoice = await GetInvoiceByInvoiceId(request.InvoiceId).ConfigureAwait(false);
-            var refundableTransaction = (await GetAchTransactionsByInvoiceAsync(invoice).ConfigureAwait(false))
+            var adjustableTransaction = (await GetAchTransactionsByInvoiceAsync(invoice).ConfigureAwait(false))
                 .Where(lookup => !IsAchRefundTransaction(lookup.Transaction))
-                .Where(lookup => IsAchRefundable(lookup.Transaction))
+                .Where(lookup => CanAdjustAchTransaction(lookup.Transaction))
                 .OrderByDescending(lookup => lookup.Transaction.TransactionId)
                 .FirstOrDefault();
 
-            if (refundableTransaction == null)
+            if (adjustableTransaction == null)
             {
-                throw new InvalidOperationException($"No refundable ACH transaction was found for invoiceId {request.InvoiceId}.");
+                throw new InvalidOperationException($"No adjustable ACH transaction was found for invoiceId {request.InvoiceId}.");
             }
 
             var localTransaction = await ResolveLocalTransactionAsync(
                 invoice,
-                refundableTransaction.Transaction.TransactionId).ConfigureAwait(false);
+                adjustableTransaction.Transaction.TransactionId).ConfigureAwait(false);
 
-            return await RefundAchTransactionInternal(
-                refundableTransaction,
+            return await AdjustAchTransactionInternal(
+                adjustableTransaction,
                 invoice,
                 localTransaction,
                 request.Amount,
                 request.IdempotencyKey).ConfigureAwait(false);
         }
 
-        private async Task<HelcimAchRefundResponse> RefundAchTransactionInternal(
-            AchTransactionLookup achTransactionLookup,
-            HelcimInvoiceResponse invoice,
-            StudentCourseTransactionResponse? localTransaction,
-            decimal amount,
+        public async Task<HelcimCardRefundResponse> RefundCardTransaction(RefundCardTransactionRequest request)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            if (request.TransactionId <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(request.TransactionId), "Card transactionId must be a positive value.");
+            }
+
+            if (request.Amount.HasValue && request.Amount.Value <= 0m)
+            {
+                throw new ArgumentOutOfRangeException(nameof(request.Amount), "Refund amount must be greater than zero when provided.");
+            }
+
+            var cardTransactionLookup = await TryGetCardTransactionById(request.TransactionId, requireInvoiceNumber: false).ConfigureAwait(false);
+            if (cardTransactionLookup == null)
+            {
+                var achTransactionLookup = await TryGetAchTransactionByTransactionId(request.TransactionId).ConfigureAwait(false);
+                if (achTransactionLookup != null)
+                {
+                    throw new InvalidOperationException(
+                        $"Helcim transaction {request.TransactionId} is an ACH transaction. Use the ACH refund flow instead.");
+                }
+
+                throw new InvalidOperationException($"Unable to find Helcim card transaction {request.TransactionId}.");
+            }
+
+            return await RefundCardTransactionInternal(
+                cardTransactionLookup,
+                request.Amount,
+                request.IpAddress,
+                request.IdempotencyKey).ConfigureAwait(false);
+        }
+
+        private async Task<HelcimCardRefundResponse> RefundCardTransactionInternal(
+            CardTransactionLookup cardTransactionLookup,
+            decimal? requestedAmount,
+            string? requestIpAddress,
             string? idempotencyKeyInput)
         {
-            var requestTransactionId = achTransactionLookup.Transaction.TransactionId;
+            var requestTransactionId = cardTransactionLookup.Transaction.TransactionId;
 
-            if (amount > achTransactionLookup.Transaction.Amount)
-            {
-                throw new InvalidOperationException("Refund amount cannot exceed the original ACH transaction amount.");
-            }
-
-            if (!IsAchRefundable(achTransactionLookup.Transaction))
+            if (cardTransactionLookup.Transaction.CardTransactionStatus != HelcimCardTransactionStatus.Approved)
             {
                 throw new InvalidOperationException(
-                    $"Helcim ACH transaction {requestTransactionId} is not in a refundable state.");
+                    $"Helcim card transaction {requestTransactionId} is not approved and cannot be refunded or reversed.");
             }
+
+            if (cardTransactionLookup.Transaction.Type != HelcimCardTransactionType.Purchase
+                && cardTransactionLookup.Transaction.Type != HelcimCardTransactionType.Capture)
+            {
+                throw new InvalidOperationException(
+                    $"Helcim card transaction {requestTransactionId} has type {cardTransactionLookup.Transaction.Type} and cannot be refunded or reversed.");
+            }
+
+            if (IsDebitCardType(cardTransactionLookup.Transaction.CardType))
+            {
+                throw new InvalidOperationException(
+                    $"Helcim card transaction {requestTransactionId} was processed as debit (cardType DB). Debit refunds must be completed in person using Helcim payment hardware.");
+            }
+
+            var invoice = await ResolveInvoiceForCardTransactionAsync(cardTransactionLookup.Transaction).ConfigureAwait(false);
+            var localTransaction = await ResolveLocalTransactionAsync(invoice, requestTransactionId).ConfigureAwait(false);
+
+            var cardBatchId = cardTransactionLookup.Transaction.CardBatchId;
+            if (cardBatchId <= 0)
+            {
+                throw new InvalidOperationException(
+                    $"Helcim card transaction {requestTransactionId} does not have a valid card batch id.");
+            }
+
+            var cardBatch = await TryGetCardBatchById(cardBatchId).ConfigureAwait(false)
+                ?? throw new InvalidOperationException($"Unable to find Helcim card batch {cardBatchId}.");
 
             var idempotencyKey = string.IsNullOrWhiteSpace(idempotencyKeyInput)
                 ? Guid.NewGuid().ToString()
                 : idempotencyKeyInput.Trim();
+            var ipAddress = ResolveCardAdjustmentIpAddress(requestIpAddress, invoice, localTransaction);
+            var amount = requestedAmount ?? cardTransactionLookup.Transaction.Amount;
+
+            string operation;
+            JObject payload;
+            if (cardBatch.Closed)
+            {
+                if (amount > cardTransactionLookup.Transaction.Amount)
+                {
+                    throw new InvalidOperationException("Refund amount cannot exceed the original card transaction amount.");
+                }
+
+                operation = "refund";
+                payload = new JObject
+                {
+                    ["originalTransactionId"] = requestTransactionId,
+                    ["amount"] = amount,
+                    ["ipAddress"] = ipAddress
+                };
+            }
+            else
+            {
+                if (requestedAmount.HasValue && requestedAmount.Value != cardTransactionLookup.Transaction.Amount)
+                {
+                    throw new InvalidOperationException(
+                        "Open card batches can only be reversed for the full original amount. Omit amount or use the full amount.");
+                }
+
+                operation = "reverse";
+                amount = cardTransactionLookup.Transaction.Amount;
+                payload = new JObject
+                {
+                    ["cardTransactionId"] = requestTransactionId,
+                    ["ipAddress"] = ipAddress
+                };
+            }
 
             var responseJson = await SendJsonRequest(
-                BuildVersionedEndpoint($"/ach/transactions/{requestTransactionId}/refund"),
-                HttpMethod.Put,
-                new JObject
-                {
-                    ["amount"] = amount
-                },
+                BuildVersionedEndpoint($"/payment/{operation}"),
+                HttpMethod.Post,
+                payload,
                 new Dictionary<string, string>
                 {
                     ["idempotency-key"] = idempotencyKey
                 }).ConfigureAwait(false);
 
-            var localRefundRecorded = await TryApplyImmediateRefundPayment(
-                invoice,
-                requestTransactionId,
-                amount,
-                localTransaction).ConfigureAwait(false);
+            var adjustmentTransactionId = TryExtractTransactionId(responseJson);
 
-            var refundTransactionId = TryExtractRefundTransactionId(responseJson);
-            var storedRefundTransaction = await TryStoreRefundTransactionAsync(
+            return new HelcimCardRefundResponse
+            {
+                Success = true,
+                TransactionId = requestTransactionId,
+                InvoiceId = invoice.InvoiceId,
+                InvoiceNumber = invoice.InvoiceNumber ?? string.Empty,
+                Amount = amount,
+                BatchClosed = cardBatch.Closed,
+                Operation = operation,
+                AdjustmentTransactionId = adjustmentTransactionId,
+                LocalRefundRecorded = false,
+                RequiresReconciliation = true,
+                IdempotencyKey = idempotencyKey,
+                RawResponse = responseJson
+            };
+        }
+
+        private async Task<HelcimAchRefundResponse> AdjustAchTransactionFromLookup(
+            AchTransactionLookup achTransactionLookup,
+            decimal? requestedAmount,
+            string? idempotencyKeyInput)
+        {
+            var invoice = await ResolveInvoiceForAchTransactionAsync(
+                achTransactionLookup.Transaction,
+                achTransactionLookup.Transaction.OrderId,
+                achTransactionLookup.Transaction.InvoiceNumber).ConfigureAwait(false);
+            var localTransaction = await ResolveLocalTransactionAsync(
+                invoice,
+                achTransactionLookup.Transaction.TransactionId).ConfigureAwait(false);
+
+            return await AdjustAchTransactionInternal(
+                achTransactionLookup,
                 invoice,
                 localTransaction,
-                requestTransactionId,
-                refundTransactionId).ConfigureAwait(false);
-            if (storedRefundTransaction.HasValue)
+                requestedAmount,
+                idempotencyKeyInput).ConfigureAwait(false);
+        }
+
+        private async Task<HelcimAchRefundResponse> AdjustAchTransactionInternal(
+            AchTransactionLookup achTransactionLookup,
+            HelcimInvoiceResponse invoice,
+            StudentCourseTransactionResponse? localTransaction,
+            decimal? requestedAmount,
+            string? idempotencyKeyInput)
+        {
+            var requestTransactionId = achTransactionLookup.Transaction.TransactionId;
+            var operation = DetermineAchAdjustmentOperation(achTransactionLookup.Transaction, requestTransactionId);
+
+            var idempotencyKey = string.IsNullOrWhiteSpace(idempotencyKeyInput)
+                ? Guid.NewGuid().ToString()
+                : idempotencyKeyInput.Trim();
+
+            decimal amount;
+            int? refundTransactionId = null;
+            var localRefundRecorded = false;
+            var requiresReconciliation = false;
+            var latestAchTransaction = achTransactionLookup.Transaction;
+            string responseJson;
+
+            if (operation == "refund")
             {
-                refundTransactionId = storedRefundTransaction;
+                amount = requestedAmount ?? achTransactionLookup.Transaction.Amount;
+                if (amount <= 0m)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(requestedAmount), "Refund amount must be greater than zero.");
+                }
+
+                if (amount > achTransactionLookup.Transaction.Amount)
+                {
+                    throw new InvalidOperationException("Refund amount cannot exceed the original ACH transaction amount.");
+                }
+
+                responseJson = await SendJsonRequest(
+                    BuildVersionedEndpoint($"/ach/transactions/{requestTransactionId}/refund"),
+                    HttpMethod.Put,
+                    new JObject
+                    {
+                        ["amount"] = amount
+                    },
+                    new Dictionary<string, string>
+                    {
+                        ["idempotency-key"] = idempotencyKey
+                    }).ConfigureAwait(false);
+
+                refundTransactionId = TryExtractRefundTransactionId(responseJson);
+            }
+            else
+            {
+                amount = achTransactionLookup.Transaction.Amount;
+
+                if (requestedAmount.HasValue
+                    && requestedAmount.Value > 0m
+                    && requestedAmount.Value != achTransactionLookup.Transaction.Amount)
+                {
+                    throw new InvalidOperationException(
+                        $"ACH {operation} can only be applied to the full original amount. Omit amount or use the full amount.");
+                }
+
+                responseJson = await SendJsonRequest(
+                    BuildVersionedEndpoint($"/ach/transactions/{requestTransactionId}/{operation}"),
+                    operation == "cancel" ? HttpMethod.Patch : HttpMethod.Put,
+                    null,
+                    new Dictionary<string, string>
+                    {
+                        ["idempotency-key"] = idempotencyKey
+                    }).ConfigureAwait(false);
+            }
+
+            var refreshedInvoice = await RefreshInvoiceForAchSynchronizationAsync(invoice).ConfigureAwait(false);
+            await TrySyncAchTransactionsByInvoiceAsync(refreshedInvoice, localTransaction, null).ConfigureAwait(false);
+
+            if (operation == "refund")
+            {
+                if (!refundTransactionId.HasValue || refundTransactionId.Value <= 0)
+                {
+                    var refundLookup = await TryFindRecentAchRefundTransaction(refreshedInvoice, requestTransactionId).ConfigureAwait(false);
+                    if (refundLookup != null)
+                    {
+                        refundTransactionId = refundLookup.Transaction.TransactionId;
+                    }
+                }
+
+                if (refundTransactionId.HasValue && refundTransactionId.Value > 0)
+                {
+                    var storedRefundTransactions = await GetStoredTransactionsByIdAsync(refundTransactionId.Value).ConfigureAwait(false);
+                    localRefundRecorded = HasCompletedTransactionDetails(storedRefundTransactions);
+                }
+
+                requiresReconciliation = !localRefundRecorded;
+            }
+            else
+            {
+                var refreshedLookup = await TryGetAchTransactionByTransactionId(requestTransactionId).ConfigureAwait(false);
+                if (refreshedLookup != null)
+                {
+                    latestAchTransaction = refreshedLookup.Transaction;
+                }
+
+                requiresReconciliation = !IsAchTerminalReversalState(latestAchTransaction);
             }
 
             return new HelcimAchRefundResponse
@@ -595,12 +827,46 @@ namespace Helcim.Implementation.Services
                 InvoiceId = invoice.InvoiceId,
                 InvoiceNumber = invoice.InvoiceNumber,
                 Amount = amount,
+                Operation = operation,
                 RefundTransactionId = refundTransactionId,
-                LocalRefundRecorded = localRefundRecorded || refundTransactionId.HasValue,
-                RequiresReconciliation = !refundTransactionId.HasValue,
+                LocalRefundRecorded = localRefundRecorded,
+                RequiresReconciliation = requiresReconciliation,
                 IdempotencyKey = idempotencyKey,
-                RawResponse = responseJson
+                RawResponse = responseJson,
+                StatusAuth = latestAchTransaction.StatusAuth,
+                StatusClearing = latestAchTransaction.StatusClearing,
+                StatusBatch = latestAchTransaction.StatusBatch
             };
+        }
+
+        private async Task<HelcimInvoiceResponse> RefreshInvoiceForAchSynchronizationAsync(HelcimInvoiceResponse invoice)
+        {
+            if (invoice.InvoiceId > 0)
+            {
+                try
+                {
+                    return await GetInvoiceByInvoiceId(invoice.InvoiceId).ConfigureAwait(false);
+                }
+                catch (InvalidOperationException)
+                {
+                }
+                catch (JsonException)
+                {
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(invoice.InvoiceNumber))
+            {
+                try
+                {
+                    return await GetInvoiceByInvoiceNumber(invoice.InvoiceNumber).ConfigureAwait(false);
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+
+            return invoice;
         }
 
         private async Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceIdInternal(int invoiceId, string? webhookRawBody)
@@ -1205,31 +1471,90 @@ namespace Helcim.Implementation.Services
                 : PaymentType.Credit;
 
         private static HelcimCardTransactionStatus MapAchTransactionStatus(HelcimAchAuthorizationStatus statusAuth)
-            => statusAuth switch
-            {
-                HelcimAchAuthorizationStatus.Declined => HelcimCardTransactionStatus.Declined,
-                _ => HelcimCardTransactionStatus.Approved
-            };
+            => IsAchTerminalAuthorizationFailure(statusAuth)
+                ? HelcimCardTransactionStatus.Declined
+                : HelcimCardTransactionStatus.Approved;
 
         private static bool IsAchRefundTransaction(HelcimAchTransactionResponse achTransaction)
             => achTransaction.OriginalTransactionId > 0
                 || string.Equals(achTransaction.LegacyType, "REFUND", StringComparison.OrdinalIgnoreCase);
 
         private static bool IsAchSettled(HelcimAchTransactionResponse achTransaction)
-            => achTransaction.StatusAuth == HelcimAchAuthorizationStatus.Approved
-                && achTransaction.StatusClearing == HelcimAchClearingStatus.Approved
+            => (int)achTransaction.StatusAuth == AchStatusAuthApproved
+                && (int)achTransaction.StatusClearing == AchStatusClearingApproved
                 && achTransaction.DateClosed.HasValue;
 
         private static bool IsAchEligibleForStorage(HelcimAchTransactionResponse achTransaction)
             => IsAchSettled(achTransaction)
                 || (achTransaction.DateClosed.HasValue
-                    && (achTransaction.StatusAuth == HelcimAchAuthorizationStatus.Declined
-                        || achTransaction.StatusAuth == HelcimAchAuthorizationStatus.Cancelled
-                        || achTransaction.StatusClearing == HelcimAchClearingStatus.Declined));
+                    && (IsAchTerminalAuthorizationFailure(achTransaction.StatusAuth)
+                        || (int)achTransaction.StatusClearing == AchStatusClearingDeclined));
 
         private static bool IsAchRefundable(HelcimAchTransactionResponse achTransaction)
-            => achTransaction.StatusBatch == HelcimAchBatchStatus.Closed
-                && achTransaction.StatusAuth == HelcimAchAuthorizationStatus.Approved;
+            => (int)achTransaction.StatusBatch == AchStatusBatchClosed
+                && (int)achTransaction.StatusAuth == AchStatusAuthApproved;
+
+        private static bool CanAdjustAchTransaction(HelcimAchTransactionResponse achTransaction)
+        {
+            var statusAuth = (int)achTransaction.StatusAuth;
+            var statusBatch = (int)achTransaction.StatusBatch;
+
+            return (statusBatch == AchStatusBatchClosed && statusAuth == AchStatusAuthApproved)
+                || (statusBatch == AchStatusBatchOpen && statusAuth == AchStatusAuthApproved)
+                || (statusBatch == AchStatusBatchOpen && statusAuth == AchStatusAuthPending);
+        }
+
+        private static bool IsAchTerminalAuthorizationFailure(HelcimAchAuthorizationStatus statusAuth)
+        {
+            var value = (int)statusAuth;
+            return value == AchStatusAuthDeclined || value == AchStatusAuthCancelled;
+        }
+
+        private static bool IsAchTerminalReversalState(HelcimAchTransactionResponse achTransaction)
+            => IsAchTerminalAuthorizationFailure(achTransaction.StatusAuth)
+                || (int)achTransaction.StatusClearing == AchStatusClearingDeclined;
+
+        private static string DetermineAchAdjustmentOperation(HelcimAchTransactionResponse achTransaction, int transactionId)
+        {
+            if (IsAchRefundTransaction(achTransaction))
+            {
+                throw new InvalidOperationException(
+                    $"Helcim ACH transaction {transactionId} is already a refund transaction and cannot be adjusted again.");
+            }
+
+            var statusAuth = (int)achTransaction.StatusAuth;
+            var statusBatch = (int)achTransaction.StatusBatch;
+
+            if (statusAuth == AchStatusAuthDeclined)
+            {
+                throw new InvalidOperationException(
+                    $"Helcim ACH transaction {transactionId} was declined and cannot be refunded, voided, or cancelled.");
+            }
+
+            if (statusAuth == AchStatusAuthCancelled)
+            {
+                throw new InvalidOperationException(
+                    $"Helcim ACH transaction {transactionId} is already voided/cancelled and cannot be adjusted again.");
+            }
+
+            if (statusBatch == AchStatusBatchClosed && statusAuth == AchStatusAuthApproved)
+            {
+                return "refund";
+            }
+
+            if (statusBatch == AchStatusBatchOpen && statusAuth == AchStatusAuthApproved)
+            {
+                return "void";
+            }
+
+            if (statusBatch == AchStatusBatchOpen && statusAuth == AchStatusAuthPending)
+            {
+                return "cancel";
+            }
+
+            throw new InvalidOperationException(
+                $"Helcim ACH transaction {transactionId} is not in an adjustable state. statusAuth={achTransaction.StatusAuth}, statusClearing={achTransaction.StatusClearing}, statusBatch={achTransaction.StatusBatch}.");
+        }
 
         private static bool ShouldApplyCardPayment(HelcimInvoiceResponse invoice, HelcimCardTransactionResponse cardTransaction)
             => cardTransaction.CardTransactionStatus == HelcimCardTransactionStatus.Approved
@@ -1509,13 +1834,28 @@ namespace Helcim.Implementation.Services
                 || string.Equals(invoiceNumber, normalizedPaymentCode, StringComparison.OrdinalIgnoreCase);
         }
 
-        private async Task<CardTransactionLookup?> TryGetCardTransactionById(int transactionId)
+        private async Task<CardTransactionLookup?> TryGetCardTransactionById(int transactionId, bool requireInvoiceNumber = true)
         {
             try
             {
-                var cardTransactionRaw = await SendGetRequest(BuildVersionedEndpoint($"/card-transactions/{transactionId}")).ConfigureAwait(false);
-                var cardTransaction = JsonConvert.DeserializeObject<HelcimCardTransactionResponse>(cardTransactionRaw);
-                if (cardTransaction == null || string.IsNullOrWhiteSpace(cardTransaction.InvoiceNumber))
+                var cardTransactionRaw = await SendGetRequest(
+                    BuildVersionedEndpoint($"/card-transactions/{transactionId}"),
+                    allowEmptyResponse: true).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(cardTransactionRaw))
+                {
+                    return null;
+                }
+
+                var cardTransactionToken = JToken.Parse(cardTransactionRaw);
+                var cardTransactionData = cardTransactionToken["transaction"] as JObject ?? cardTransactionToken as JObject;
+                if (cardTransactionData == null || IsAchTransactionResponse(cardTransactionData))
+                {
+                    return null;
+                }
+
+                var cardTransaction = cardTransactionData.ToObject<HelcimCardTransactionResponse>();
+                if (cardTransaction == null
+                    || (requireInvoiceNumber && string.IsNullOrWhiteSpace(cardTransaction.InvoiceNumber)))
                 {
                     return null;
                 }
@@ -1526,7 +1866,15 @@ namespace Helcim.Implementation.Services
                     TransactionRaw = cardTransactionRaw
                 };
             }
-            catch
+            catch (HelcimRequestException ex) when (IsLookupMiss(ex))
+            {
+                return null;
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+            catch (InvalidOperationException)
             {
                 return null;
             }
@@ -1534,11 +1882,8 @@ namespace Helcim.Implementation.Services
 
         private async Task<CardTransactionLookup?> TryGetCardTransactionByInvoiceNumber(string invoiceNumber)
         {
-            var cardTransactionEndpoint = BuildVersionedEndpoint($"/card-transactions?invoiceNumber={Uri.EscapeDataString(invoiceNumber)}");
-            var cardTransactionRaw = await SendGetRequest(cardTransactionEndpoint).ConfigureAwait(false);
-            var cardTransactions = JsonConvert.DeserializeObject<List<HelcimCardTransactionResponse>>(cardTransactionRaw);
-            var cardTransaction = cardTransactions?
-                .Where(transaction => string.Equals(transaction.InvoiceNumber, invoiceNumber, StringComparison.OrdinalIgnoreCase))
+            var cardTransactions = await GetCardTransactionsByInvoiceNumber(invoiceNumber).ConfigureAwait(false);
+            var cardTransaction = cardTransactions
                 .OrderByDescending(transaction => transaction.TransactionId)
                 .FirstOrDefault();
 
@@ -1554,11 +1899,117 @@ namespace Helcim.Implementation.Services
             };
         }
 
+        private async Task<List<HelcimCardTransactionResponse>> GetCardTransactionsByInvoiceNumber(string invoiceNumber)
+        {
+            var cardTransactionEndpoint = BuildVersionedEndpoint($"/card-transactions?invoiceNumber={Uri.EscapeDataString(invoiceNumber)}");
+            var cardTransactionRaw = await SendGetRequest(cardTransactionEndpoint).ConfigureAwait(false);
+            return JsonConvert.DeserializeObject<List<HelcimCardTransactionResponse>>(cardTransactionRaw)?
+                .Where(transaction => string.Equals(transaction.InvoiceNumber, invoiceNumber, StringComparison.OrdinalIgnoreCase))
+                .ToList()
+                ?? new List<HelcimCardTransactionResponse>();
+        }
+
+        private async Task<HelcimInvoiceResponse> ResolveInvoiceForCardTransactionAsync(HelcimCardTransactionResponse cardTransaction)
+        {
+            if (!string.IsNullOrWhiteSpace(cardTransaction.InvoiceNumber))
+            {
+                return await GetInvoiceByInvoiceNumber(cardTransaction.InvoiceNumber).ConfigureAwait(false);
+            }
+
+            var existingDetailedTransaction = await GetExistingDetailedTransactionAsync(cardTransaction.TransactionId).ConfigureAwait(false);
+            if (existingDetailedTransaction?.InvoiceId > 0)
+            {
+                return await GetInvoiceByInvoiceId(existingDetailedTransaction.InvoiceId).ConfigureAwait(false);
+            }
+
+            if (!string.IsNullOrWhiteSpace(existingDetailedTransaction?.InvoiceNumber))
+            {
+                return await GetInvoiceByInvoiceNumber(existingDetailedTransaction.InvoiceNumber).ConfigureAwait(false);
+            }
+
+            throw new InvalidOperationException(
+                $"Unable to resolve a Helcim invoice for card transaction {cardTransaction.TransactionId}.");
+        }
+
+        private async Task<CardBatchLookup?> TryGetCardBatchById(int cardBatchId)
+        {
+            try
+            {
+                var cardBatchRaw = await SendGetRequest(BuildVersionedEndpoint($"/card-batches/{cardBatchId}")).ConfigureAwait(false);
+                var token = JToken.Parse(cardBatchRaw);
+                var batchToken = token["cardBatch"] ?? token["batch"] ?? token;
+                var closed = batchToken.Value<bool?>("closed");
+                if (!closed.HasValue)
+                {
+                    return null;
+                }
+
+                return new CardBatchLookup
+                {
+                    CardBatchId = batchToken.Value<int?>("id")
+                        ?? batchToken.Value<int?>("cardBatchId")
+                        ?? cardBatchId,
+                    Closed = closed.Value,
+                    Raw = cardBatchRaw
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private async Task<CardTransactionLookup?> TryResolveCardAdjustmentTransactionAsync(
+            HelcimInvoiceResponse invoice,
+            int originalTransactionId,
+            HelcimCardTransactionType expectedType,
+            int? adjustmentTransactionId)
+        {
+            if (adjustmentTransactionId.HasValue && adjustmentTransactionId.Value > 0)
+            {
+                var byId = await TryGetCardTransactionById(adjustmentTransactionId.Value, requireInvoiceNumber: false).ConfigureAwait(false);
+                if (byId != null && byId.Transaction.Type == expectedType)
+                {
+                    return byId;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(invoice.InvoiceNumber))
+            {
+                return null;
+            }
+
+            var transactions = await GetCardTransactionsByInvoiceNumber(invoice.InvoiceNumber).ConfigureAwait(false);
+            var adjustment = transactions
+                .Where(transaction => transaction.TransactionId != originalTransactionId)
+                .Where(transaction => transaction.Type == expectedType)
+                .OrderByDescending(transaction => transaction.TransactionId)
+                .FirstOrDefault();
+
+            if (adjustment == null)
+            {
+                return null;
+            }
+
+            return new CardTransactionLookup
+            {
+                Transaction = adjustment,
+                TransactionRaw = JsonConvert.SerializeObject(adjustment)
+            };
+        }
+
         private async Task<AchTransactionLookup?> TryGetAchTransactionByTransactionId(int transactionId)
         {
             try
             {
-                var achTransactionRaw = await SendGetRequest(BuildVersionedEndpoint($"/ach/transactions/{transactionId}")).ConfigureAwait(false);
+                var achTransactionRaw = await SendGetRequest(
+                    BuildVersionedEndpoint($"/ach/transactions/{transactionId}"),
+                    allowEmptyResponse: true).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(achTransactionRaw))
+                {
+                    return null;
+                }
+
                 var achPayload = JObject.Parse(achTransactionRaw);
                 var singleTransactionData = achPayload["transaction"] as JObject ?? achPayload;
                 var achTransaction = ExtractAchTransaction(singleTransactionData);
@@ -1570,7 +2021,15 @@ namespace Helcim.Implementation.Services
                     TransactionRaw = achTransactionRaw
                 };
             }
-            catch
+            catch (HelcimRequestException ex) when (IsLookupMiss(ex))
+            {
+                return null;
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+            catch (InvalidOperationException)
             {
                 return null;
             }
@@ -1782,12 +2241,16 @@ namespace Helcim.Implementation.Services
         }
 
         private static int? TryExtractRefundTransactionId(string responseJson)
+            => TryExtractTransactionId(responseJson);
+
+        private static int? TryExtractTransactionId(string responseJson)
         {
             try
             {
                 var token = JToken.Parse(responseJson);
                 return token["transaction"]?.Value<int?>("id")
                     ?? token.Value<int?>("id")
+                    ?? token["transaction"]?.Value<int?>("transactionId")
                     ?? token.Value<int?>("transactionId");
             }
             catch
@@ -1841,10 +2304,6 @@ namespace Helcim.Implementation.Services
             string? webhookRawBody)
         {
             var existingTransactions = await GetStoredTransactionsByIdAsync(achTransaction.TransactionId).ConfigureAwait(false);
-            if (HasCompletedTransactionDetails(existingTransactions))
-            {
-                return CreatePaymentCompletionResponse(invoice, achTransaction.TransactionId, "ach", duplicate: true);
-            }
 
             if (ShouldApplyAchPayment(invoice, achTransaction))
             {
@@ -2359,8 +2818,70 @@ namespace Helcim.Implementation.Services
 
         private static PaymentType MapPaymentType(HelcimCardTransactionType cardTransactionType)
             => cardTransactionType == HelcimCardTransactionType.Refund
+                || cardTransactionType == HelcimCardTransactionType.Reverse
                 ? PaymentType.Refund
                 : PaymentType.Credit;
+
+        private static bool IsDebitCardType(string? cardType)
+            => string.Equals(cardType?.Trim(), "DB", StringComparison.OrdinalIgnoreCase);
+
+        private static HelcimTransactionAdjustmentResponse MapAdjustmentResponse(HelcimCardRefundResponse response)
+            => new()
+            {
+                Success = response.Success,
+                PaymentFlow = "card",
+                TransactionId = response.TransactionId,
+                InvoiceId = response.InvoiceId,
+                InvoiceNumber = response.InvoiceNumber,
+                Amount = response.Amount,
+                Operation = response.Operation,
+                AdjustmentTransactionId = response.AdjustmentTransactionId,
+                BatchClosed = response.BatchClosed,
+                LocalAdjustmentRecorded = response.LocalRefundRecorded,
+                RequiresReconciliation = response.RequiresReconciliation,
+                IdempotencyKey = response.IdempotencyKey,
+                RawResponse = response.RawResponse
+            };
+
+        private static HelcimTransactionAdjustmentResponse MapAdjustmentResponse(HelcimAchRefundResponse response)
+            => new()
+            {
+                Success = response.Success,
+                PaymentFlow = "ach",
+                TransactionId = response.TransactionId,
+                InvoiceId = response.InvoiceId,
+                InvoiceNumber = response.InvoiceNumber,
+                Amount = response.Amount,
+                Operation = response.Operation,
+                AdjustmentTransactionId = response.RefundTransactionId,
+                LocalAdjustmentRecorded = response.LocalRefundRecorded,
+                RequiresReconciliation = response.RequiresReconciliation,
+                IdempotencyKey = response.IdempotencyKey,
+                RawResponse = response.RawResponse,
+                StatusAuth = response.StatusAuth,
+                StatusClearing = response.StatusClearing,
+                StatusBatch = response.StatusBatch
+            };
+
+        private static string ResolveCardAdjustmentIpAddress(
+            string? requestIpAddress,
+            HelcimInvoiceResponse invoice,
+            StudentCourseTransactionResponse? localTransaction)
+        {
+            if (!string.IsNullOrWhiteSpace(requestIpAddress))
+            {
+                return requestIpAddress.Trim();
+            }
+
+            var invoiceIpAddress = invoice.LineItems?.FirstOrDefault()?.UserIp;
+            if (!string.IsNullOrWhiteSpace(invoiceIpAddress))
+            {
+                return invoiceIpAddress.Trim();
+            }
+
+            throw new InvalidOperationException(
+                $"A customer IP address is required to refund or reverse Helcim card transaction {localTransaction?.PaymentCode ?? invoice.InvoiceNumber ?? "unknown"}.");
+        }
 
         private Task UpdateWebhookProcessing(
             string webhookId,
@@ -2404,6 +2925,11 @@ namespace Helcim.Implementation.Services
                 : path.StartsWith("/", StringComparison.Ordinal)
                     ? path
                     : "/" + path;
+
+        private static bool IsLookupMiss(HelcimRequestException ex)
+            => !ex.IsUpstreamFailure
+                && (ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("returned no results", StringComparison.OrdinalIgnoreCase));
 
         private async Task<List<HelcimCardTransactionResponse>> GetCardTransactionsForReconciliation(DateTime startDate, DateTime endDate)
         {
@@ -2510,16 +3036,111 @@ namespace Helcim.Implementation.Services
                     return string.Empty;
                 }
 
-                throw new InvalidOperationException($"Helcim {method} request returned an empty response for endpoint {endpoint}.");
+                throw new HelcimRequestException(
+                    $"Helcim {method} request failed or returned an empty response for endpoint {endpoint}.",
+                    isUpstreamFailure: true);
             }
 
+            ThrowIfHelcimErrorResponse(responseJson, method, endpoint);
             return responseJson;
+        }
+
+        private static void ThrowIfHelcimErrorResponse(string responseJson, HttpMethod method, string endpoint)
+        {
+            try
+            {
+                var token = JToken.Parse(responseJson);
+                if (token.Type != JTokenType.Object)
+                {
+                    return;
+                }
+
+                var obj = (JObject)token;
+                var status = obj.Value<string>("status");
+                if (!string.Equals(status, "error", StringComparison.OrdinalIgnoreCase) && obj["errors"] == null)
+                {
+                    return;
+                }
+
+                throw new HelcimRequestException(
+                    BuildHelcimErrorMessage(obj, method, endpoint),
+                    isUpstreamFailure: false,
+                    rawResponse: responseJson);
+            }
+            catch (JsonReaderException)
+            {
+                // Non-JSON responses are handled by the caller as opaque success payloads.
+            }
+        }
+
+        private static string BuildHelcimErrorMessage(JObject errorObject, HttpMethod method, string endpoint)
+        {
+            var messages = new List<string>();
+
+            var topLevelMessage = errorObject.Value<string>("message");
+            if (!string.IsNullOrWhiteSpace(topLevelMessage))
+            {
+                messages.Add(topLevelMessage.Trim());
+            }
+
+            if (errorObject["errors"] is JObject errorsObject)
+            {
+                foreach (var errorGroup in errorsObject.Properties())
+                {
+                    if (errorGroup.Value is not JArray items)
+                    {
+                        continue;
+                    }
+
+                    foreach (var item in items.OfType<JObject>())
+                    {
+                        var message = item.Value<string>("message");
+                        var source = item.Value<string>("source");
+                        var data = item.Value<string>("data");
+
+                        var parts = new List<string>();
+                        if (!string.IsNullOrWhiteSpace(message))
+                        {
+                            parts.Add(message.Trim());
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(source))
+                        {
+                            parts.Add($"source: {source.Trim()}");
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(data))
+                        {
+                            parts.Add($"value: {data.Trim()}");
+                        }
+
+                        if (parts.Count > 0)
+                        {
+                            messages.Add(string.Join(", ", parts));
+                        }
+                    }
+                }
+            }
+
+            if (messages.Count == 0)
+            {
+                messages.Add("Helcim reported that the request failed.");
+            }
+
+            return $"Helcim {method} request failed for endpoint {endpoint}. {string.Join(" | ", messages.Distinct())}";
         }
 
         private sealed class CardTransactionLookup
         {
             public HelcimCardTransactionResponse Transaction { get; set; } = null!;
             public string TransactionRaw { get; set; } = string.Empty;
+        }
+
+        private sealed class CardBatchLookup
+        {
+            public int CardBatchId { get; set; }
+            public bool Closed { get; set; }
+            public string Raw { get; set; } = string.Empty;
         }
 
         private sealed class AchTransactionLookup

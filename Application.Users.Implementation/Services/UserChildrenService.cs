@@ -179,8 +179,8 @@ namespace Application.Users.Implementation
             {
                 ChildId = existingChild.ChildId,
                 FamilyId = existingChild.FamilyId,
-                FirstName = existingChild.FirstName,
-                LastName = existingChild.LastName,
+                FirstName = child.FirstName ?? existingChild.FirstName,
+                LastName = child.LastName ?? existingChild.LastName,
                 ArabicName = child.ArabicName ?? existingChild.ArabicName,
                 HasSurahCatalogBeenProvided = existingChild.HasSurahCatalogBeenProvided,
                 DateOfBirth = child.DateOfBirth ?? existingChild.DateOfBirth,

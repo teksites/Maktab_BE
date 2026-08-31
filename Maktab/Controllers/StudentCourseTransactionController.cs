@@ -1,4 +1,5 @@
 using Courses.Services;
+using Helcim;
 using Helcim.Services;
 using Maktab.Attributes;
 using MaktabDataContracts.Enums;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Users.Services;
 
@@ -102,9 +104,11 @@ public class StudentCourseTransactionController : ControllerBase
 
     [ApiAuthorize(false, false, UserRoleType.Admin)]
     [HttpGet("family/{familyId:guid}/helcim/detailed")]
-    public async Task<List<HelcimTransactionResponseDetailed>> GetDetailedHelcimTransactionsByFamilyId(Guid familyId)
+    public async Task<List<HelcimTransactionResponseDetailedView>> GetDetailedHelcimTransactionsByFamilyId(Guid familyId)
     {
-        return await _helcimService.GetDetailedByFamilyId(familyId).ConfigureAwait(false);
+        return (await _helcimService.GetDetailedByFamilyId(familyId).ConfigureAwait(false))
+            .Select(item => item.ToView())
+            .ToList();
     }
 
     [ApiAuthorize(false, false, UserRoleType.Admin)]
@@ -116,9 +120,11 @@ public class StudentCourseTransactionController : ControllerBase
 
     [ApiAuthorize(false, false, UserRoleType.Admin)]
     [HttpGet("paymentcode/{paymentCode}/helcim/detailed")]
-    public async Task<List<HelcimTransactionResponseDetailed>> GetDetailedHelcimTransactionsByPaymentCode(string paymentCode)
+    public async Task<List<HelcimTransactionResponseDetailedView>> GetDetailedHelcimTransactionsByPaymentCode(string paymentCode)
     {
-        return await _helcimService.GetDetailedByPaymentCode(paymentCode).ConfigureAwait(false);
+        return (await _helcimService.GetDetailedByPaymentCode(paymentCode).ConfigureAwait(false))
+            .Select(item => item.ToView())
+            .ToList();
     }
 
     [ApiAuthorize(false, false, UserRoleType.Admin)]
@@ -130,9 +136,11 @@ public class StudentCourseTransactionController : ControllerBase
 
     [ApiAuthorize(false, false, UserRoleType.Admin)]
     [HttpGet("transaction/{transactionId:guid}/helcim/detailed")]
-    public async Task<List<HelcimTransactionResponseDetailed>> GetDetailedHelcimTransactionsByTransactionId(Guid transactionId)
+    public async Task<List<HelcimTransactionResponseDetailedView>> GetDetailedHelcimTransactionsByTransactionId(Guid transactionId)
     {
-        return await _helcimService.GetDetailedByMaktabTransactionId(transactionId).ConfigureAwait(false);
+        return (await _helcimService.GetDetailedByMaktabTransactionId(transactionId).ConfigureAwait(false))
+            .Select(item => item.ToView())
+            .ToList();
     }
 
     //[HttpPost]

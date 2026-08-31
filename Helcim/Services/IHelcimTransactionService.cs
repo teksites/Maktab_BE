@@ -12,8 +12,10 @@ namespace Helcim.Services
         Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceNumber(string invoiceNumber);
         Task<HelcimReconciliationResponse> ReconcileTransactions(HelcimReconciliationRequest? request = null);
         Task<IReadOnlyList<HelcimAchRefundInvoiceSummaryResponse>> GetAchRefundInvoices(GetAchRefundInvoicesRequest request);
+        Task<HelcimTransactionAdjustmentResponse> RefundTransaction(RefundTransactionRequest request);
         Task<HelcimAchRefundResponse> RefundAchTransaction(RefundAchTransactionRequest request);
         Task<HelcimAchRefundResponse> RefundAchInvoice(RefundAchInvoiceRequest request);
+        Task<HelcimCardRefundResponse> RefundCardTransaction(RefundCardTransactionRequest request);
         Task<HelcimWebhookHandlingStatus> HandleWebhook(
             string rawBody,
             string? webhookId,

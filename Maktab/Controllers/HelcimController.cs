@@ -70,14 +70,116 @@ public class HelcimController : ControllerBase
         => _service.GetAchRefundInvoices(request);
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
+    [HttpPost("byadmin/refund")]
+    public async Task<ActionResult<HelcimTransactionAdjustmentResponse>> RefundTransaction(RefundTransactionRequest request)
+    {
+        try
+        {
+            return Ok(await _service.RefundTransaction(request).ConfigureAwait(false));
+        }
+        catch (HelcimRequestException ex)
+        {
+            return StatusCode(ex.IsUpstreamFailure ? 502 : 400, new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("Unable to find", StringComparison.OrdinalIgnoreCase)
+            || ex.Message.Contains("Unable to resolve", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpPost("byadmin/ach/refund")]
-    public Task<HelcimAchRefundResponse> RefundAchTransaction(RefundAchTransactionRequest request)
-        => _service.RefundAchTransaction(request);
+    public async Task<ActionResult<HelcimAchRefundResponse>> RefundAchTransaction(RefundAchTransactionRequest request)
+    {
+        try
+        {
+            return Ok(await _service.RefundAchTransaction(request).ConfigureAwait(false));
+        }
+        catch (HelcimRequestException ex)
+        {
+            return StatusCode(ex.IsUpstreamFailure ? 502 : 400, new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("Unable to find", StringComparison.OrdinalIgnoreCase)
+            || ex.Message.Contains("Unable to resolve", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpPost("byadmin/ach/refund/invoice")]
-    public Task<HelcimAchRefundResponse> RefundAchInvoice(RefundAchInvoiceRequest request)
-        => _service.RefundAchInvoice(request);
+    public async Task<ActionResult<HelcimAchRefundResponse>> RefundAchInvoice(RefundAchInvoiceRequest request)
+    {
+        try
+        {
+            return Ok(await _service.RefundAchInvoice(request).ConfigureAwait(false));
+        }
+        catch (HelcimRequestException ex)
+        {
+            return StatusCode(ex.IsUpstreamFailure ? 502 : 400, new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("Unable to find", StringComparison.OrdinalIgnoreCase)
+            || ex.Message.Contains("Unable to resolve", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
+    [HttpPost("byadmin/card/refund")]
+    public async Task<ActionResult<HelcimCardRefundResponse>> RefundCardTransaction(RefundCardTransactionRequest request)
+    {
+        try
+        {
+            return Ok(await _service.RefundCardTransaction(request).ConfigureAwait(false));
+        }
+        catch (HelcimRequestException ex)
+        {
+            return StatusCode(ex.IsUpstreamFailure ? 502 : 400, new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("Unable to find", StringComparison.OrdinalIgnoreCase)
+            || ex.Message.Contains("Unable to resolve", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 
     [HttpPost("/api/payment-notifier")]
     public async Task<IActionResult> HelcimWebhook([FromBody] JsonElement body)
