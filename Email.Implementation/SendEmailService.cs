@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Mail;
 using System.Net.Mime;
+using System.Text;
 
 namespace Email.Implementation
 {
@@ -21,15 +22,16 @@ namespace Email.Implementation
             string fromAddress = _configuration["Smtp:FromAddress"].ToString();
             string userName = _configuration["Smtp:UserName"].ToString();
             string password = _configuration["Smtp:Password"].ToString();
-
-            using (MailMessage mm = BuildMailMessage(fromAddress, emailData))
+            bool enableSsl = GetEnableSsl();
+            string schoolName = GetFooterSchoolName();
+            using (MailMessage mm = BuildMailMessage(fromAddress, emailData, AppendSystemFooter(emailData.Body, schoolName)))
             {
                 try
                 {
                     using (SmtpClient smtp = new SmtpClient())
                     {
                         smtp.Host = host;
-                        smtp.EnableSsl = false;
+                        smtp.EnableSsl = enableSsl;
                         NetworkCredential NetworkCred = new NetworkCredential(userName, password);
                         smtp.UseDefaultCredentials = false;
                         smtp.Credentials = NetworkCred;
@@ -55,15 +57,16 @@ namespace Email.Implementation
             string fromAddress = _configuration["Smtp:FromAddress"].ToString();
             string userName = _configuration["Smtp:UserName"].ToString();
             string password = _configuration["Smtp:Password"].ToString();
-
-            using (MailMessage mm = BuildMailMessage(fromAddress, emailData))
+            bool enableSsl = GetEnableSsl();
+            string schoolName = GetFooterSchoolName();
+            using (MailMessage mm = BuildMailMessage(fromAddress, emailData, AppendSystemFooter(emailData.Body, schoolName)))
             {
                 try
                 {
                     using (SmtpClient smtp = new SmtpClient())
                     {
                         smtp.Host = host;
-                        smtp.EnableSsl = false;
+                        smtp.EnableSsl = enableSsl;
                         NetworkCredential NetworkCred = new NetworkCredential(userName, password);
                         smtp.UseDefaultCredentials = false;
                         smtp.Credentials = NetworkCred;
@@ -89,17 +92,18 @@ namespace Email.Implementation
             string fromAddress = _configuration["Smtp:FromAddress"].ToString();
             string userName = _configuration["Smtp:UserName"].ToString();
             string password = _configuration["Smtp:Password"].ToString();
-
-            using (MailMessage mm = BuildMailMessage(fromAddress, emailData))
+            bool enableSsl = GetEnableSsl();
+            string schoolName = GetFooterSchoolName();
+            using (MailMessage mm = BuildMailMessage(fromAddress, emailData, AppendSystemFooter(emailData.Body, schoolName)))
             {
                 try
                 {
                     using (SmtpClient smtp = new SmtpClient())
                     {
                         smtp.Host = host;
-                        smtp.EnableSsl = true;
+                        smtp.EnableSsl = enableSsl;
                         NetworkCredential NetworkCred = new NetworkCredential(userName, password);
-                        smtp.UseDefaultCredentials = true;
+                        smtp.UseDefaultCredentials = false;
                         smtp.Credentials = NetworkCred;
                         smtp.Port = port;
 
@@ -126,6 +130,16 @@ namespace Email.Implementation
             return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Bcc, emailData.Attachments, emailData.Subject, emailData.Body);
         }
 
+        private static MailMessage BuildMailMessage(string fromAddress, EmailData emailData, string body)
+        {
+            var recipients = new[] { emailData.To }
+                .Where(address => !string.IsNullOrWhiteSpace(address))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Bcc, emailData.Attachments, emailData.Subject, body);
+        }
+
         private static MailMessage BuildMailMessage(string fromAddress, MultiUserEmailData emailData)
         {
             var recipients = emailData.To
@@ -134,6 +148,16 @@ namespace Email.Implementation
                 .ToList();
 
             return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Bcc, emailData.Attachments, emailData.Subject, emailData.Body);
+        }
+
+        private static MailMessage BuildMailMessage(string fromAddress, MultiUserEmailData emailData, string body)
+        {
+            var recipients = emailData.To
+                .Where(address => !string.IsNullOrWhiteSpace(address))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return BuildMailMessage(fromAddress, recipients, emailData.Cc, emailData.Bcc, emailData.Attachments, emailData.Subject, body);
         }
 
         private static MailMessage BuildMailMessage(
@@ -197,6 +221,33 @@ namespace Email.Implementation
             }
 
             return message;
+        }
+
+        private string GetFooterSchoolName()
+            => _configuration["Smtp:FooterSchoolName"]?.Trim() ?? "ICC Brossard Schools and Activities";
+
+        private bool GetEnableSsl()
+            => bool.TryParse(_configuration["Smtp:EnableSsl"], out var enableSsl)
+                ? enableSsl
+                : true;
+
+        private string AppendSystemFooter(string body, string schoolName)
+        {
+            var normalizedBody = body ?? string.Empty;
+            var encodedSchoolName = WebUtility.HtmlEncode(schoolName?.Trim() ?? string.Empty);
+
+            var footer = new StringBuilder();
+            footer.Append(normalizedBody);
+            footer.Append("<hr/>");
+            footer.Append("<div style=\"margin-top:16px;font-size:13px;color:#555;\">");
+            footer.Append("<p><em>Please don't reply to this email. If you have any questions or concerns, please reach out to ");
+            footer.Append(encodedSchoolName);
+            footer.Append(" using the Contact Us form in the portal.</em></p>");
+            footer.Append("<p><em>Veuillez ne pas répondre à ce courriel. Si vous avez des questions ou des préoccupations, veuillez communiquer avec ");
+            footer.Append(encodedSchoolName);
+            footer.Append(" en utilisant le formulaire Nous joindre du portail.</em></p>");
+            footer.Append("</div>");
+            return footer.ToString();
         }
 
     }

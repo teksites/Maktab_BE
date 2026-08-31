@@ -171,6 +171,8 @@ namespace Application.Users.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"UPDATE child_information SET
+                FirstName = @FirstName,
+                LastName = @LastName,
                 OtherHealthConditions = @OtherHealthConditions,
                 Allergies = @Allergies,
                 AcedemicGroupType = @AcedemicGroupType,
@@ -187,6 +189,8 @@ namespace Application.Users.Repository.Implementation
                 WHERE ChildId = @ChildId";
 
             cmd.AddParameter("@ChildId", child.ChildId.ToByteArray());
+            cmd.AddParameter("@FirstName", child.FirstName);
+            cmd.AddParameter("@LastName", child.LastName);
             cmd.AddParameter("@OtherHealthConditions", child.OtherHealthConditions);
             cmd.AddParameter("@Allergies", child.Allergies);
             cmd.AddParameter("@AcedemicGroupType", (int)child.AcedemicGroup);

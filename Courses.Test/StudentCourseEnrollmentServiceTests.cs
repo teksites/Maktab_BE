@@ -1505,7 +1505,7 @@ public class StudentCourseEnrollmentServiceTests
     }
 
     [Fact]
-    public async Task UpdateEnrollment_DoesNotAllowMoveIntoSeatHoldingStatusWhenGroupIsFull()
+    public async Task UpdateEnrollment_DoesNotAllowMoveIntoSeatHoldingStatusWhenGroupIsFull_ForNonAdmin()
     {
         var enrollmentId = Guid.NewGuid();
         var courseId = Guid.NewGuid();
@@ -1549,10 +1549,97 @@ public class StudentCourseEnrollmentServiceTests
             EnrollmentStatus = EnrollmentStatus.Enrolled,
             WillUseDayCare = false,
             DayCareDays = 0
-        }, ifUpdatedByAdmin: true);
+        }, ifUpdatedByAdmin: false);
 
         Assert.False(result);
         repository.Verify(repo => repo.UpdateEnrollment(enrollmentId, It.IsAny<AddStudentCourseEnrollment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateEnrollment_AllowsAdminMoveIntoSeatHoldingStatusWhenGroupIsFull()
+    {
+        var enrollmentId = Guid.NewGuid();
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetEnrollment(enrollmentId))
+            .ReturnsAsync(CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Awaiting));
+        repository
+            .Setup(repo => repo.GetCourseEnrollmentGroupInformation(groupId))
+            .ReturnsAsync(new CourseEnrollmentGroupInformationResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                MaxStudents = 3,
+                IfRegistrationOpen = true,
+                EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>
+                {
+                    [EnrollmentStatus.Enrolled] = 3,
+                    [EnrollmentStatus.Registered] = 1
+                }
+            });
+        repository
+            .Setup(repo => repo.UpdateEnrollment(enrollmentId, It.IsAny<AddStudentCourseEnrollment>()))
+            .ReturnsAsync(true);
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[]
+            {
+                CreateFamilyTransaction(courseId, familyId, new[]
+                {
+                    CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Enrolled)
+                })
+            });
+        transactionService
+            .Setup(service => service.UpdateTransaction(It.IsAny<Guid>(), It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 100));
+
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
+
+        var groupService = new Mock<ICourseEnrollmentGroupService>();
+        groupService
+            .Setup(service => service.SetCourseGroupRegistrationStatus(groupId, false))
+            .ReturnsAsync(new CourseEnrollmentGroupResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                IfRegistrationOpen = false
+            });
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService,
+            groupService: groupService);
+
+        var result = await service.UpdateEnrollment(enrollmentId, new AddStudentCourseEnrollment
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            CourseId = courseId,
+            CourseEnrollmentGroupId = groupId,
+            EnrollmentStatus = EnrollmentStatus.Enrolled,
+            WillUseDayCare = false,
+            DayCareDays = 0
+        }, ifUpdatedByAdmin: true);
+
+        Assert.True(result);
+        repository.Verify(repo => repo.UpdateEnrollment(enrollmentId, It.IsAny<AddStudentCourseEnrollment>()), Times.Once);
+        groupService.Verify(service => service.SetCourseGroupRegistrationStatus(groupId, false), Times.Once);
     }
 
     [Fact]
@@ -1653,7 +1740,7 @@ public class StudentCourseEnrollmentServiceTests
             EnrollmentStatus = EnrollmentStatus.Enrolled,
             WillUseDayCare = false,
             DayCareDays = 0
-        }, ifUpdatedByAdmin: true);
+        }, ifUpdatedByAdmin: false);
 
         Assert.True(result);
         groupService.Verify(service => service.SetCourseGroupRegistrationStatus(groupId, false), Times.Once);

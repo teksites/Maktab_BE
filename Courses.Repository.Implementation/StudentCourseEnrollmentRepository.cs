@@ -148,6 +148,11 @@ namespace Courses.Repository.Implementation
             sce.CourseId,
             sce.ChildId,
             sce.FamilyId,
+            ins.Name AS InstituteName,
+            c.Name AS CourseName,
+            c.NameFr AS CourseNameFr,
+            ceg.GroupTitle,
+            ceg.GroupTitleFr,
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.IsActive,
@@ -174,6 +179,8 @@ namespace Courses.Repository.Implementation
             ui.Relationship
         FROM student_course_enrollment sce
         LEFT JOIN course_enrollment_groups ceg ON ceg.CourseEnrollmentGroupId = sce.CourseEnrollmentGroupId
+        LEFT JOIN courses c ON c.CourseId = sce.CourseId
+        LEFT JOIN institutes ins ON ins.InstituteId = c.InstituteId
         INNER JOIN child_information ci ON ci.ChildId = sce.ChildId
         {FamilyMemberJoinSql}
         WHERE sce.ChildId = @ChildId AND sce.CourseId = @CourseId AND sce.IsActive = TRUE";
@@ -361,6 +368,11 @@ namespace Courses.Repository.Implementation
             sce.CourseId,
             sce.ChildId,
             sce.FamilyId,
+            ins.Name AS InstituteName,
+            c.Name AS CourseName,
+            c.NameFr AS CourseNameFr,
+            ceg.GroupTitle,
+            ceg.GroupTitleFr,
             sce.WillUseDayCare,
             sce.DayCareDays,
             sce.IsActive,
@@ -387,6 +399,8 @@ namespace Courses.Repository.Implementation
             ui.Relationship
         FROM student_course_enrollment sce
         LEFT JOIN course_enrollment_groups ceg ON ceg.CourseEnrollmentGroupId = sce.CourseEnrollmentGroupId
+        LEFT JOIN courses c ON c.CourseId = sce.CourseId
+        LEFT JOIN institutes ins ON ins.InstituteId = c.InstituteId
         INNER JOIN child_information ci ON ci.ChildId = sce.ChildId
         {FamilyMemberJoinSql}
         WHERE sce.{columnName} = @Value AND sce.IsActive = TRUE";
@@ -423,6 +437,9 @@ namespace Courses.Repository.Implementation
                 CourseId = reader.GetGuidFromByteArray("CourseId"),
                 ChildId = reader.GetGuidFromByteArray("ChildId"),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
+                InstituteName = reader.GetStringOrDefault("InstituteName"),
+                CourseName = reader.GetStringOrDefault("CourseName"),
+                CourseNameFr = reader.GetStringOrDefault("CourseNameFr"),
 
                 ChildName = $"{reader.GetString("ChildFirstName")} {reader.GetString("ChildLastName")}",
                 RegistrationNumber = reader.GetStringOrDefault("ChildRegistrationNumber"),
@@ -439,6 +456,10 @@ namespace Courses.Repository.Implementation
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn"),
                 EnrollmentIndex = reader.GetInt32("EnrollmentIndex"),
+                CourseEnrollmentGroupName = reader.GetStringOrDefault("GroupTitle"),
+                CourseEnrollmentGroupNameFr = reader.GetStringOrDefault("GroupTitleFr"),
+                GroupTitle = reader.GetStringOrDefault("GroupTitle"),
+                GroupTitleFr = reader.GetStringOrDefault("GroupTitleFr"),
                 GroupIndex = reader.GetInt32("GroupIndex"),
                 EnrollmentStatus= (EnrollmentStatus)reader.GetInt32("EnrollmentStatus"),
 

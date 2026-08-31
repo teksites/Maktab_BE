@@ -48,7 +48,7 @@ public class HelcimTransactionRepositoryTests
     [Fact]
     public async Task GetDetailedByPaymentCode_MapsRawResponseTransactionResponseAndFamilyId()
     {
-        var database = new FakeDatabase(CreateDetailedReader);
+        var database = new FakeDatabase(() => CreateDetailedReader());
         var repository = new HelcimTransactionRepository(database);
 
         var result = await repository.GetDetailedByPaymentCode("PAY001");
@@ -61,11 +61,24 @@ public class HelcimTransactionRepositoryTests
         Assert.Equal(47889842, item.TransactionId);
         Assert.Equal("[{\"invoiceId\":63677011}]", item.RawResponse);
         Assert.Equal("{\"transactionId\":47889842}", item.TransactionResponse);
+        Assert.Equal("MC", item.CardType);
         Assert.Equal(HelcimCurrency.Cad, item.Currency);
         Assert.Equal(HelcimInvoiceStatus.Paid, item.InvoiceStatus);
         Assert.Equal(HelcimCardTransactionStatus.Approved, item.CardTransactionStatus);
         Assert.Equal(HelcimInvoiceType.Invoice, item.InvoiceType);
         Assert.Equal(HelcimCardTransactionType.Purchase, item.CardTransactionType);
+    }
+
+    [Fact]
+    public async Task GetDetailedByPaymentCode_PreservesRawCardTypeCode()
+    {
+        var database = new FakeDatabase(() => CreateDetailedReader("DB"));
+        var repository = new HelcimTransactionRepository(database);
+
+        var result = await repository.GetDetailedByPaymentCode("PAY001");
+
+        var item = Assert.Single(result);
+        Assert.Equal("DB", item.CardType);
     }
 
     [Fact]
@@ -104,7 +117,7 @@ public class HelcimTransactionRepositoryTests
         return table.CreateDataReader();
     }
 
-    private static DbDataReader CreateDetailedReader()
+    private static DbDataReader CreateDetailedReader(string cardType = "MC")
     {
         var table = new DataTable();
         table.Columns.Add("PaymentCode", typeof(string));
@@ -157,7 +170,7 @@ public class HelcimTransactionRepositoryTests
             "card-token",
             "5413330011",
             "malik ten",
-            "MC",
+            cardType,
             "X",
             "M",
             string.Empty,
