@@ -51,7 +51,8 @@ public class EmailController : ControllerBase
                 To = request.Recipients,
                 Cc = request.RecipientsCC ?? Enumerable.Empty<string>(),
                 Bcc = request.RecipientsBCC ?? Enumerable.Empty<string>(),
-                Attachments = attachments
+                Attachments = attachments,
+                IncludeSystemFooter = false
             }).ConfigureAwait(false);
         }
         catch (Exception)

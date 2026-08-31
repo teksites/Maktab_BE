@@ -1577,7 +1577,9 @@ namespace Courses.Repository.Implementation
                         CourseName = reader.IsDBNull(ordCourseName) ? string.Empty : reader.GetString(ordCourseName),
                         CourseNameFr = reader.IsDBNull(ordCourseNameFr) ? string.Empty : reader.GetString(ordCourseNameFr),
                         ChildName = childName,
-                        ArabicName = reader.IsDBNull(ordChildArabicName) ? string.Empty : reader.GetString(ordChildArabicName),
+                        ArabicName = reader.IsDBNull(ordChildArabicName)
+                            ? string.Empty
+                            : reader.GetString(ordChildArabicName),
                         RegistrationNumber = reader.IsDBNull(ordChildRegistrationNumber) ? string.Empty : reader.GetString(ordChildRegistrationNumber),
                         DateOfBirth = reader.GetDateTime(ordChildDateOfBirth),
                         Gender = (Gender)reader.GetInt32(ordChildGender),

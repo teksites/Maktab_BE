@@ -12,6 +12,7 @@ namespace Courses.Implementation.Services
     {
         private readonly IStudentCourseAttendanceRepository _repository;
         private readonly ICourseStaffAssignmentService _courseStaffAssignmentService;
+        private readonly ICourseService _courseService;
         private readonly ISendEmailService _sendEmailService;
         private readonly IUserService _userService;
 
@@ -19,10 +20,12 @@ namespace Courses.Implementation.Services
             IStudentCourseAttendanceRepository repository,
             ICourseStaffAssignmentService courseStaffAssignmentService,
             ISendEmailService sendEmailService,
-            IUserService userService)
+            IUserService userService,
+            ICourseService courseService)
         {
             _repository = repository;
             _courseStaffAssignmentService = courseStaffAssignmentService;
+            _courseService = courseService;
             _sendEmailService = sendEmailService;
             _userService = userService;
         }
@@ -350,6 +353,10 @@ namespace Courses.Implementation.Services
 
             var familyEmailsByFamilyId = new Dictionary<Guid, List<string>>();
             var rosterByEnrollmentId = roster.Students.ToDictionary(student => student.StudentCourseEnrollmentId);
+            var course = await _courseService.GetCourse(roster.CourseId).ConfigureAwait(false);
+            var schoolContacts = course == null
+                ? Array.Empty<EmailSchoolContact>()
+                : new[] { CreateSchoolContact(course) };
 
             foreach (var student in students)
             {
@@ -380,10 +387,20 @@ namespace Courses.Implementation.Services
                 {
                     To = targetEmails,
                     Subject = email.Subject,
-                    Body = email.Body
+                    Body = email.Body,
+                    SchoolContacts = schoolContacts
                 }).ConfigureAwait(false);
             }
         }
+
+        private static EmailSchoolContact CreateSchoolContact(MaktabDataContracts.Responses.Course.CourseResponseDetailed course)
+            => new()
+            {
+                Name = course.InstituteName,
+                NameFr = course.InstituteNameFr,
+                Email = course.InstituteEmail,
+                Phone = course.InstitutePhone
+            };
 
         private async Task<List<string>> GetFamilyNotificationEmailAddressesAsync(Guid familyId)
         {

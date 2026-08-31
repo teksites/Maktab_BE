@@ -23,8 +23,7 @@ namespace Email.Implementation
             string userName = _configuration["Smtp:UserName"].ToString();
             string password = _configuration["Smtp:Password"].ToString();
             bool enableSsl = GetEnableSsl();
-            string schoolName = GetFooterSchoolName();
-            using (MailMessage mm = BuildMailMessage(fromAddress, emailData, AppendSystemFooter(emailData.Body, schoolName)))
+            using (MailMessage mm = BuildMailMessage(fromAddress, emailData, BuildEmailBody(emailData)))
             {
                 try
                 {
@@ -58,8 +57,7 @@ namespace Email.Implementation
             string userName = _configuration["Smtp:UserName"].ToString();
             string password = _configuration["Smtp:Password"].ToString();
             bool enableSsl = GetEnableSsl();
-            string schoolName = GetFooterSchoolName();
-            using (MailMessage mm = BuildMailMessage(fromAddress, emailData, AppendSystemFooter(emailData.Body, schoolName)))
+            using (MailMessage mm = BuildMailMessage(fromAddress, emailData, BuildEmailBody(emailData)))
             {
                 try
                 {
@@ -93,8 +91,7 @@ namespace Email.Implementation
             string userName = _configuration["Smtp:UserName"].ToString();
             string password = _configuration["Smtp:Password"].ToString();
             bool enableSsl = GetEnableSsl();
-            string schoolName = GetFooterSchoolName();
-            using (MailMessage mm = BuildMailMessage(fromAddress, emailData, AppendSystemFooter(emailData.Body, schoolName)))
+            using (MailMessage mm = BuildMailMessage(fromAddress, emailData, BuildEmailBody(emailData)))
             {
                 try
                 {
@@ -223,31 +220,105 @@ namespace Email.Implementation
             return message;
         }
 
-        private string GetFooterSchoolName()
-            => _configuration["Smtp:FooterSchoolName"]?.Trim() ?? "ICC Brossard Schools and Activities";
+        private string BuildEmailBody(EmailData emailData)
+            => emailData.IncludeSystemFooter
+                ? AppendSystemFooter(emailData.Body, emailData.SchoolContacts)
+                : emailData.Body ?? string.Empty;
+
+        private string BuildEmailBody(MultiUserEmailData emailData)
+            => emailData.IncludeSystemFooter
+                ? AppendSystemFooter(emailData.Body, emailData.SchoolContacts)
+                : emailData.Body ?? string.Empty;
+
+        private EmailSchoolContact GetDefaultSchoolContact()
+            => new()
+            {
+                Name = _configuration["Smtp:FooterSchoolName"]?.Trim() ?? "ICC Brossard Schools and Activities",
+                NameFr = _configuration["Smtp:FooterSchoolNameFr"]?.Trim() ?? "ICC Brossard Schools and Activities",
+                Email = _configuration["Smtp:FooterSchoolEmail"]?.Trim() ?? "schools@iccbrossard.com",
+                Phone = _configuration["Smtp:FooterSchoolPhone"]?.Trim() ?? string.Empty
+            };
 
         private bool GetEnableSsl()
             => bool.TryParse(_configuration["Smtp:EnableSsl"], out var enableSsl)
                 ? enableSsl
                 : true;
 
-        private string AppendSystemFooter(string body, string schoolName)
+        private string AppendSystemFooter(string body, IEnumerable<EmailSchoolContact>? schoolContacts)
         {
             var normalizedBody = body ?? string.Empty;
-            var encodedSchoolName = WebUtility.HtmlEncode(schoolName?.Trim() ?? string.Empty);
+            var defaultContact = GetDefaultSchoolContact();
+            var contacts = (schoolContacts ?? Enumerable.Empty<EmailSchoolContact>())
+                .Where(contact => contact != null)
+                .Select(contact => NormalizeContact(contact, defaultContact))
+                .GroupBy(contact => $"{contact.Name}|{contact.Email}|{contact.Phone}", StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+
+            if (!contacts.Any())
+            {
+                contacts.Add(defaultContact);
+            }
 
             var footer = new StringBuilder();
             footer.Append(normalizedBody);
             footer.Append("<hr/>");
             footer.Append("<div style=\"margin-top:16px;font-size:13px;color:#555;\">");
-            footer.Append("<p><em>Please don't reply to this email. If you have any questions or concerns, please reach out to ");
-            footer.Append(encodedSchoolName);
-            footer.Append(" using the Contact Us form in the portal.</em></p>");
-            footer.Append("<p><em>Veuillez ne pas répondre à ce courriel. Si vous avez des questions ou des préoccupations, veuillez communiquer avec ");
-            footer.Append(encodedSchoolName);
-            footer.Append(" en utilisant le formulaire Nous joindre du portail.</em></p>");
+            footer.Append("<p><em>Please don't reply to this email.</em></p>");
+
+            foreach (var contact in contacts)
+            {
+                AppendContactFooter(footer, contact);
+            }
+
             footer.Append("</div>");
             return footer.ToString();
+        }
+
+        private static EmailSchoolContact NormalizeContact(EmailSchoolContact contact, EmailSchoolContact fallback)
+            => new()
+            {
+                Name = string.IsNullOrWhiteSpace(contact.Name) ? fallback.Name : contact.Name.Trim(),
+                NameFr = string.IsNullOrWhiteSpace(contact.NameFr) ? fallback.NameFr : contact.NameFr.Trim(),
+                Email = string.IsNullOrWhiteSpace(contact.Email) ? fallback.Email : contact.Email.Trim(),
+                Phone = string.IsNullOrWhiteSpace(contact.Phone) ? fallback.Phone : contact.Phone.Trim()
+            };
+
+        private static void AppendContactFooter(StringBuilder footer, EmailSchoolContact contact)
+        {
+            var schoolName = WebUtility.HtmlEncode(contact.Name);
+            var schoolNameFr = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(contact.NameFr) ? contact.Name : contact.NameFr);
+            var email = WebUtility.HtmlEncode(contact.Email);
+            var phone = WebUtility.HtmlEncode(contact.Phone);
+            var emailLink = string.IsNullOrWhiteSpace(contact.Email)
+                ? string.Empty
+                : $"<a href=\"mailto:{email}\">{email}</a>";
+            var englishContactMethod = BuildContactMethod(emailLink, phone, "at", "or");
+            var frenchContactMethod = BuildContactMethod(emailLink, phone, "à", "ou au");
+
+            footer.Append("<p><em>For assistance please contact ");
+            footer.Append(schoolName);
+            footer.Append(englishContactMethod);
+            footer.Append(".</em></p>");
+            footer.Append("<p><em>Pour obtenir de l'aide, veuillez svp contacter ");
+            footer.Append(schoolNameFr);
+            footer.Append(frenchContactMethod);
+            footer.Append(".</em></p>");
+        }
+
+        private static string BuildContactMethod(string emailLink, string phone, string emailPreposition, string phoneJoiner)
+        {
+            if (!string.IsNullOrWhiteSpace(emailLink) && !string.IsNullOrWhiteSpace(phone))
+            {
+                return $" {emailPreposition} {emailLink} {phoneJoiner} {phone}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(emailLink))
+            {
+                return $" {emailPreposition} {emailLink}";
+            }
+
+            return string.IsNullOrWhiteSpace(phone) ? string.Empty : $" {emailPreposition} {phone}";
         }
 
     }

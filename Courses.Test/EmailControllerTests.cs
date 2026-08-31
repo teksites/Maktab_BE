@@ -39,6 +39,7 @@ public class EmailControllerTests
         Assert.Equal(request.RecipientsCC, capturedEmail.Cc);
         Assert.Equal(request.RecipientsBCC, capturedEmail.Bcc);
         Assert.Empty(capturedEmail.Attachments);
+        Assert.False(capturedEmail.IncludeSystemFooter);
     }
 
     [Fact]

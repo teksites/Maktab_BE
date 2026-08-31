@@ -48,6 +48,7 @@ namespace Courses.Implementation.Services
         {
             public Guid FamilyId { get; init; }
             public EnrollmentStatus Status { get; init; }
+            public EmailSchoolContact SchoolContact { get; init; } = new();
             public string ChildName { get; init; } = string.Empty;
             public string CourseName { get; init; } = string.Empty;
             public string CourseNameFr { get; init; } = string.Empty;
@@ -1031,6 +1032,7 @@ namespace Courses.Implementation.Services
                 {
                     FamilyId = enrollmentDetails.FamilyId,
                     Status = enrollmentStatus,
+                    SchoolContact = CreateSchoolContact(courseDetails),
                     ChildName = enrollmentDetails.ChildName ?? string.Empty,
                     CourseName = courseDetails.Name ?? string.Empty,
                     CourseNameFr = courseDetails.NameFr ?? string.Empty,
@@ -1062,7 +1064,8 @@ namespace Courses.Implementation.Services
                 {
                     To = targetEmails,
                     Subject = email.Value.Subject,
-                    Body = email.Value.Body
+                    Body = email.Value.Body,
+                    SchoolContacts = familyNotifications.Select(notification => notification.SchoolContact)
                 }).ConfigureAwait(false);
             }
         }
@@ -1109,9 +1112,19 @@ namespace Courses.Implementation.Services
             {
                 To = targetEmails,
                 Subject = email.Subject,
-                Body = email.Body
+                Body = email.Body,
+                SchoolContacts = new[] { CreateSchoolContact(courseDetails) }
             }).ConfigureAwait(false);
         }
+
+        private static EmailSchoolContact CreateSchoolContact(CourseResponseDetailed course)
+            => new()
+            {
+                Name = course.InstituteName,
+                NameFr = course.InstituteNameFr,
+                Email = course.InstituteEmail,
+                Phone = course.InstitutePhone
+            };
 
         private async Task<List<string>> GetFamilyNotificationEmailAddressesAsync(Guid familyId)
         {
