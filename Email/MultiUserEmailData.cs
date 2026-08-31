@@ -8,5 +8,7 @@ namespace Email
         public IEnumerable<string> Bcc { get; set; } = new List<string>();
         public IEnumerable<EmailAttachmentPayload> Attachments { get; set; } = new List<EmailAttachmentPayload>();
         public string Body { get; set; } = string.Empty;
+        public bool IncludeSystemFooter { get; set; } = true;
+        public IEnumerable<EmailSchoolContact> SchoolContacts { get; set; } = new List<EmailSchoolContact>();
     }
 }

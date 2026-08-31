@@ -410,7 +410,17 @@ public class StudentCourseAttendanceServiceTests
             .ReturnsAsync(true);
 
         var userService = CreateUserService(familyId);
-        var service = CreateAttendanceService(repository, courseStaffAssignmentService, sendEmailService, userService);
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(new MaktabDataContracts.Responses.Course.CourseResponseDetailed
+            {
+                InstituteName = "ICC Brossard",
+                InstituteNameFr = "ICC Brossard FR",
+                InstituteEmail = "schools@iccbrossard.com",
+                InstitutePhone = "514-555-0100"
+            });
+        var service = CreateAttendanceService(repository, courseStaffAssignmentService, sendEmailService, userService, courseService);
 
         await service.UpsertCourseGroupAttendance(userId, UserRoleType.SchoolTeacher, new UpsertCourseGroupAttendanceRequest
         {
@@ -437,6 +447,10 @@ public class StudentCourseAttendanceServiceTests
         Assert.Contains("absent", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("cher parent", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("dear parent", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
+        var schoolContact = Assert.Single(sentEmail.SchoolContacts);
+        Assert.Equal("ICC Brossard", schoolContact.Name);
+        Assert.Equal("schools@iccbrossard.com", schoolContact.Email);
+        Assert.Equal("514-555-0100", schoolContact.Phone);
     }
 
     [Fact]
@@ -569,12 +583,14 @@ public class StudentCourseAttendanceServiceTests
         Mock<IStudentCourseAttendanceRepository>? repository = null,
         Mock<ICourseStaffAssignmentService>? courseStaffAssignmentService = null,
         Mock<ISendEmailService>? sendEmailService = null,
-        Mock<IUserService>? userService = null)
+        Mock<IUserService>? userService = null,
+        Mock<ICourseService>? courseService = null)
     {
         return new StudentCourseAttendanceService(
             (repository ?? new Mock<IStudentCourseAttendanceRepository>()).Object,
             (courseStaffAssignmentService ?? new Mock<ICourseStaffAssignmentService>()).Object,
             (sendEmailService ?? new Mock<ISendEmailService>()).Object,
-            (userService ?? CreateUserService(Guid.NewGuid())).Object);
+            (userService ?? CreateUserService(Guid.NewGuid())).Object,
+            (courseService ?? new Mock<ICourseService>()).Object);
     }
 }

@@ -80,12 +80,14 @@ public class SendEmailServiceTests
     }
 
     [Fact]
-    public void AppendSystemFooter_AppendsBilingualReplyDisclaimer()
+    public void AppendSystemFooter_AppendsBilingualSchoolContactDetails()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Smtp:FooterSchoolName"] = "ICC Brossard Schools and Activities"
+                ["Smtp:FooterSchoolName"] = "ICC Brossard Schools and Activities",
+                ["Smtp:FooterSchoolEmail"] = "schools@iccbrossard.com",
+                ["Smtp:FooterSchoolPhone"] = "514-555-0100"
             })
             .Build();
 
@@ -99,15 +101,51 @@ public class SendEmailServiceTests
         var body = Assert.IsType<string>(method!.Invoke(service, new object[]
         {
             "<p>Hello</p>",
-            "ICC Brossard Schools and Activities"
+            new[]
+            {
+                new EmailSchoolContact
+                {
+                    Name = "Rattel School",
+                    NameFr = "Ecole Rattel",
+                    Email = "rattel@example.com",
+                    Phone = "514-555-0199"
+                }
+            }
         }));
 
         Assert.Contains("<p>Hello</p>", body);
         Assert.Contains("Please don't reply to this email.", body);
-        Assert.Contains("ICC Brossard Schools and Activities", body);
-        Assert.Contains("Contact Us form in the portal", body);
-        Assert.Contains("Veuillez ne pas", body);
-        Assert.Contains("formulaire Nous joindre du portail", body);
+        Assert.Contains("Rattel School", body);
+        Assert.Contains("Ecole Rattel", body);
+        Assert.Contains("rattel@example.com", body);
+        Assert.Contains("514-555-0199", body);
+        Assert.Contains("For assistance please contact", body);
+        Assert.Contains("Pour obtenir de l'aide", body);
+    }
+
+    [Fact]
+    public void BuildEmailBody_ManualEmailDoesNotAppendSystemFooter()
+    {
+        var service = new SendEmailService(new ConfigurationBuilder().Build());
+        var method = typeof(SendEmailService).GetMethod(
+            "BuildEmailBody",
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            binder: null,
+            types: new[] { typeof(MultiUserEmailData) },
+            modifiers: null);
+
+        Assert.NotNull(method);
+
+        var body = Assert.IsType<string>(method!.Invoke(service, new object[]
+        {
+            new MultiUserEmailData
+            {
+                Body = "<p>Manual email</p>",
+                IncludeSystemFooter = false
+            }
+        }));
+
+        Assert.Equal("<p>Manual email</p>", body);
     }
 
     private static MailMessage InvokeBuildMailMessage(MultiUserEmailData emailData)

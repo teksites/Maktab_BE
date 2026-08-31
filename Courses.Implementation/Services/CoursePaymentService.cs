@@ -277,9 +277,19 @@ namespace Courses.Services.Implementation
             {
                 To = targetEmails,
                 Subject = email.Subject,
-                Body = email.Body
+                Body = email.Body,
+                SchoolContacts = new[] { CreateSchoolContact(course) }
             }).ConfigureAwait(false);
         }
+
+        private static EmailSchoolContact CreateSchoolContact(CourseResponseDetailed course)
+            => new()
+            {
+                Name = course.InstituteName,
+                NameFr = course.InstituteNameFr,
+                Email = course.InstituteEmail,
+                Phone = course.InstitutePhone
+            };
 
         private async Task<List<string>> GetFamilyNotificationEmailAddressesAsync(Guid familyId)
         {
