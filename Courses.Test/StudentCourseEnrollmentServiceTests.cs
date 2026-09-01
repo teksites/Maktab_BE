@@ -212,6 +212,56 @@ public class StudentCourseEnrollmentServiceTests
     }
 
     [Fact]
+    public async Task AddEnrollment_WhenGroupBelongsToAnotherCourse_ThrowsAndDoesNotCreateEnrollment()
+    {
+        var courseId = Guid.NewGuid();
+        var otherCourseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetCourseEnrollmentGroupInformation(groupId))
+            .ReturnsAsync(new CourseEnrollmentGroupInformationResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = otherCourseId,
+                MaxStudents = 20,
+                IfRegistrationOpen = true,
+                EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>()
+            });
+
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(Array.Empty<StudentCourseTransactionResponse>());
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 120));
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService);
+
+        var exception = await Assert.ThrowsAsync<Exception>(() => service.AddEnrollment(new AddStudentCourseEnrollment
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            CourseId = courseId,
+            CourseEnrollmentGroupId = groupId,
+            WillUseDayCare = false,
+            DayCareDays = 0
+        }));
+
+        Assert.Equal("The selected course enrollment group does not belong to the selected course", exception.Message);
+        repository.Verify(repo => repo.AddEnrollment(It.IsAny<AddStudentCourseEnrollment>()), Times.Never);
+    }
+
+    [Fact]
     public async Task AddEnrollment_WhenEnrollmentFillsLastSeat_DoesNotCloseGroupRegistration()
     {
         var courseId = Guid.NewGuid();

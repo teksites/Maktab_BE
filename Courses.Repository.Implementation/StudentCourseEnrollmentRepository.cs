@@ -530,7 +530,8 @@ namespace Courses.Repository.Implementation
             SUM(CASE WHEN sce.EnrollmentStatus = 4 THEN 1 ELSE 0 END) AS CancelledCount,
             SUM(CASE WHEN sce.EnrollmentStatus = 5 THEN 1 ELSE 0 END) AS RefundedCount
         FROM course_enrollment_groups ceg
-        LEFT JOIN student_course_enrollment sce ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId 
+        LEFT JOIN student_course_enrollment sce ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+            AND sce.CourseId = ceg.CourseId
             AND sce.IsActive = TRUE
         WHERE ceg.CourseId = @CourseId AND ceg.IsActive = TRUE
         GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.GroupIndex, ceg.MaxStudents, ceg.IfRegistrationOpen
@@ -584,7 +585,8 @@ namespace Courses.Repository.Implementation
             SUM(CASE WHEN sce.EnrollmentStatus = 4 THEN 1 ELSE 0 END) AS CancelledCount,
             SUM(CASE WHEN sce.EnrollmentStatus = 5 THEN 1 ELSE 0 END) AS RefundedCount
         FROM course_enrollment_groups ceg
-        LEFT JOIN student_course_enrollment sce ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId 
+        LEFT JOIN student_course_enrollment sce ON sce.CourseEnrollmentGroupId = ceg.CourseEnrollmentGroupId
+            AND sce.CourseId = ceg.CourseId
             AND sce.IsActive = TRUE
         WHERE ceg.CourseEnrollmentGroupId = @CourseGroupId AND ceg.IsActive = TRUE
         GROUP BY ceg.CourseEnrollmentGroupId, ceg.CourseId, ceg.GroupIndex, ceg.MaxStudents, ceg.IfRegistrationOpen";
