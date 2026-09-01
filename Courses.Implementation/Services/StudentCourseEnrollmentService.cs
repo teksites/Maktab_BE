@@ -92,6 +92,11 @@ namespace Courses.Implementation.Services
                 throw new Exception("Course enrollment group not found");
             }
 
+            if (enrollmentGroupState.CourseId != enrollment.CourseId)
+            {
+                throw new Exception("The selected course enrollment group does not belong to the selected course");
+            }
+
             if (!enrollmentGroupState.IfRegistrationOpen)
             {
                 throw new Exception("The registration is closed. Contact Admin please");
