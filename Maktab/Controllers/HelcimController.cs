@@ -184,13 +184,14 @@ public class HelcimController : ControllerBase
     private static ObjectResult BuildRefundFailure(HelcimRequestException exception)
         => new(BuildRefundFailure((Exception)exception))
         {
-            StatusCode = exception.IsUpstreamFailure ? StatusCodes.Status502BadGateway : StatusCodes.Status400BadRequest
+            StatusCode = exception.IsUpstreamFailure ? 502 : 400
         };
 
     private static HelcimRefundFailureResponse BuildRefundFailure(Exception exception)
     {
-        var isHelcimFailure = exception is HelcimRequestException helcimException;
-        var isUpstreamFailure = isHelcimFailure && helcimException!.IsUpstreamFailure;
+        var helcimException = exception as HelcimRequestException;
+        var isHelcimFailure = helcimException != null;
+        var isUpstreamFailure = helcimException?.IsUpstreamFailure ?? false;
 
         return new HelcimRefundFailureResponse
         {
