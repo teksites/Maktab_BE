@@ -2948,11 +2948,19 @@ public class HelcimTransactionServiceTests
             .Setup(repo => repo.GetByFamilyId(familyId))
             .ReturnsAsync(expected);
 
-        var service = CreateService(repository.Object, Mock.Of<IWebMsgSenderService>());
+        var cardBinLookupService = CreateCardBinLookupService();
+        cardBinLookupService
+            .Setup(service => service.EnrichAsync(expected, It.IsAny<CancellationToken>()))
+            .Callback(() => expected[0].CardFundingType = "Debit")
+            .Returns(Task.CompletedTask);
+
+        var service = CreateService(repository.Object, Mock.Of<IWebMsgSenderService>(), cardBinLookupService: cardBinLookupService.Object);
 
         var result = await service.GetByFamilyId(familyId);
 
         Assert.Same(expected, result);
+        Assert.Equal("Debit", result[0].CardFundingType);
+        cardBinLookupService.Verify(service => service.EnrichAsync(expected, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -3049,7 +3057,8 @@ public class HelcimTransactionServiceTests
         ICourseService? courseService = null,
         IStudentCourseTransactionService? studentCourseTransactionService = null,
         IStudentCourseEnrollmentService? studentCourseEnrollmentService = null,
-        ICoursePaymentService? coursePaymentService = null)
+        ICoursePaymentService? coursePaymentService = null,
+        ICardBinLookupService? cardBinLookupService = null)
     {
         studentCourseTransactionService ??= CreateStudentCourseTransactionService().Object;
         courseService ??= CreateCourseService().Object;
@@ -3061,7 +3070,24 @@ public class HelcimTransactionServiceTests
             courseService,
             studentCourseTransactionService,
             studentCourseEnrollmentService ?? Mock.Of<IStudentCourseEnrollmentService>(),
-            coursePaymentService ?? Mock.Of<ICoursePaymentService>());
+            coursePaymentService ?? Mock.Of<ICoursePaymentService>(),
+            cardBinLookupService ?? CreateCardBinLookupService().Object);
+    }
+
+    private static Mock<ICardBinLookupService> CreateCardBinLookupService()
+    {
+        var service = new Mock<ICardBinLookupService>();
+        service
+            .Setup(instance => instance.EnrichAsync(
+                It.IsAny<IList<HelcimTransactionResponse>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        service
+            .Setup(instance => instance.EnrichDetailedAsync(
+                It.IsAny<IList<HelcimTransactionResponseDetailed>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        return service;
     }
 
     private static Mock<IStudentCourseTransactionService> CreateStudentCourseTransactionService()

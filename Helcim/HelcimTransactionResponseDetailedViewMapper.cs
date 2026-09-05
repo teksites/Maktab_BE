@@ -9,7 +9,7 @@ namespace Helcim
         public static HelcimTransactionResponseDetailedView ToView(this HelcimTransactionResponseDetailed source)
         {
             var normalizedCardType = NormalizeCardType(source.CardType);
-            var paymentSourceType = NormalizePaymentSourceType(normalizedCardType);
+            var paymentSourceType = NormalizePaymentSourceType(source, normalizedCardType);
 
             return new HelcimTransactionResponseDetailedView
             {
@@ -40,6 +40,14 @@ namespace Helcim
                 CardTransactionStatus = source.CardTransactionStatus,
                 InvoiceType = source.InvoiceType,
                 CardTransactionType = source.CardTransactionType,
+                PaymentInstrument = source.PaymentInstrument,
+                CardCompany = source.CardCompany,
+                CardFundingType = source.CardFundingType,
+                CardFundingTypeKnown = source.CardFundingTypeKnown,
+                CardProduct = source.CardProduct,
+                CardIssuer = source.CardIssuer,
+                CardIssuerCountryCode = source.CardIssuerCountryCode,
+                CardIssuerCountryName = source.CardIssuerCountryName,
                 RawResponse = source.RawResponse,
                 TransactionResponse = source.TransactionResponse,
                 CreatedAt = source.CreatedAt,
@@ -63,20 +71,27 @@ namespace Helcim
                 "DB" => HelcimNormalizedCardType.Debit,
                 "VI" => HelcimNormalizedCardType.Visa,
                 "MC" => HelcimNormalizedCardType.Mastercard,
-                "AX" or "AE" or "AM" => HelcimNormalizedCardType.AmericanExpress,
+                "AX" or "AE" or "AM" or "AMEX" => HelcimNormalizedCardType.AmericanExpress,
                 "DS" or "DI" or "DC" => HelcimNormalizedCardType.Discover,
                 null or "" or "WEBHOOK_RAW" => HelcimNormalizedCardType.Unknown,
                 _ => HelcimNormalizedCardType.Other
             };
         }
 
-        private static HelcimNormalizedPaymentSourceType NormalizePaymentSourceType(HelcimNormalizedCardType cardType)
-            => cardType switch
+        private static HelcimNormalizedPaymentSourceType NormalizePaymentSourceType(HelcimTransactionResponseDetailed source, HelcimNormalizedCardType cardType)
+            => source.PaymentInstrument switch
             {
-                HelcimNormalizedCardType.Ach => HelcimNormalizedPaymentSourceType.Ach,
-                HelcimNormalizedCardType.Debit => HelcimNormalizedPaymentSourceType.DebitCard,
-                HelcimNormalizedCardType.Unknown => HelcimNormalizedPaymentSourceType.Unknown,
-                _ => HelcimNormalizedPaymentSourceType.CreditCard
+                "ACH" => HelcimNormalizedPaymentSourceType.Ach,
+                "Interac Debit" or "Debit Card" => HelcimNormalizedPaymentSourceType.DebitCard,
+                "Credit Card" => HelcimNormalizedPaymentSourceType.CreditCard,
+                "Card" or "Prepaid Card" or "Charge Card" => HelcimNormalizedPaymentSourceType.Card,
+                _ => cardType switch
+                {
+                    HelcimNormalizedCardType.Ach => HelcimNormalizedPaymentSourceType.Ach,
+                    HelcimNormalizedCardType.Debit => HelcimNormalizedPaymentSourceType.DebitCard,
+                    HelcimNormalizedCardType.Unknown => HelcimNormalizedPaymentSourceType.Unknown,
+                    _ => HelcimNormalizedPaymentSourceType.Card
+                }
             };
 
         private static CardType MapKnownCardType(HelcimNormalizedCardType cardType)
@@ -94,6 +109,7 @@ namespace Helcim
                 HelcimNormalizedPaymentSourceType.Ach => "ACH",
                 HelcimNormalizedPaymentSourceType.DebitCard => "Debit Card",
                 HelcimNormalizedPaymentSourceType.CreditCard => "Credit Card",
+                HelcimNormalizedPaymentSourceType.Card => "Card",
                 _ => "Unknown"
             };
 

@@ -15,6 +15,14 @@ namespace Helcim.Registry
             services.AddScoped<IHelcimTransactionService, HelcimTransactionService>();
             services.AddScoped<IHelcimTransactionRepository, HelcimTransactionRepository>();
             services.AddSingleton<IHelcimClientConfiguration, HelcimClientConfiguration>();
+            services.AddSingleton<ICardBinCheckConfiguration, CardBinCheckConfiguration>();
+            services.AddMemoryCache();
+            services.AddHttpClient<ICardBinLookupService, CardBinLookupService>((serviceProvider, client) =>
+            {
+                var configuration = serviceProvider.GetRequiredService<ICardBinCheckConfiguration>();
+                client.BaseAddress = new Uri(configuration.BaseUrl);
+                client.Timeout = configuration.RequestTimeout;
+            });
 
             return services;
         }

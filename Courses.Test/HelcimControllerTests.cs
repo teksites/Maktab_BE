@@ -26,13 +26,11 @@ public class HelcimControllerTests
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
         var errorObject = badRequest.Value;
-        Assert.NotNull(errorObject);
-        Assert.IsNotType<string>(errorObject);
-        var errorProperty = errorObject.GetType().GetProperty("error");
-        Assert.NotNull(errorProperty);
-        var errorMessage = Assert.IsType<string>(errorProperty!.GetValue(errorObject));
+        var errorMessage = Assert.IsType<HelcimRefundFailureResponse>(errorObject).Error;
         Assert.Contains("cardType DB", errorMessage);
         Assert.Contains("payment hardware", errorMessage);
+
+        AssertRefundFailure(errorObject, "Maktab", isUpstreamFailure: false, retryable: false);
     }
 
     [Fact]
@@ -55,11 +53,10 @@ public class HelcimControllerTests
         var statusResult = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(502, statusResult.StatusCode);
         var errorObject = statusResult.Value;
-        Assert.NotNull(errorObject);
-        var errorProperty = errorObject!.GetType().GetProperty("error");
-        Assert.NotNull(errorProperty);
-        var errorMessage = Assert.IsType<string>(errorProperty!.GetValue(errorObject));
+        var errorMessage = Assert.IsType<HelcimRefundFailureResponse>(errorObject).Error;
         Assert.Contains("empty response", errorMessage);
+
+        AssertRefundFailure(errorObject, "Helcim", isUpstreamFailure: true, retryable: true);
     }
 
     [Fact]
@@ -81,12 +78,47 @@ public class HelcimControllerTests
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
         var errorObject = badRequest.Value;
-        Assert.NotNull(errorObject);
-        Assert.IsNotType<string>(errorObject);
-        var errorProperty = errorObject.GetType().GetProperty("error");
-        Assert.NotNull(errorProperty);
-        var errorMessage = Assert.IsType<string>(errorProperty!.GetValue(errorObject));
+        var errorMessage = Assert.IsType<HelcimRefundFailureResponse>(errorObject).Error;
         Assert.Contains("cardType DB", errorMessage);
         Assert.Contains("payment hardware", errorMessage);
+
+        AssertRefundFailure(errorObject, "Maktab", isUpstreamFailure: false, retryable: false);
+    }
+
+    [Fact]
+    public async Task RefundAchTransaction_WhenHelcimRejectsRefund_ReturnsProviderFailureDetails()
+    {
+        var service = new Mock<IHelcimTransactionService>();
+        service
+            .Setup(x => x.RefundAchTransaction(It.IsAny<RefundAchTransactionRequest>()))
+            .ThrowsAsync(new HelcimRequestException(
+                "The ACH transaction is no longer refundable.",
+                isUpstreamFailure: false,
+                rawResponse: "{\"status\":\"error\"}"));
+
+        var controller = new HelcimController(service.Object);
+
+        var result = await controller.RefundAchTransaction(new RefundAchTransactionRequest
+        {
+            TransactionId = 2062
+        });
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        AssertRefundFailure(badRequest.Value, "Helcim", isUpstreamFailure: false, retryable: false);
+        var errorMessage = Assert.IsType<HelcimRefundFailureResponse>(badRequest.Value).Error;
+        Assert.Equal("The ACH transaction is no longer refundable.", errorMessage);
+    }
+
+    private static void AssertRefundFailure(
+        object? value,
+        string expectedErrorSource,
+        bool isUpstreamFailure,
+        bool retryable)
+    {
+        var failure = Assert.IsType<HelcimRefundFailureResponse>(value);
+        Assert.False(failure.Success);
+        Assert.Equal(expectedErrorSource, failure.ErrorSource);
+        Assert.Equal(isUpstreamFailure, failure.IsUpstreamFailure);
+        Assert.Equal(retryable, failure.Retryable);
     }
 }

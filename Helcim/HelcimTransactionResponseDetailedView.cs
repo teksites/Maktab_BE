@@ -34,6 +34,14 @@ namespace Helcim
         public HelcimCardTransactionStatus CardTransactionStatus { get; set; }
         public HelcimInvoiceType InvoiceType { get; set; }
         public HelcimCardTransactionType CardTransactionType { get; set; }
+        public string PaymentInstrument { get; set; } = "Unknown";
+        public string CardCompany { get; set; } = string.Empty;
+        public string CardFundingType { get; set; } = "Unknown";
+        public bool CardFundingTypeKnown { get; set; }
+        public string? CardProduct { get; set; }
+        public string? CardIssuer { get; set; }
+        public string? CardIssuerCountryCode { get; set; }
+        public string? CardIssuerCountryName { get; set; }
         public string? RawResponse { get; set; }
         public string? TransactionResponse { get; set; }
         public DateTime? CreatedAt { get; set; }

@@ -10,10 +10,10 @@ public class HelcimTransactionResponseDetailedViewMapperTests
     [Theory]
     [InlineData("ACH", HelcimNormalizedPaymentSourceType.Ach, "ACH", HelcimNormalizedCardType.Ach, "ACH", CardType.Unknown)]
     [InlineData("DB", HelcimNormalizedPaymentSourceType.DebitCard, "Debit Card", HelcimNormalizedCardType.Debit, "Debit", CardType.Unknown)]
-    [InlineData("MC", HelcimNormalizedPaymentSourceType.CreditCard, "Credit Card", HelcimNormalizedCardType.Mastercard, "Mastercard", CardType.Master)]
-    [InlineData("VI", HelcimNormalizedPaymentSourceType.CreditCard, "Credit Card", HelcimNormalizedCardType.Visa, "Visa", CardType.Visa)]
-    [InlineData("AX", HelcimNormalizedPaymentSourceType.CreditCard, "Credit Card", HelcimNormalizedCardType.AmericanExpress, "American Express", CardType.Amex)]
-    [InlineData("ZZ", HelcimNormalizedPaymentSourceType.CreditCard, "Credit Card", HelcimNormalizedCardType.Other, "Other", CardType.Unknown)]
+    [InlineData("MC", HelcimNormalizedPaymentSourceType.Card, "Card", HelcimNormalizedCardType.Mastercard, "Mastercard", CardType.Master)]
+    [InlineData("VI", HelcimNormalizedPaymentSourceType.Card, "Card", HelcimNormalizedCardType.Visa, "Visa", CardType.Visa)]
+    [InlineData("AX", HelcimNormalizedPaymentSourceType.Card, "Card", HelcimNormalizedCardType.AmericanExpress, "American Express", CardType.Amex)]
+    [InlineData("ZZ", HelcimNormalizedPaymentSourceType.Card, "Card", HelcimNormalizedCardType.Other, "Other", CardType.Unknown)]
     [InlineData("", HelcimNormalizedPaymentSourceType.Unknown, "Unknown", HelcimNormalizedCardType.Unknown, "Unknown", CardType.Unknown)]
     public void ToView_NormalizesCardTypeMetadata(
         string rawCardType,
@@ -33,6 +33,33 @@ public class HelcimTransactionResponseDetailedViewMapperTests
         Assert.Equal(expectedNormalizedCardType, result.NormalizedCardType);
         Assert.Equal(expectedCardLabel, result.NormalizedCardTypeLabel);
         Assert.Equal(expectedKnownCardType, result.KnownCardType);
+    }
+
+    [Fact]
+    public void ToView_WhenBinLookupConfirmsVisaDebit_PreservesTheEnrichedDetails()
+    {
+        var source = CreateResponse("VI");
+        source.PaymentInstrument = "Debit Card";
+        source.CardCompany = "Visa";
+        source.CardFundingType = "Debit";
+        source.CardFundingTypeKnown = true;
+        source.CardProduct = "Classic";
+        source.CardIssuer = "Example Bank";
+        source.CardIssuerCountryCode = "CA";
+        source.CardIssuerCountryName = "Canada";
+
+        var result = source.ToView();
+
+        Assert.Equal(HelcimNormalizedPaymentSourceType.DebitCard, result.PaymentSourceType);
+        Assert.Equal("Debit Card", result.PaymentSourceLabel);
+        Assert.Equal("Debit Card", result.PaymentInstrument);
+        Assert.Equal("Visa", result.CardCompany);
+        Assert.Equal("Debit", result.CardFundingType);
+        Assert.True(result.CardFundingTypeKnown);
+        Assert.Equal("Classic", result.CardProduct);
+        Assert.Equal("Example Bank", result.CardIssuer);
+        Assert.Equal("CA", result.CardIssuerCountryCode);
+        Assert.Equal("Canada", result.CardIssuerCountryName);
     }
 
     private static HelcimTransactionResponseDetailed CreateResponse(string rawCardType)
