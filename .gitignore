@@ -226,3 +226,10 @@
 /Helcim.Repository.Implementation/Scripts/AlterHelcimTransactionPrimaryKeyToTransactionId.sql
 /docs/school-pricing-report.html
 /docs
+/Zeffy/bin/Debug/net8.0
+/ExternalContracts/MaktabDataContracts.pdb
+/ExternalContracts/MaktabDataContracts.deps.json
+/Zeffy.Implementation/bin/Debug/net8.0
+/Zeffy.Registry/bin/Debug/net8.0
+/Zeffy.Repository.Implementation/bin/Debug/net8.0
+/Zeffy.Repository/bin/Debug/net8.0
