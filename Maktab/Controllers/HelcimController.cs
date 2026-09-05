@@ -79,21 +79,21 @@ public class HelcimController : ControllerBase
         }
         catch (HelcimRequestException ex)
         {
-            return StatusCode(ex.IsUpstreamFailure ? 502 : 400, new { error = ex.Message });
+            return BuildRefundFailure(ex);
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest(BuildRefundFailure(ex));
         }
         catch (InvalidOperationException ex) when (
             ex.Message.Contains("Unable to find", StringComparison.OrdinalIgnoreCase)
             || ex.Message.Contains("Unable to resolve", StringComparison.OrdinalIgnoreCase))
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound(BuildRefundFailure(ex));
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest(BuildRefundFailure(ex));
         }
     }
 
@@ -107,21 +107,21 @@ public class HelcimController : ControllerBase
         }
         catch (HelcimRequestException ex)
         {
-            return StatusCode(ex.IsUpstreamFailure ? 502 : 400, new { error = ex.Message });
+            return BuildRefundFailure(ex);
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest(BuildRefundFailure(ex));
         }
         catch (InvalidOperationException ex) when (
             ex.Message.Contains("Unable to find", StringComparison.OrdinalIgnoreCase)
             || ex.Message.Contains("Unable to resolve", StringComparison.OrdinalIgnoreCase))
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound(BuildRefundFailure(ex));
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest(BuildRefundFailure(ex));
         }
     }
 
@@ -135,21 +135,21 @@ public class HelcimController : ControllerBase
         }
         catch (HelcimRequestException ex)
         {
-            return StatusCode(ex.IsUpstreamFailure ? 502 : 400, new { error = ex.Message });
+            return BuildRefundFailure(ex);
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest(BuildRefundFailure(ex));
         }
         catch (InvalidOperationException ex) when (
             ex.Message.Contains("Unable to find", StringComparison.OrdinalIgnoreCase)
             || ex.Message.Contains("Unable to resolve", StringComparison.OrdinalIgnoreCase))
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound(BuildRefundFailure(ex));
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest(BuildRefundFailure(ex));
         }
     }
 
@@ -163,22 +163,43 @@ public class HelcimController : ControllerBase
         }
         catch (HelcimRequestException ex)
         {
-            return StatusCode(ex.IsUpstreamFailure ? 502 : 400, new { error = ex.Message });
+            return BuildRefundFailure(ex);
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest(BuildRefundFailure(ex));
         }
         catch (InvalidOperationException ex) when (
             ex.Message.Contains("Unable to find", StringComparison.OrdinalIgnoreCase)
             || ex.Message.Contains("Unable to resolve", StringComparison.OrdinalIgnoreCase))
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound(BuildRefundFailure(ex));
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return BadRequest(BuildRefundFailure(ex));
         }
+    }
+
+    private static ObjectResult BuildRefundFailure(HelcimRequestException exception)
+        => new(BuildRefundFailure((Exception)exception))
+        {
+            StatusCode = exception.IsUpstreamFailure ? StatusCodes.Status502BadGateway : StatusCodes.Status400BadRequest
+        };
+
+    private static HelcimRefundFailureResponse BuildRefundFailure(Exception exception)
+    {
+        var isHelcimFailure = exception is HelcimRequestException helcimException;
+        var isUpstreamFailure = isHelcimFailure && helcimException!.IsUpstreamFailure;
+
+        return new HelcimRefundFailureResponse
+        {
+            Success = false,
+            Error = exception.Message,
+            ErrorSource = isHelcimFailure ? "Helcim" : "Maktab",
+            IsUpstreamFailure = isUpstreamFailure,
+            Retryable = isUpstreamFailure
+        };
     }
 
     [HttpPost("/api/payment-notifier")]

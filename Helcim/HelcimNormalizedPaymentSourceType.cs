@@ -5,6 +5,7 @@ namespace Helcim
         Unknown = 0,
         Ach = 1,
         DebitCard = 2,
-        CreditCard = 3
+        Card = 3,
+        CreditCard = 4
     }
 }

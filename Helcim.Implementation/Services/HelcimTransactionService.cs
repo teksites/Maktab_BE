@@ -48,6 +48,7 @@ namespace Helcim.Implementation.Services
         private readonly IStudentCourseTransactionService _studentCourseTransactionService;
         private readonly IStudentCourseEnrollmentService _studentCourseEnrollmentService;
         private readonly ICoursePaymentService _coursePaymentService;
+        private readonly ICardBinLookupService _cardBinLookupService;
 
         public HelcimTransactionService(
             IHelcimTransactionRepository repository,
@@ -56,7 +57,8 @@ namespace Helcim.Implementation.Services
             ICourseService courseService,
             IStudentCourseTransactionService studentCourseTransactionService,
             IStudentCourseEnrollmentService studentCourseEnrollmentService,
-            ICoursePaymentService coursePaymentService)
+            ICoursePaymentService coursePaymentService,
+            ICardBinLookupService cardBinLookupService)
         {
             _repository = repository;
             _clientConfiguration = clientConfiguration;
@@ -65,6 +67,7 @@ namespace Helcim.Implementation.Services
             _studentCourseTransactionService = studentCourseTransactionService;
             _studentCourseEnrollmentService = studentCourseEnrollmentService;
             _coursePaymentService = coursePaymentService;
+            _cardBinLookupService = cardBinLookupService;
         }
 
         public async Task<HelcimPayInitializeResponse> InitializePayment(InitiatePaymentRequest request)
@@ -1131,23 +1134,47 @@ namespace Helcim.Implementation.Services
             }
         }
 
-        public Task<List<HelcimTransactionResponse>> GetByFamilyId(Guid familyId)
-            => _repository.GetByFamilyId(familyId);
+        public async Task<List<HelcimTransactionResponse>> GetByFamilyId(Guid familyId)
+        {
+            var transactions = await _repository.GetByFamilyId(familyId).ConfigureAwait(false);
+            await _cardBinLookupService.EnrichAsync(transactions).ConfigureAwait(false);
+            return transactions;
+        }
 
-        public Task<List<HelcimTransactionResponse>> GetByPaymentCode(string paymentCode)
-            => _repository.GetByPaymentCode(paymentCode);
+        public async Task<List<HelcimTransactionResponse>> GetByPaymentCode(string paymentCode)
+        {
+            var transactions = await _repository.GetByPaymentCode(paymentCode).ConfigureAwait(false);
+            await _cardBinLookupService.EnrichAsync(transactions).ConfigureAwait(false);
+            return transactions;
+        }
 
-        public Task<List<HelcimTransactionResponseDetailed>> GetDetailedByFamilyId(Guid familyId)
-            => _repository.GetDetailedByFamilyId(familyId);
+        public async Task<List<HelcimTransactionResponseDetailed>> GetDetailedByFamilyId(Guid familyId)
+        {
+            var transactions = await _repository.GetDetailedByFamilyId(familyId).ConfigureAwait(false);
+            await _cardBinLookupService.EnrichDetailedAsync(transactions).ConfigureAwait(false);
+            return transactions;
+        }
 
-        public Task<List<HelcimTransactionResponseDetailed>> GetDetailedByPaymentCode(string paymentCode)
-            => _repository.GetDetailedByPaymentCode(paymentCode);
+        public async Task<List<HelcimTransactionResponseDetailed>> GetDetailedByPaymentCode(string paymentCode)
+        {
+            var transactions = await _repository.GetDetailedByPaymentCode(paymentCode).ConfigureAwait(false);
+            await _cardBinLookupService.EnrichDetailedAsync(transactions).ConfigureAwait(false);
+            return transactions;
+        }
 
-        public Task<List<HelcimTransactionResponse>> GetByMaktabTransactionId(Guid maktabTransactionId)
-            => _repository.GetByMaktabTransactionId(maktabTransactionId);
+        public async Task<List<HelcimTransactionResponse>> GetByMaktabTransactionId(Guid maktabTransactionId)
+        {
+            var transactions = await _repository.GetByMaktabTransactionId(maktabTransactionId).ConfigureAwait(false);
+            await _cardBinLookupService.EnrichAsync(transactions).ConfigureAwait(false);
+            return transactions;
+        }
 
-        public Task<List<HelcimTransactionResponseDetailed>> GetDetailedByMaktabTransactionId(Guid maktabTransactionId)
-            => _repository.GetDetailedByMaktabTransactionId(maktabTransactionId);
+        public async Task<List<HelcimTransactionResponseDetailed>> GetDetailedByMaktabTransactionId(Guid maktabTransactionId)
+        {
+            var transactions = await _repository.GetDetailedByMaktabTransactionId(maktabTransactionId).ConfigureAwait(false);
+            await _cardBinLookupService.EnrichDetailedAsync(transactions).ConfigureAwait(false);
+            return transactions;
+        }
 
         private async Task<string> BuildInvoiceNumber(InitiatePaymentRequest request)
         {
