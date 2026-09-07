@@ -34,9 +34,7 @@ public sealed class MaktabStripeController : ControllerBase
         _payments = payments;
     }
 
-    [ApiAuthorize]
-    [HttpPost("payment-intents")]
-    public async Task<ActionResult<StripePaymentIntentResponse>> CreatePaymentIntent(CreateStripeCoursePaymentIntentRequest request)
+    private async Task<ActionResult<StripePaymentIntentResponse>> CreatePaymentIntentInternal(CreateStripeCoursePaymentIntentRequest request)
     {
         var transaction = await _transactions.GetTransaction(request.StudentCourseTransactionId).ConfigureAwait(false);
         if (transaction == null || !transaction.IsActive)
@@ -82,12 +80,12 @@ public sealed class MaktabStripeController : ControllerBase
     [ApiAuthorize]
     [HttpPost("parent/payment-intents")]
     public Task<ActionResult<StripePaymentIntentResponse>> CreateParentPaymentIntent(CreateStripeCoursePaymentIntentRequest request)
-        => CreatePaymentIntent(request);
+        => CreatePaymentIntentInternal(request);
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpPost("admin/payment-intents")]
     public Task<ActionResult<StripePaymentIntentResponse>> CreateAdminPaymentIntent(CreateStripeCoursePaymentIntentRequest request)
-        => CreatePaymentIntent(request);
+        => CreatePaymentIntentInternal(request);
 
     [ApiAuthorize(false, false, UserRoleType.Admin | UserRoleType.SuperUser | UserRoleType.SchoolAdmin | UserRoleType.SchoolSupervisor)]
     [HttpPost("admin/refunds")]
