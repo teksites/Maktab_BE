@@ -5,6 +5,7 @@ using Application.Users.Registry;
 using Courses.Registry;
 using Helcim.Implementation.Configuration;
 using Helcim.Registry;
+using Stripe.Registry;
 using Zeffy.Registry;
 using Data.MySql.Regjstry;
 using Email.Registry;
@@ -46,6 +47,7 @@ namespace Maktab
                     // If you ever want global filters, add them here
                     // e.g. options.Filters.Add<SessionInfoFilter>();
                 })
+                .AddApplicationPart(typeof(Stripe.Api.Controllers.StripeController).Assembly)
                 .AddJsonOptions(options =>
                 {
                     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -179,6 +181,8 @@ namespace Maktab
             services.AddElavonServices();
             services.AddCoursesServices();
             services.AddHelcimServices();
+            services.AddStripeServices();
+            services.AddScoped<Stripe.Services.IStripeWebhookEventHandler, Maktab.Services.MaktabStripeWebhookEventHandler>();
             services.AddZeffyServices();
 
             var helcimClientConfiguration = new HelcimClientConfiguration(Configuration);

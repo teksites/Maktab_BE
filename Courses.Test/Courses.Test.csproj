@@ -40,6 +40,9 @@
     <ProjectReference Include="..\Helcim.Repository\Helcim.Repository.csproj" />
     <ProjectReference Include="..\Helcim.Repository.Implementation\Helcim.Repository.Implementation.csproj" />
     <ProjectReference Include="..\Maktab\Maktab.csproj" />
+    <ProjectReference Include="..\Stripe\Stripe.csproj" />
+    <ProjectReference Include="..\Stripe.Implementation\Stripe.Implementation.csproj" />
+    <ProjectReference Include="..\Stripe.Repository\Stripe.Repository.csproj" />
   </ItemGroup>
 
   <ItemGroup>
