@@ -2294,14 +2294,18 @@ namespace Helcim.Implementation.Services
             string? webhookRawBody)
         {
             var existingTransactions = await GetStoredTransactionsByIdAsync(cardTransaction.TransactionId).ConfigureAwait(false);
-            if (HasCompletedTransactionDetails(existingTransactions))
-            {
-                return CreatePaymentCompletionResponse(invoice, cardTransaction.TransactionId, "card", duplicate: true);
-            }
 
+            // A transaction detail may have been stored before its local payment was applied
+            // (for example, a legacy reversal). Course-payment insertion is idempotent by
+            // Helcim external transaction id, so safely reconcile the ledger first.
             if (ShouldApplyCardPayment(invoice, cardTransaction))
             {
                 await ProcessPaidInvoiceAsync(invoice, cardTransaction, localTransaction).ConfigureAwait(false);
+            }
+
+            if (HasCompletedTransactionDetails(existingTransactions))
+            {
+                return CreatePaymentCompletionResponse(invoice, cardTransaction.TransactionId, "card", duplicate: true);
             }
 
             var existingDetailedTransaction = await GetExistingDetailedTransactionAsync(cardTransaction.TransactionId).ConfigureAwait(false);
