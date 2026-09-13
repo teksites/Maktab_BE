@@ -238,3 +238,17 @@
 /Zeffy.Registry/obj/Debug/net8.0/Zeffy.Registry.csproj.FileListAbsolute.txt
 /Zeffy.Repository.Implementation/obj/Debug/net8.0/Zeffy.Repository.Implementation.csproj.FileListAbsolute.txt
 /Zeffy.Repository/obj/Debug/net8.0/Zeffy.Repository.csproj.FileListAbsolute.txt
+/Stripe/bin/Debug/net8.0
+/Stripe.Api/bin/Debug/net8.0
+/Stripe.Api/obj
+/Stripe.Api.Host/bin/Debug/net8.0
+/Stripe.Api.Host/obj/Debug/net8.0
+/Stripe.Api.Host/obj
+/Stripe.Implementation/bin/Debug/net8.0
+/Stripe.Implementation/obj/Debug/net8.0
+/Stripe.Implementation/obj
+/Stripe.Registry
+/Stripe.Repository
+/Stripe.Repository.Implementation/bin/Debug/net8.0
+/Stripe.Repository.Implementation/obj/Debug/net8.0
+/Stripe.Repository.Implementation/obj

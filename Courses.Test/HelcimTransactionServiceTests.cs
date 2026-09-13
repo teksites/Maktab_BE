@@ -809,6 +809,71 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
+    public async Task SyncInvoicePayment_WhenStoredReverseHasNoLocalPayment_BackfillsRefundPayment()
+    {
+        const int invoiceId = 63677013;
+        const int reverseTransactionId = 47889844;
+        const string invoiceNumber = "ORD-20260503-REVERSE";
+        const string paymentCode = "HELREVERSE";
+        var studentTransactionId = Guid.Parse("aaaaaaaa-2222-2222-2222-222222222222");
+        var familyId = Guid.Parse("bbbbbbbb-2222-2222-2222-222222222222");
+
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository
+            .Setup(repo => repo.GetByTransactionId(reverseTransactionId))
+            .ReturnsAsync(new List<HelcimTransactionResponse>
+            {
+                new()
+                {
+                    TransactionId = reverseTransactionId,
+                    InvoiceNumber = invoiceNumber,
+                    Amount = 99m
+                }
+            });
+
+        var sender = new Mock<IWebMsgSenderService>();
+        var responses = new Queue<string>(new[]
+        {
+            $"{{\"invoiceId\":{invoiceId},\"invoiceNumber\":\"{invoiceNumber}\",\"token\":\"token\",\"notes\":\"{paymentCode}\",\"dateCreated\":\"2026-05-03 11:42:08\",\"dateUpdated\":\"2026-05-03 11:42:09\",\"status\":\"CANCELLED\",\"customerId\":40499452,\"amount\":99,\"amountPaid\":0,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"{studentTransactionId}\",\"description\":\"127.0.0.1\",\"quantity\":1,\"price\":99,\"total\":99}}]}}",
+            $"[{{\"transactionId\":{reverseTransactionId},\"dateCreated\":\"2026-05-03 11:42:09\",\"cardBatchId\":6429263,\"status\":\"APPROVED\",\"type\":\"reverse\",\"amount\":99,\"currency\":\"CAD\",\"cardType\":\"MC\",\"invoiceNumber\":\"{invoiceNumber}\"}}]"
+        });
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync(() => responses.Dequeue());
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransactionByPaymentCode(paymentCode))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                PaymentCode = paymentCode
+            });
+
+        AddCoursePayment? capturedPayment = null;
+        var coursePaymentService = new Mock<ICoursePaymentService>();
+        coursePaymentService
+            .Setup(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()))
+            .Callback<AddCoursePayment>(payment => capturedPayment = payment)
+            .ReturnsAsync((new CoursePaymentResponse(), true));
+
+        var service = CreateService(
+            repository.Object,
+            sender.Object,
+            studentCourseTransactionService: studentCourseTransactionService.Object,
+            coursePaymentService: coursePaymentService.Object);
+
+        var result = await service.SyncInvoicePayment(invoiceId.ToString());
+
+        Assert.True(result.Success);
+        Assert.True(result.Duplicate);
+        Assert.NotNull(capturedPayment);
+        Assert.Equal(MaktabDataContracts.Enums.PaymentType.Refund, capturedPayment!.PaymentType);
+        Assert.Equal(reverseTransactionId.ToString(), capturedPayment.ExternalPaymentId);
+    }
+
+    [Fact]
     public async Task SyncInvoicePaymentByInvoiceId_ForAchInvoice_FetchesAchTransactionAndSavesPayment()
     {
         var invoiceId = 63677015;
