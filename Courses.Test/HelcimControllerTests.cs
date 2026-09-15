@@ -2,6 +2,7 @@ using Helcim;
 using Helcim.Services;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
+using Users.Services;
 
 namespace Courses.Test;
 
@@ -16,7 +17,7 @@ public class HelcimControllerTests
             .ThrowsAsync(new InvalidOperationException(
                 "Helcim card transaction 2060 was processed as debit (cardType DB). Debit refunds must be completed in person using Helcim payment hardware."));
 
-        var controller = new HelcimController(service.Object);
+        var controller = new HelcimController(service.Object, Mock.Of<IDataAccessVerificationService>());
 
         var result = await controller.RefundTransaction(new RefundTransactionRequest
         {
@@ -43,7 +44,7 @@ public class HelcimControllerTests
                 "Helcim POST request failed or returned an empty response for endpoint https://api.helcim.com/v2/payment/refund.",
                 isUpstreamFailure: true));
 
-        var controller = new HelcimController(service.Object);
+        var controller = new HelcimController(service.Object, Mock.Of<IDataAccessVerificationService>());
 
         var result = await controller.RefundTransaction(new RefundTransactionRequest
         {
@@ -68,7 +69,7 @@ public class HelcimControllerTests
             .ThrowsAsync(new InvalidOperationException(
                 "Helcim card transaction 2060 was processed as debit (cardType DB). Debit refunds must be completed in person using Helcim payment hardware."));
 
-        var controller = new HelcimController(service.Object);
+        var controller = new HelcimController(service.Object, Mock.Of<IDataAccessVerificationService>());
 
         var result = await controller.RefundCardTransaction(new RefundCardTransactionRequest
         {
@@ -96,14 +97,15 @@ public class HelcimControllerTests
                 isUpstreamFailure: false,
                 rawResponse: "{\"status\":\"error\"}"));
 
-        var controller = new HelcimController(service.Object);
+        var controller = new HelcimController(service.Object, Mock.Of<IDataAccessVerificationService>());
 
         var result = await controller.RefundAchTransaction(new RefundAchTransactionRequest
         {
             TransactionId = 2062
         });
 
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        var badRequest = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(400, badRequest.StatusCode);
         AssertRefundFailure(badRequest.Value, "Helcim", isUpstreamFailure: false, retryable: false);
         var errorMessage = Assert.IsType<HelcimRefundFailureResponse>(badRequest.Value).Error;
         Assert.Equal("The ACH transaction is no longer refundable.", errorMessage);

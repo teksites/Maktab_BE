@@ -90,6 +90,227 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
+    public async Task InitializePaymentForSession_WhenSaveCardInfoIsSelected_PersistsServerOwnedCheckoutContext()
+    {
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository.Setup(repo => repo.GetByMaktabTransactionId(It.IsAny<Guid>()))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+        repository.Setup(repo => repo.GetByPaymentCode("PAY001"))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+
+        var sender = new Mock<IWebMsgSenderService>();
+        sender.Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Post))
+            .ReturnsAsync("{\"checkoutToken\":\"chk_saved_card\"}");
+        var checkoutContexts = new Mock<IHelcimCheckoutContextRepository>();
+        var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var familyId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+        var service = CreateService(repository.Object, sender.Object, checkoutContexts: checkoutContexts.Object);
+
+        await service.InitializePaymentForSession(new InitiatePaymentRequest
+        {
+            PaymentCode = "PAY001",
+            Amount = 99,
+            TransactionId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            UserIp = "127.0.0.1",
+            SaveCardInfo = true
+        }, userId, familyId);
+
+        checkoutContexts.Verify(contexts => contexts.Save(It.Is<HelcimCheckoutContext>(context =>
+            context.UserId == userId
+            && context.FamilyId == familyId
+            && context.SaveCardInfo
+            && context.InvoiceNumber.StartsWith("INV-PAY001-", StringComparison.Ordinal))), Times.Once);
+    }
+
+    [Fact]
+    public async Task InitializePaymentForSession_WhenHelcimInitializationFails_DoesNotPersistCheckoutContext()
+    {
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository.Setup(repo => repo.GetByMaktabTransactionId(It.IsAny<Guid>()))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+        repository.Setup(repo => repo.GetByPaymentCode("PAY001"))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+        var sender = new Mock<IWebMsgSenderService>();
+        sender.Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Post))
+            .ReturnsAsync(string.Empty);
+        var checkoutContexts = new Mock<IHelcimCheckoutContextRepository>();
+
+        var service = CreateService(repository.Object, sender.Object, checkoutContexts: checkoutContexts.Object);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.InitializePaymentForSession(new InitiatePaymentRequest
+        {
+            PaymentCode = "PAY001",
+            Amount = 99,
+            TransactionId = Guid.NewGuid(),
+            UserIp = "127.0.0.1",
+            SaveCardInfo = true
+        }, Guid.NewGuid(), Guid.NewGuid()));
+
+        checkoutContexts.Verify(contexts => contexts.Save(It.IsAny<HelcimCheckoutContext>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SyncInvoicePayment_WhenCheckoutOptedIn_EncryptsAndStoresReturnedCardToken()
+    {
+        const int invoiceId = 7001;
+        const int helcimTransactionId = 8001;
+        const string invoiceNumber = "INV-PAY001-202609151200-1";
+        const string paymentCode = "PAY001";
+        var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var familyId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var maktabTransactionId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository.Setup(repo => repo.GetByTransactionId(helcimTransactionId))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+        var sender = new Mock<IWebMsgSenderService>();
+        sender.SetupSequence(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync($"{{\"invoiceId\":{invoiceId},\"invoiceNumber\":\"{invoiceNumber}\",\"notes\":\"{paymentCode}\",\"status\":\"PAID\",\"amount\":99,\"amountPaid\":99,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"{maktabTransactionId}\",\"quantity\":1,\"price\":99,\"total\":99}}]}}")
+            .ReturnsAsync($"[{{\"transactionId\":{helcimTransactionId},\"status\":\"APPROVED\",\"type\":\"purchase\",\"amount\":99,\"currency\":\"CAD\",\"cardType\":\"VI\",\"invoiceNumber\":\"{invoiceNumber}\",\"cardToken\":\"helcim-token\",\"cardNumber\":\"4242424242\",\"cardHolderName\":\"Test Parent\"}}]");
+
+        var transactions = new Mock<IStudentCourseTransactionService>();
+        transactions.Setup(service => service.GetTransactionByPaymentCode(paymentCode)).ReturnsAsync(new StudentCourseTransactionResponse
+        {
+            StudentCourseTransactionId = maktabTransactionId,
+            FamilyId = familyId,
+            PaymentCode = paymentCode
+        });
+        var contexts = new Mock<IHelcimCheckoutContextRepository>();
+        contexts.Setup(service => service.Get(invoiceNumber)).ReturnsAsync(new HelcimCheckoutContext
+        {
+            InvoiceNumber = invoiceNumber,
+            UserId = userId,
+            FamilyId = familyId,
+            SaveCardInfo = true
+        });
+        var protector = new Mock<IHelcimCardTokenProtector>();
+        protector.Setup(service => service.Protect("helcim-token")).Returns(new ProtectedHelcimCardToken
+        {
+            Ciphertext = new byte[] { 1 }, Nonce = new byte[] { 2 }, Tag = new byte[] { 3 }, Hash = "token-hash"
+        });
+        var cards = new Mock<IHelcimCardVaultRepository>();
+        cards.Setup(service => service.AddIfMissing(It.IsAny<HelcimSavedCardRecord>())).ReturnsAsync(true);
+        var binLookup = CreateCardBinLookupService();
+        binLookup.Setup(service => service.GetDisplayDetailsAsync("VI", "4242424242", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CardBinLookupResult { CardCompany = "Visa", CardFundingType = "Credit" });
+        var coursePayments = new Mock<ICoursePaymentService>();
+        coursePayments.Setup(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()))
+            .ReturnsAsync((new CoursePaymentResponse(), true));
+        var attempts = new Mock<IHelcimPaymentAttemptRepository>();
+        attempts.Setup(service => service.GetByInvoiceNumber(invoiceNumber)).ReturnsAsync(new HelcimPaymentAttemptRecord
+        {
+            PaymentAttemptId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            InvoiceNumber = invoiceNumber,
+            Status = HelcimPaymentAttemptStatus.ApprovedAwaitingConfirmation
+        });
+        attempts.Setup(service => service.UpdateResult(It.IsAny<Guid>(), It.IsAny<HelcimPaymentAttemptStatus>(), It.IsAny<int?>(), It.IsAny<string?>()))
+            .Returns(Task.CompletedTask);
+
+        var service = CreateService(repository.Object, sender.Object,
+            studentCourseTransactionService: transactions.Object,
+            coursePaymentService: coursePayments.Object,
+            cardBinLookupService: binLookup.Object,
+            cardVault: cards.Object,
+            cardTokenProtector: protector.Object,
+            paymentAttempts: attempts.Object,
+            checkoutContexts: contexts.Object);
+
+        await service.SyncInvoicePayment(invoiceId.ToString());
+
+        cards.Verify(vault => vault.AddIfMissing(It.Is<HelcimSavedCardRecord>(card =>
+            card.UserId == userId
+            && card.FamilyId == familyId
+            && card.TokenHash == "token-hash"
+            && card.CardCompany == "Visa"
+            && card.CardFundingType == "Credit"
+            && card.LastFourDigits == "4242"
+            && card.SourceHelcimTransactionId == helcimTransactionId)), Times.Once);
+        attempts.Verify(service => service.UpdateResult(
+            Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            HelcimPaymentAttemptStatus.Confirmed,
+            helcimTransactionId,
+            null), Times.Once);
+    }
+
+    [Fact]
+    public async Task ChargeSavedCard_WhenApproved_CreatesAttemptAndWaitsForWebhookConfirmation()
+    {
+        var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var familyId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var transactionId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var cardId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+        var courseId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+        JsonMessageData? posted = null;
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository.Setup(repo => repo.GetByMaktabTransactionId(transactionId)).ReturnsAsync(new List<HelcimTransactionResponse>());
+        repository.Setup(repo => repo.GetByPaymentCode("PAY001")).ReturnsAsync(new List<HelcimTransactionResponse>());
+        var sender = new Mock<IWebMsgSenderService>();
+        sender.Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Post))
+            .Callback<JsonMessageData, InternalContracts.IClientConfiguration, HttpMethod>((payload, _, _) => posted = payload)
+            .ReturnsAsync("{\"transactionId\":9001,\"status\":\"APPROVED\"}");
+        var transactions = new Mock<IStudentCourseTransactionService>();
+        transactions.Setup(service => service.GetTransactionByPaymentCode("PAY001")).ReturnsAsync(new StudentCourseTransactionResponse
+        {
+            StudentCourseTransactionId = transactionId, FamilyId = familyId, PaymentCode = "PAY001", IsActive = true,
+            TotalPayable = 100m, TotalAmountPaid = 20m,
+            Enrollments = new List<StudentCourseEnrollmentResponse> { new() { CourseId = courseId } }
+        });
+        var courses = new Mock<ICourseService>();
+        courses.Setup(service => service.GetHelcimTerminalId(courseId)).ReturnsAsync(1234);
+        var cards = new Mock<IHelcimCardVaultRepository>();
+        cards.Setup(service => service.GetActiveCard(cardId, userId)).ReturnsAsync(new HelcimSavedCardRecord
+        {
+            CardId = cardId, UserId = userId, TokenCiphertext = new byte[] { 1 }, TokenNonce = new byte[] { 2 }, TokenTag = new byte[] { 3 }, TokenHash = "hash"
+        });
+        var protector = new Mock<IHelcimCardTokenProtector>();
+        protector.Setup(service => service.Unprotect(It.IsAny<ProtectedHelcimCardToken>())).Returns("card-token");
+        var attempts = new Mock<IHelcimPaymentAttemptRepository>();
+        attempts.Setup(service => service.GetByIdempotencyKey("key-1", userId)).ReturnsAsync((HelcimPaymentAttemptRecord?)null);
+        attempts.Setup(service => service.Add(It.IsAny<HelcimPaymentAttemptRecord>())).Returns(Task.CompletedTask);
+        attempts.Setup(service => service.UpdateResult(It.IsAny<Guid>(), It.IsAny<HelcimPaymentAttemptStatus>(), It.IsAny<int?>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+
+        var service = CreateService(repository.Object, sender.Object, courseService: courses.Object,
+            studentCourseTransactionService: transactions.Object, cardVault: cards.Object,
+            cardTokenProtector: protector.Object, paymentAttempts: attempts.Object);
+        var result = await service.ChargeSavedCard(new ChargeSavedCardRequest
+        {
+            CardId = cardId, PaymentCode = "PAY001", TransactionId = transactionId, Amount = 50m, UserIp = "127.0.0.1", IdempotencyKey = "key-1"
+        }, userId, familyId);
+
+        Assert.True(result.AcceptedByHelcim);
+        Assert.True(result.AwaitingConfirmation);
+        Assert.Equal(9001, result.HelcimTransactionId);
+        Assert.Equal("awaiting_confirmation", result.Status);
+        Assert.Equal("key-1", posted!.Headers!["idempotency-key"]);
+        Assert.Equal("https://api.helcim.com/v2/payment/purchase", posted.ExternalEndpoint);
+        attempts.Verify(service => service.Add(It.IsAny<HelcimPaymentAttemptRecord>()), Times.Once);
+        attempts.Verify(service => service.UpdateResult(It.IsAny<Guid>(), HelcimPaymentAttemptStatus.ApprovedAwaitingConfirmation, 9001, null), Times.Once);
+    }
+
+    [Fact]
+    public async Task ChargeSavedCard_WhenIdempotencyKeyAlreadyExists_DoesNotCallHelcimAgain()
+    {
+        var userId = Guid.NewGuid();
+        var attempts = new Mock<IHelcimPaymentAttemptRepository>();
+        attempts.Setup(service => service.GetByIdempotencyKey("same-key", userId)).ReturnsAsync(new HelcimPaymentAttemptRecord
+        {
+            PaymentAttemptId = Guid.NewGuid(), UserId = userId, IdempotencyKey = "same-key", InvoiceNumber = "INV-PAY001-1",
+            Status = HelcimPaymentAttemptStatus.ApprovedAwaitingConfirmation, HelcimTransactionId = 9001
+        });
+        var sender = new Mock<IWebMsgSenderService>();
+        var service = CreateService(Mock.Of<IHelcimTransactionRepository>(), sender.Object, paymentAttempts: attempts.Object);
+
+        var result = await service.ChargeSavedCard(new ChargeSavedCardRequest
+        {
+            CardId = Guid.NewGuid(), PaymentCode = "PAY001", TransactionId = Guid.NewGuid(), Amount = 1m, IdempotencyKey = "same-key"
+        }, userId, Guid.NewGuid());
+
+        Assert.True(result.AwaitingConfirmation);
+        sender.Verify(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), It.IsAny<HttpMethod>()), Times.Never);
+    }
+
+    [Fact]
     public async Task InitializePayment_IncludesResolvedTerminalIdFromPaymentCode()
     {
         var repository = new Mock<IHelcimTransactionRepository>();
@@ -2358,7 +2579,7 @@ public class HelcimTransactionServiceTests
             });
 
         var cardTransactionsResponse = $"[{{\"transactionId\":{reverseTransactionId},\"dateCreated\":\"2026-05-04 11:00:00\",\"cardBatchId\":6429263,\"status\":\"APPROVED\",\"type\":\"reverse\",\"amount\":140,\"currency\":\"CAD\",\"cardType\":\"VI\",\"invoiceNumber\":\"{invoiceNumber}\"}}]";
-        var invoiceResponse = $"{{\"invoiceId\":63677014,\"invoiceNumber\":\"{invoiceNumber}\",\"token\":\"token\",\"notes\":\"{paymentCode}\",\"dateCreated\":\"2026-05-04 10:52:00\",\"dateUpdated\":\"2026-05-04 11:00:00\",\"status\":\"CANCELLED\",\"customerId\":40499452,\"amount\":140,\"amountPaid\":0,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"{studentTransactionId}\",\"description\":\"127.0.0.1\",\"quantity\":1,\"price\":140,\"total\":140}}]}}";
+        var invoiceResponse = $"[{{\"invoiceId\":63677014,\"invoiceNumber\":\"{invoiceNumber}\",\"token\":\"token\",\"notes\":\"{paymentCode}\",\"dateCreated\":\"2026-05-04 10:52:00\",\"dateUpdated\":\"2026-05-04 11:00:00\",\"status\":\"CANCELLED\",\"customerId\":40499452,\"amount\":140,\"amountPaid\":0,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"{studentTransactionId}\",\"description\":\"127.0.0.1\",\"quantity\":1,\"price\":140,\"total\":140}}]}}]";
         var cardPageRequests = 0;
         var sender = new Mock<IWebMsgSenderService>();
         sender
@@ -3208,7 +3429,11 @@ public class HelcimTransactionServiceTests
         IStudentCourseTransactionService? studentCourseTransactionService = null,
         IStudentCourseEnrollmentService? studentCourseEnrollmentService = null,
         ICoursePaymentService? coursePaymentService = null,
-        ICardBinLookupService? cardBinLookupService = null)
+        ICardBinLookupService? cardBinLookupService = null,
+        IHelcimCardVaultRepository? cardVault = null,
+        IHelcimCardTokenProtector? cardTokenProtector = null,
+        IHelcimPaymentAttemptRepository? paymentAttempts = null,
+        IHelcimCheckoutContextRepository? checkoutContexts = null)
     {
         studentCourseTransactionService ??= CreateStudentCourseTransactionService().Object;
         courseService ??= CreateCourseService().Object;
@@ -3221,7 +3446,11 @@ public class HelcimTransactionServiceTests
             studentCourseTransactionService,
             studentCourseEnrollmentService ?? Mock.Of<IStudentCourseEnrollmentService>(),
             coursePaymentService ?? Mock.Of<ICoursePaymentService>(),
-            cardBinLookupService ?? CreateCardBinLookupService().Object);
+            cardBinLookupService ?? CreateCardBinLookupService().Object,
+            cardVault,
+            cardTokenProtector,
+            paymentAttempts,
+            checkoutContexts);
     }
 
     private static Mock<ICardBinLookupService> CreateCardBinLookupService()

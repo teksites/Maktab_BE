@@ -28,6 +28,7 @@ public sealed class HelcimPaymentAttemptRecord
 public interface IHelcimPaymentAttemptRepository
 {
     Task<HelcimPaymentAttemptRecord?> GetByIdempotencyKey(string idempotencyKey, Guid userId);
+    Task<HelcimPaymentAttemptRecord?> GetByInvoiceNumber(string invoiceNumber);
     Task Add(HelcimPaymentAttemptRecord attempt);
     Task UpdateResult(Guid paymentAttemptId, HelcimPaymentAttemptStatus status, int? helcimTransactionId, string? failureReason);
 }
