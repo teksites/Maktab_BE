@@ -2,6 +2,7 @@
 using Data;
 using MaktabDataContracts.Requests.Institute;
 using MaktabDataContracts.Responses.Institute;
+using MaktabDataContracts.Enums;
 using System.Data.Common;
 
 namespace Courses.Repository.Implementation
@@ -15,9 +16,9 @@ namespace Courses.Repository.Implementation
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"INSERT INTO institutes 
-                (InstituteId, Name, NameFr, Description, DescriptionFr, Email, Phone, TerminalId, IsActive, CreatedAt, UpdatedOn)
+                (InstituteId, Name, NameFr, Description, DescriptionFr, Email, Phone, TerminalId, InstituteType, IsActive, CreatedAt, UpdatedOn)
                 VALUES 
-                (@InstituteId, @Name, @NameFr, @Description, @DescriptionFr, @Email, @Phone, @TerminalId, @IsActive, @CreatedAt, @UpdatedOn)";
+                (@InstituteId, @Name, @NameFr, @Description, @DescriptionFr, @Email, @Phone, @TerminalId, @InstituteType, @IsActive, @CreatedAt, @UpdatedOn)";
 
             var instituteId = Guid.NewGuid();
             cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
@@ -28,6 +29,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@Email", institute.Email ?? string.Empty);
             cmd.AddParameter("@Phone", institute.Phone ?? string.Empty);
             cmd.AddParameter("@TerminalId", (object?)institute.TerminalId ?? DBNull.Value);
+            cmd.AddParameter("@InstituteType", (int)institute.InstituteType);
             cmd.AddParameter("@IsActive", true);
             cmd.AddParameter("@CreatedAt", DateTime.UtcNow);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
@@ -48,13 +50,18 @@ namespace Courses.Repository.Implementation
             return MapToInstituteResponse(reader);
         }
 
-        public async Task<IEnumerable<InstituteResponse>> GetAllInstitutes(bool onlyActive = true)
+        public async Task<IEnumerable<InstituteResponse>> GetAllInstitutes(bool onlyActive = true, InstituteType? instituteType = null)
         {
             var results = new List<InstituteResponse>();
             using var conn = await Database.CreateAndOpenConnectionAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"SELECT * FROM institutes";
-            if (onlyActive) cmd.CommandText += " WHERE IsActive = TRUE";
+            cmd.CommandText = @"SELECT * FROM institutes WHERE 1 = 1";
+            if (onlyActive) cmd.CommandText += " AND IsActive = TRUE";
+            if (instituteType.HasValue)
+            {
+                cmd.CommandText += " AND InstituteType = @InstituteType";
+                cmd.AddParameter("@InstituteType", (int)instituteType.Value);
+            }
 
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
@@ -76,6 +83,7 @@ namespace Courses.Repository.Implementation
                 Email = @Email, 
                 Phone = @Phone, 
                 TerminalId = @TerminalId,
+                InstituteType = @InstituteType,
                 UpdatedOn = @UpdatedOn 
                 WHERE InstituteId = @InstituteId";
 
@@ -87,6 +95,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@Email", institute.Email ?? string.Empty);
             cmd.AddParameter("@Phone", institute.Phone ?? string.Empty);
             cmd.AddParameter("@TerminalId", (object?)institute.TerminalId ?? DBNull.Value);
+            cmd.AddParameter("@InstituteType", (int)institute.InstituteType);
             cmd.AddParameter("@UpdatedOn", DateTime.UtcNow);
 
             return await cmd.ExecuteNonQueryAsync() > 0;
@@ -117,6 +126,7 @@ namespace Courses.Repository.Implementation
                 Email = reader.GetString("Email"),
                 Phone = reader.GetString("Phone"),
                 TerminalId = reader.GetNullableString("TerminalId") ?? string.Empty,
+                InstituteType = (InstituteType)reader.GetByte("InstituteType"),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn")

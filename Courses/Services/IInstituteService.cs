@@ -7,7 +7,7 @@ namespace Courses.Services
     {
         Task<InstituteResponse> AddInstitute(AddInstitute institute);
         Task<bool> DeleteInstitute(Guid instituteId, bool hardDelete = false);
-        Task<IEnumerable<InstituteResponse>> GetAllInstitutes(bool onlyActive = true);
+        Task<IEnumerable<InstituteResponse>> GetAllInstitutes(bool onlyActive = true, InstituteType? instituteType = null);
         Task<InstituteResponse> GetInstitute(Guid instituteId);
         Task<bool> UpdateInstitute(Guid instituteId, AddInstitute institute);
     }
