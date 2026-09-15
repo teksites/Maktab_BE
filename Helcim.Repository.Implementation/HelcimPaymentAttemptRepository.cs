@@ -19,15 +19,18 @@ public sealed class HelcimPaymentAttemptRepository : DbRepository, IHelcimPaymen
         command.AddParameter("@UserId", userId.ToByteArray());
         using var reader = await command.ExecuteReaderAsync();
         if (!await reader.ReadAsync()) return null;
-        return new HelcimPaymentAttemptRecord
-        {
-            PaymentAttemptId = ReadDbFieldGuid(reader, "PaymentAttemptId"), UserId = ReadDbFieldGuid(reader, "UserId"),
-            CardId = ReadDbFieldGuid(reader, "CardId"), MaktabTransactionId = ReadDbFieldGuid(reader, "MaktabTransactionId"),
-            PaymentCode = ReadDbFieldString(reader, "PaymentCode"), InvoiceNumber = ReadDbFieldString(reader, "InvoiceNumber"),
-            IdempotencyKey = ReadDbFieldString(reader, "IdempotencyKey"), Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
-            Status = (HelcimPaymentAttemptStatus)reader.GetByte(reader.GetOrdinal("Status")),
-            HelcimTransactionId = ReadDbFieldNullInt(reader, "HelcimTransactionId"), FailureReason = reader.GetNullableString("FailureReason")
-        };
+        return Map(reader);
+    }
+
+    public async Task<HelcimPaymentAttemptRecord?> GetByInvoiceNumber(string invoiceNumber)
+    {
+        using var connection = await Database.CreateAndOpenConnectionAsync();
+        using var command = connection.CreateCommand();
+        command.CommandText = @"SELECT PaymentAttemptId, UserId, CardId, MaktabTransactionId, PaymentCode, InvoiceNumber,
+            IdempotencyKey, Amount, Status, HelcimTransactionId, FailureReason FROM helcim_payment_attempt WHERE InvoiceNumber = @Invoice";
+        command.AddParameter("@Invoice", invoiceNumber);
+        using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? Map(reader) : null;
     }
 
     public async Task Add(HelcimPaymentAttemptRecord attempt)
@@ -50,4 +53,14 @@ public sealed class HelcimPaymentAttemptRepository : DbRepository, IHelcimPaymen
         command.AddParameter("@Status", (byte)status); command.AddParameter("@TransactionId", transactionId); command.AddParameter("@Failure", failureReason); command.AddParameter("@Id", id.ToByteArray());
         await command.ExecuteNonQueryAsync();
     }
+
+    private static HelcimPaymentAttemptRecord Map(System.Data.IDataReader reader) => new()
+    {
+        PaymentAttemptId = ReadDbFieldGuid(reader, "PaymentAttemptId"), UserId = ReadDbFieldGuid(reader, "UserId"),
+        CardId = ReadDbFieldGuid(reader, "CardId"), MaktabTransactionId = ReadDbFieldGuid(reader, "MaktabTransactionId"),
+        PaymentCode = ReadDbFieldString(reader, "PaymentCode"), InvoiceNumber = ReadDbFieldString(reader, "InvoiceNumber"),
+        IdempotencyKey = ReadDbFieldString(reader, "IdempotencyKey"), Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
+        Status = (HelcimPaymentAttemptStatus)reader.GetByte(reader.GetOrdinal("Status")),
+        HelcimTransactionId = ReadDbFieldNullInt(reader, "HelcimTransactionId"), FailureReason = reader.GetNullableString("FailureReason")
+    };
 }

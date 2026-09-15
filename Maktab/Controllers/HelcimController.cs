@@ -12,6 +12,7 @@ using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Text.Json;
 using MaktabDataContracts.Enums;
+using Users.Services;
 
 [Route("api/helcim")]
 [ApiController]
@@ -19,16 +20,21 @@ using MaktabDataContracts.Enums;
 public class HelcimController : ControllerBase
 {
     private readonly IHelcimTransactionService _service;
+    private readonly IDataAccessVerificationService _access;
 
-    public HelcimController(IHelcimTransactionService service)
+    public HelcimController(IHelcimTransactionService service, IDataAccessVerificationService access)
     {
         _service = service;
+        _access = access;
     }
 
     [ApiAuthorize]
     [HttpPost("initialize-payment")]
-    public Task<HelcimPayInitializeResponse> InitializePayment(InitiatePaymentRequest request)
-        => _service.InitializePayment(request);
+    public async Task<HelcimPayInitializeResponse> InitializePayment(InitiatePaymentRequest request)
+    {
+        var session = await GetSessionContext();
+        return await _service.InitializePaymentForSession(request, session.UserId, session.FamilyId);
+    }
 
     [ApiAuthorize]
     [HttpPost("complete-payment")]
@@ -201,6 +207,19 @@ public class HelcimController : ControllerBase
             IsUpstreamFailure = isUpstreamFailure,
             Retryable = isUpstreamFailure
         };
+    }
+
+    private async Task<SessionAccessContext> GetSessionContext()
+    {
+        if (!Request.Headers.TryGetValue("Session_Info", out var value)
+            || !Guid.TryParse(value, out var sessionId)
+            || sessionId == Guid.Empty)
+        {
+            throw new UnauthorizedAccessException("Session header not found or invalid.");
+        }
+
+        return await _access.GetSessionAccessContext(sessionId).ConfigureAwait(false)
+            ?? throw new UnauthorizedAccessException("No active session found.");
     }
 
     [HttpPost("/api/payment-notifier")]

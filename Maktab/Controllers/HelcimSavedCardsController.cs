@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Helcim;
 using Helcim.Repository;
+using Helcim.Services;
 using Maktab.Attributes;
+using MaktabDataContracts.Requests.Helcim;
 using MaktabDataContracts.Responses.Helcim;
 using Microsoft.AspNetCore.Mvc;
 using Users.Services;
@@ -13,10 +16,14 @@ using Users.Services;
 public sealed class HelcimSavedCardsController : ControllerBase
 {
     private readonly IHelcimCardVaultRepository _cards;
+    private readonly IHelcimTransactionService _transactions;
     private readonly IDataAccessVerificationService _access;
 
-    public HelcimSavedCardsController(IHelcimCardVaultRepository cards, IDataAccessVerificationService access)
-        => (_cards, _access) = (cards, access);
+    public HelcimSavedCardsController(
+        IHelcimCardVaultRepository cards,
+        IHelcimTransactionService transactions,
+        IDataAccessVerificationService access)
+        => (_cards, _transactions, _access) = (cards, transactions, access);
 
     [ApiAuthorize]
     [HttpGet]
@@ -45,6 +52,37 @@ public sealed class HelcimSavedCardsController : ControllerBase
     {
         try { await _cards.Deactivate(cardId, (await GetSession()).UserId); return NoContent(); }
         catch (KeyNotFoundException) { return NotFound(); }
+    }
+
+    [ApiAuthorize]
+    [HttpPost("charge")]
+    public async Task<ActionResult<SavedCardPaymentAttemptResponse>> Charge(ChargeSavedCardRequest request)
+    {
+        try
+        {
+            var session = await GetSession();
+            return Ok(await _transactions.ChargeSavedCard(request, session.UserId, session.FamilyId));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { error = exception.Message, code = "saved_card_or_transaction_not_found" });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { error = exception.Message, code = "invalid_saved_card_payment_request" });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { error = exception.Message, code = "saved_card_payment_not_allowed" });
+        }
+        catch (HelcimRequestException exception)
+        {
+            return StatusCode(exception.IsUpstreamFailure ? 502 : 400, new
+            {
+                error = exception.Message,
+                code = exception.IsUpstreamFailure ? "helcim_unavailable" : "helcim_payment_rejected"
+            });
+        }
     }
 
     private async Task<SessionAccessContext> GetSession()
