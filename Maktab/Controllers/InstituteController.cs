@@ -26,8 +26,10 @@ public class InstituteController : ControllerBase
 
     // INSTITUTES
     [HttpGet]
-    public async Task<IEnumerable<InstituteResponse>> GetAllInstitutes(bool onlyActive = true)
-        => await _instituteService.GetAllInstitutes(onlyActive);
+    public async Task<IEnumerable<InstituteResponse>> GetAllInstitutes(
+        bool onlyActive = true,
+        InstituteType? instituteType = null)
+        => await _instituteService.GetAllInstitutes(onlyActive, instituteType);
 
      [HttpGet("{instituteId:guid}")]
     public async Task<InstituteResponse> GetInstitute(Guid instituteId)

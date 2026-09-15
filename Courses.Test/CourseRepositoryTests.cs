@@ -32,6 +32,34 @@ public class CourseRepositoryTests
         Assert.True(course!.IsManualEnrollment);
         Assert.True(course.IsCourseHasPrequisite);
         Assert.True(course.IsCourseAnEvent);
+        Assert.True(course.IsAdultRestricted);
+    }
+
+    [Fact]
+    public async Task GetCourse_LoadsCustomRequirements()
+    {
+        var courseId = Guid.NewGuid();
+        var readerCount = 0;
+        var database = new FakeDatabase(() =>
+        {
+            readerCount++;
+            return readerCount == 1
+                ? CreateCourseReader(courseId, "54181")
+                : CreateCustomRequirementsReader();
+        });
+        var groupRepository = new Mock<ICourseEnrollmentGroupRepository>();
+        groupRepository
+            .Setup(repo => repo.GetAllGroups(courseId, true))
+            .ReturnsAsync(Array.Empty<MaktabDataContracts.Responses.Course.CourseEnrollmentGroupResponse>());
+
+        var repository = new CourseRepository(database, groupRepository.Object);
+
+        var course = await repository.GetCourse(courseId);
+
+        Assert.NotNull(course);
+        Assert.Equal(
+            new[] { CourseCustomRequirements.SurahRequirement, CourseCustomRequirements.Other },
+            course!.CustomRequirements);
     }
 
     [Fact]
@@ -110,6 +138,7 @@ public class CourseRepositoryTests
         table.Columns.Add("PolicyHyperLink", typeof(string));
         table.Columns.Add("IsCourseCompleted", typeof(bool));
         table.Columns.Add("IsCourseHasPrequisite", typeof(bool));
+        table.Columns.Add("IsAdultRestricted", typeof(bool));
         table.Columns.Add("IsManualEnrollment", typeof(bool));
         table.Columns.Add("IsCourseAnEvent", typeof(bool));
         table.Columns.Add("IsRegistrationOpened", typeof(bool));
@@ -145,6 +174,7 @@ public class CourseRepositoryTests
             true,
             true,
             true,
+            true,
             DateTime.UtcNow.AddDays(-1),
             DateTime.UtcNow.AddDays(5),
             (byte)0,
@@ -156,6 +186,15 @@ public class CourseRepositoryTests
             "school@example.com",
             "514-555-0100");
 
+        return table.CreateDataReader();
+    }
+
+    private static DbDataReader CreateCustomRequirementsReader()
+    {
+        var table = new DataTable();
+        table.Columns.Add("RequirementType", typeof(int));
+        table.Rows.Add((int)CourseCustomRequirements.SurahRequirement);
+        table.Rows.Add((int)CourseCustomRequirements.Other);
         return table.CreateDataReader();
     }
 
