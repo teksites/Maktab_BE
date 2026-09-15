@@ -86,6 +86,11 @@ public class CourseServiceTests
                 PolicyHyperLink = string.Empty,
                 IsCourseCompleted = false,
                 IsCourseHasPrequisite = true,
+                IsAdultRestricted = true,
+                CustomRequirements = new List<CourseCustomRequirements>
+                {
+                    CourseCustomRequirements.SurahRequirement
+                },
                 IsCourseAnEvent = true,
                 IsManualEnrollment = true,
                 IsRegistrationOpened = true,
@@ -108,6 +113,8 @@ public class CourseServiceTests
         Assert.NotNull(capturedRequest);
         Assert.True(capturedRequest!.IsManualEnrollment);
         Assert.True(capturedRequest.IsCourseHasPrequisite);
+        Assert.True(capturedRequest.IsAdultRestricted);
+        Assert.Equal(new[] { CourseCustomRequirements.SurahRequirement }, capturedRequest.CustomRequirements);
         Assert.True(capturedRequest.IsCourseAnEvent);
         Assert.False(capturedRequest.IsRegistrationOpened);
     }

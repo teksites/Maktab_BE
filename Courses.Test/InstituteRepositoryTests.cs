@@ -1,5 +1,6 @@
 using Courses.Repository.Implementation;
 using Courses.Test.Infrastructure;
+using MaktabDataContracts.Enums;
 using System.Data;
 using System.Data.Common;
 
@@ -8,46 +9,23 @@ namespace Courses.Test;
 public class InstituteRepositoryTests
 {
     [Fact]
-    public async Task GetInstitute_MapsTerminalId()
+    public async Task GetAllInstitutes_FiltersByInstituteType()
     {
-        var instituteId = Guid.NewGuid();
-        var database = new FakeDatabase(() => CreateInstituteReader(instituteId));
+        DbCommand? command = null;
+        var database = new FakeDatabase(CreateEmptyReader, executedCommand => command = executedCommand);
         var repository = new InstituteRepository(database);
 
-        var institute = await repository.GetInstitute(instituteId);
+        await repository.GetAllInstitutes(onlyActive: true, InstituteType.Mosque);
 
-        Assert.NotNull(institute);
-        Assert.Equal("54181", institute!.TerminalId);
+        Assert.NotNull(command);
+        Assert.Contains("InstituteType = @InstituteType", command!.CommandText);
+        Assert.Equal((int)InstituteType.Mosque, Convert.ToInt32(command.Parameters["@InstituteType"].Value));
     }
 
-    private static DbDataReader CreateInstituteReader(Guid instituteId)
+    private static DbDataReader CreateEmptyReader()
     {
         var table = new DataTable();
         table.Columns.Add("InstituteId", typeof(byte[]));
-        table.Columns.Add("Name", typeof(string));
-        table.Columns.Add("NameFr", typeof(string));
-        table.Columns.Add("Description", typeof(string));
-        table.Columns.Add("DescriptionFr", typeof(string));
-        table.Columns.Add("Email", typeof(string));
-        table.Columns.Add("Phone", typeof(string));
-        table.Columns.Add("TerminalId", typeof(string));
-        table.Columns.Add("IsActive", typeof(bool));
-        table.Columns.Add("CreatedAt", typeof(DateTime));
-        table.Columns.Add("UpdatedOn", typeof(DateTime));
-
-        table.Rows.Add(
-            instituteId.ToByteArray(),
-            "Institute",
-            "Institut",
-            "Description",
-            "Description fr",
-            "school@example.com",
-            "5551112222",
-            "54181",
-            true,
-            DateTime.UtcNow.AddDays(-5),
-            DateTime.UtcNow);
-
         return table.CreateDataReader();
     }
 }
