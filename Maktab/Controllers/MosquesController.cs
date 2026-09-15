@@ -5,6 +5,9 @@ using MaktabDataContracts.Requests.Institute;
 using MaktabDataContracts.Responses.Institute;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 [Route("api/mosques")]
 [ApiController]
