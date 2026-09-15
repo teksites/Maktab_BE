@@ -2336,6 +2336,88 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
+    public async Task ReconcileTransactions_WhenStoredReverseHasNoLocalPayment_BackfillsRefundPayment()
+    {
+        const int reverseTransactionId = 47889845;
+        const string invoiceNumber = "ORD-20260504-REVERSE";
+        const string paymentCode = "RECONREVERSE";
+        var studentTransactionId = Guid.Parse("aaaaaaaa-3333-3333-3333-333333333333");
+        var familyId = Guid.Parse("bbbbbbbb-3333-3333-3333-333333333333");
+
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository
+            .Setup(repo => repo.GetByTransactionId(reverseTransactionId))
+            .ReturnsAsync(new List<HelcimTransactionResponse>
+            {
+                new()
+                {
+                    TransactionId = reverseTransactionId,
+                    InvoiceNumber = invoiceNumber,
+                    Amount = 140m
+                }
+            });
+
+        var cardTransactionsResponse = $"[{{\"transactionId\":{reverseTransactionId},\"dateCreated\":\"2026-05-04 11:00:00\",\"cardBatchId\":6429263,\"status\":\"APPROVED\",\"type\":\"reverse\",\"amount\":140,\"currency\":\"CAD\",\"cardType\":\"VI\",\"invoiceNumber\":\"{invoiceNumber}\"}}]";
+        var invoiceResponse = $"{{\"invoiceId\":63677014,\"invoiceNumber\":\"{invoiceNumber}\",\"token\":\"token\",\"notes\":\"{paymentCode}\",\"dateCreated\":\"2026-05-04 10:52:00\",\"dateUpdated\":\"2026-05-04 11:00:00\",\"status\":\"CANCELLED\",\"customerId\":40499452,\"amount\":140,\"amountPaid\":0,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"{studentTransactionId}\",\"description\":\"127.0.0.1\",\"quantity\":1,\"price\":140,\"total\":140}}]}}";
+        var sender = new Mock<IWebMsgSenderService>();
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync((JsonMessageData payload, IHelcimClientConfiguration _, HttpMethod _) =>
+            {
+                if (payload.ExternalEndpoint.Contains("/card-transactions?", StringComparison.Ordinal))
+                {
+                    return cardTransactionsResponse;
+                }
+
+                if (payload.ExternalEndpoint.Contains($"/invoices/?invoiceNumber={invoiceNumber}", StringComparison.Ordinal))
+                {
+                    return invoiceResponse;
+                }
+
+                if (payload.ExternalEndpoint.Contains("/ach/transactions?", StringComparison.Ordinal))
+                {
+                    return "[]";
+                }
+
+                throw new InvalidOperationException($"Unexpected Helcim endpoint: {payload.ExternalEndpoint}");
+            });
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransactionByPaymentCode(paymentCode))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = studentTransactionId,
+                FamilyId = familyId,
+                PaymentCode = paymentCode
+            });
+
+        AddCoursePayment? capturedPayment = null;
+        var coursePaymentService = new Mock<ICoursePaymentService>();
+        coursePaymentService
+            .Setup(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()))
+            .Callback<AddCoursePayment>(payment => capturedPayment = payment)
+            .ReturnsAsync((new CoursePaymentResponse(), true));
+
+        var service = CreateService(
+            repository.Object,
+            sender.Object,
+            studentCourseTransactionService: studentCourseTransactionService.Object,
+            coursePaymentService: coursePaymentService.Object);
+
+        var result = await service.ReconcileTransactions(new HelcimReconciliationRequest
+        {
+            StartDate = new DateTime(2026, 5, 4),
+            EndDate = new DateTime(2026, 5, 4)
+        });
+
+        Assert.Equal(1, result.CardTransactionsFetched);
+        Assert.NotNull(capturedPayment);
+        Assert.Equal(MaktabDataContracts.Enums.PaymentType.Refund, capturedPayment!.PaymentType);
+        Assert.Equal(reverseTransactionId.ToString(), capturedPayment.ExternalPaymentId);
+    }
+
+    [Fact]
     public async Task GetAchRefundInvoices_WhenAchListResponseIsEmpty_ReturnsEmptyList()
     {
         var repository = new Mock<IHelcimTransactionRepository>();

@@ -270,13 +270,6 @@ namespace Helcim.Implementation.Services
 
                 foreach (var cardTransaction in cardTransactions)
                 {
-                    var existingTransactions = await GetStoredTransactionsByIdAsync(cardTransaction.TransactionId).ConfigureAwait(false);
-                    if (HasCompletedTransactionDetails(existingTransactions))
-                    {
-                        response.SkippedDuplicates++;
-                        continue;
-                    }
-
                     if (string.IsNullOrWhiteSpace(cardTransaction.InvoiceNumber))
                     {
                         response.UnmatchedTransactions++;
