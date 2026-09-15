@@ -2359,6 +2359,7 @@ public class HelcimTransactionServiceTests
 
         var cardTransactionsResponse = $"[{{\"transactionId\":{reverseTransactionId},\"dateCreated\":\"2026-05-04 11:00:00\",\"cardBatchId\":6429263,\"status\":\"APPROVED\",\"type\":\"reverse\",\"amount\":140,\"currency\":\"CAD\",\"cardType\":\"VI\",\"invoiceNumber\":\"{invoiceNumber}\"}}]";
         var invoiceResponse = $"{{\"invoiceId\":63677014,\"invoiceNumber\":\"{invoiceNumber}\",\"token\":\"token\",\"notes\":\"{paymentCode}\",\"dateCreated\":\"2026-05-04 10:52:00\",\"dateUpdated\":\"2026-05-04 11:00:00\",\"status\":\"CANCELLED\",\"customerId\":40499452,\"amount\":140,\"amountPaid\":0,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{{\"sku\":\"{studentTransactionId}\",\"description\":\"127.0.0.1\",\"quantity\":1,\"price\":140,\"total\":140}}]}}";
+        var cardPageRequests = 0;
         var sender = new Mock<IWebMsgSenderService>();
         sender
             .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
@@ -2366,7 +2367,9 @@ public class HelcimTransactionServiceTests
             {
                 if (payload.ExternalEndpoint.Contains("/card-transactions?", StringComparison.Ordinal))
                 {
-                    return cardTransactionsResponse;
+                    return Interlocked.Increment(ref cardPageRequests) == 1
+                        ? cardTransactionsResponse
+                        : "[]";
                 }
 
                 if (payload.ExternalEndpoint.Contains($"/invoices/?invoiceNumber={invoiceNumber}", StringComparison.Ordinal))
