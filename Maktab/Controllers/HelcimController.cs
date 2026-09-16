@@ -36,6 +36,35 @@ public class HelcimController : ControllerBase
         return await _service.InitializePaymentForSession(request, session.UserId, session.FamilyId);
     }
 
+    // API-key access is deliberately limited to anonymous donation checkout initialization.
+    [ApiKeyAuthorize]
+    [HttpPost("donations/initialize-payment")]
+    public async Task<ActionResult<HelcimPayInitializeResponse>> InitializeAnonymousDonation(InitiatePaymentRequest request)
+    {
+        if (request.PaymentType != PaymentInitiationType.Donation)
+        {
+            return BadRequest(new { error = "This endpoint accepts donation payments only.", code = "donation_payment_type_required" });
+        }
+
+        if (request.SaveCardInfo)
+        {
+            return BadRequest(new { error = "Anonymous donation checkout cannot save a card.", code = "anonymous_card_save_not_allowed" });
+        }
+
+        try
+        {
+            return Ok(await _service.InitializePaymentForSession(request, Guid.Empty, Guid.Empty));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { error = exception.Message, code = "invalid_donation_payment_request" });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { error = exception.Message, code = "donation_campaign_unavailable" });
+        }
+    }
+
     [ApiAuthorize]
     [HttpPost("complete-payment")]
     public Task<HelcimPaymentCompletionResponse> CompletePayment(CompleteHelcimPayPaymentRequest request)

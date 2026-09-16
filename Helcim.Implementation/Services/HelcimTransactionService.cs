@@ -57,6 +57,7 @@ namespace Helcim.Implementation.Services
         private readonly IHelcimCheckoutContextRepository? _checkoutContexts;
         private readonly IHelcimPaymentContextRepository? _paymentContexts;
         private readonly IDonationPaymentRepository? _donationPayments;
+        private readonly IDonationCampaignRepository? _donationCampaigns;
 
         public HelcimTransactionService(
             IHelcimTransactionRepository repository,
@@ -72,7 +73,8 @@ namespace Helcim.Implementation.Services
             IHelcimPaymentAttemptRepository? paymentAttempts = null,
             IHelcimCheckoutContextRepository? checkoutContexts = null,
             IHelcimPaymentContextRepository? paymentContexts = null,
-            IDonationPaymentRepository? donationPayments = null)
+            IDonationPaymentRepository? donationPayments = null,
+            IDonationCampaignRepository? donationCampaigns = null)
         {
             _repository = repository;
             _clientConfiguration = clientConfiguration;
@@ -88,6 +90,7 @@ namespace Helcim.Implementation.Services
             _checkoutContexts = checkoutContexts;
             _paymentContexts = paymentContexts;
             _donationPayments = donationPayments;
+            _donationCampaigns = donationCampaigns;
         }
 
         public async Task<HelcimPayInitializeResponse> InitializePayment(InitiatePaymentRequest request)
@@ -117,6 +120,11 @@ namespace Helcim.Implementation.Services
             if (request.Amount <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(request.Amount), "Helcim payment amount must be greater than zero.");
+            }
+
+            if (request.PaymentType == PaymentInitiationType.Donation && _donationCampaigns != null)
+            {
+                await ValidateDonationCampaignAsync(request.CampaignId!.Value, Convert.ToDecimal(request.Amount)).ConfigureAwait(false);
             }
 
             var invoiceNumber = request.PaymentType == PaymentInitiationType.Donation
@@ -206,6 +214,27 @@ namespace Helcim.Implementation.Services
             };
 
             return response;
+        }
+
+        private async Task ValidateDonationCampaignAsync(Guid campaignId, decimal amount)
+        {
+            var campaign = await _donationCampaigns!.Get(campaignId).ConfigureAwait(false);
+            if (campaign == null || !campaign.IsActive)
+            {
+                throw new InvalidOperationException("The selected donation campaign is unavailable.");
+            }
+
+            var today = DateTime.UtcNow.Date;
+            if ((campaign.StartDate.HasValue && campaign.StartDate.Value.Date > today)
+                || (campaign.EndDate.HasValue && campaign.EndDate.Value.Date < today))
+            {
+                throw new InvalidOperationException("The selected donation campaign is not currently active.");
+            }
+
+            if (!campaign.AllowCustomAmount && !campaign.PresetAmounts.Any(preset => preset.Amount == amount))
+            {
+                throw new ArgumentException("Donation amount must match one of the campaign preset amounts.", nameof(amount));
+            }
         }
 
         public async Task<HelcimPayInitializeResponse> InitializeSavedCardVerification(Guid userId, Guid familyId)

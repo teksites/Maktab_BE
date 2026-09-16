@@ -1,5 +1,8 @@
 using Helcim;
 using Helcim.Services;
+using MaktabDataContracts.Enums;
+using MaktabDataContracts.Requests.Helcim;
+using MaktabDataContracts.Responses.Helcim;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Users.Services;
@@ -8,6 +11,45 @@ namespace Courses.Test;
 
 public class HelcimControllerTests
 {
+    [Fact]
+    public async Task InitializeAnonymousDonation_RejectsANonDonationRequestBeforeCallingHelcim()
+    {
+        var service = new Mock<IHelcimTransactionService>();
+        var controller = new HelcimController(service.Object, Mock.Of<IDataAccessVerificationService>());
+
+        var result = await controller.InitializeAnonymousDonation(new InitiatePaymentRequest
+        {
+            PaymentType = PaymentInitiationType.Course,
+            Amount = 25
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        service.Verify(instance => instance.InitializePaymentForSession(
+            It.IsAny<InitiatePaymentRequest>(), It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InitializeAnonymousDonation_UsesEmptyPayerIdentifiers()
+    {
+        var service = new Mock<IHelcimTransactionService>();
+        service.Setup(instance => instance.InitializePaymentForSession(
+                It.IsAny<InitiatePaymentRequest>(), Guid.Empty, Guid.Empty))
+            .ReturnsAsync(new HelcimPayInitializeResponse { CheckoutToken = "anonymous-donation-token" });
+        var controller = new HelcimController(service.Object, Mock.Of<IDataAccessVerificationService>());
+        var request = new InitiatePaymentRequest
+        {
+            PaymentType = PaymentInitiationType.Donation,
+            CampaignId = Guid.NewGuid(),
+            Amount = 25
+        };
+
+        var result = await controller.InitializeAnonymousDonation(request);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal("anonymous-donation-token", Assert.IsType<HelcimPayInitializeResponse>(ok.Value).CheckoutToken);
+        service.Verify(instance => instance.InitializePaymentForSession(request, Guid.Empty, Guid.Empty), Times.Once);
+    }
+
     [Fact]
     public async Task RefundTransaction_WhenDebitRefundBlocked_ReturnsBadRequestWithErrorBody()
     {
