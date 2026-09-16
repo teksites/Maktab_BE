@@ -164,21 +164,121 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
-    public async Task InitializePaymentForSession_RejectsDonationBeforeCallingHelcimUntilDonationLedgerExists()
+    public async Task InitializePaymentForSession_DonationPersistsAnonymousContextAndDoesNotResolveCourse()
     {
         var sender = new Mock<IWebMsgSenderService>();
         var paymentContexts = new Mock<IHelcimPaymentContextRepository>();
-        var service = CreateService(new Mock<IHelcimTransactionRepository>().Object, sender.Object, paymentContexts: paymentContexts.Object);
+        HelcimPaymentContext? savedContext = null;
+        paymentContexts.Setup(contexts => contexts.Save(It.IsAny<HelcimPaymentContext>()))
+            .Callback<HelcimPaymentContext>(context => savedContext = context)
+            .Returns(Task.CompletedTask);
+        sender.Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Post))
+            .ReturnsAsync("{\"checkoutToken\":\"chk_donation\"}");
+        var studentTransactions = CreateStudentCourseTransactionService();
+        var courseService = CreateCourseService();
+        var service = CreateService(
+            new Mock<IHelcimTransactionRepository>().Object,
+            sender.Object,
+            courseService: courseService.Object,
+            studentCourseTransactionService: studentTransactions.Object,
+            paymentContexts: paymentContexts.Object);
+        var campaignId = Guid.NewGuid();
 
-        await Assert.ThrowsAsync<NotSupportedException>(() => service.InitializePaymentForSession(new InitiatePaymentRequest
+        var response = await service.InitializePaymentForSession(new InitiatePaymentRequest
         {
             Amount = 25,
             PaymentType = PaymentInitiationType.Donation,
-            CampaignId = Guid.NewGuid()
-        }, Guid.NewGuid(), Guid.Empty));
+            CampaignId = campaignId
+        }, Guid.Empty, Guid.Empty);
 
-        sender.Verify(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Post), Times.Never);
-        paymentContexts.Verify(contexts => contexts.Save(It.IsAny<HelcimPaymentContext>()), Times.Never);
+        Assert.Equal("chk_donation", response.CheckoutToken);
+        Assert.NotNull(savedContext);
+        Assert.Equal(PaymentInitiationType.Donation, savedContext!.PaymentType);
+        Assert.Equal(campaignId, savedContext.CampaignId);
+        Assert.Null(savedContext.UserId);
+        Assert.Null(savedContext.FamilyId);
+        Assert.StartsWith("INV-DON-", savedContext.InvoiceNumber);
+        studentTransactions.Verify(service => service.GetTransaction(It.IsAny<Guid>()), Times.Never);
+        studentTransactions.Verify(service => service.GetTransactionByPaymentCode(It.IsAny<string>()), Times.Never);
+        courseService.Verify(service => service.GetHelcimTerminalId(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SyncInvoicePayment_DonationContextStoresBinEnrichedDonationWithoutCoursePayment()
+    {
+        const int invoiceId = 900101;
+        const int helcimTransactionId = 900102;
+        var contextId = Guid.NewGuid();
+        var campaignId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        const string invoiceNumber = "INV-DON-12345678-20260916123000-abcdefgh";
+
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository.Setup(repo => repo.GetByTransactionId(helcimTransactionId))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+        repository.Setup(repo => repo.GetDetailedByTransactionId(helcimTransactionId))
+            .ReturnsAsync(new List<HelcimTransactionResponseDetailed>());
+        repository.Setup(repo => repo.Add(It.IsAny<AddHelcimTransactionDetails>()))
+            .Returns(Task.CompletedTask);
+
+        var paymentContexts = new Mock<IHelcimPaymentContextRepository>();
+        paymentContexts.Setup(contexts => contexts.GetByPaymentContextId(contextId))
+            .ReturnsAsync(new HelcimPaymentContext
+            {
+                PaymentContextId = contextId,
+                InvoiceNumber = invoiceNumber,
+                PaymentType = PaymentInitiationType.Donation,
+                CampaignId = campaignId,
+                UserId = userId,
+                Amount = 25m
+            });
+
+        DonationPaymentRecord? storedDonation = null;
+        var donations = new Mock<IDonationPaymentRepository>();
+        donations.Setup(service => service.AddOrUpdate(It.IsAny<DonationPaymentRecord>()))
+            .Callback<DonationPaymentRecord>(payment => storedDonation = payment)
+            .Returns(Task.CompletedTask);
+
+        var binLookup = CreateCardBinLookupService();
+        binLookup.Setup(service => service.GetDisplayDetailsAsync("VI", "4111111111111111", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CardBinLookupResult
+            {
+                CardCompany = "Visa",
+                CardFundingType = "Debit",
+                CardFundingTypeKnown = true
+            });
+
+        var responses = new Queue<string>(new[]
+        {
+            $"{{\"invoiceId\":{invoiceId},\"invoiceNumber\":\"{invoiceNumber}\",\"notes\":\"MKTCTX:{contextId:D}\",\"datePaid\":\"2026-09-16 12:30:10\",\"status\":\"PAID\",\"amount\":25,\"amountPaid\":25,\"currency\":\"CAD\",\"type\":\"INVOICE\"}}",
+            $"[{{\"transactionId\":{helcimTransactionId},\"status\":\"APPROVED\",\"type\":\"purchase\",\"amount\":25,\"currency\":\"CAD\",\"cardType\":\"VI\",\"invoiceNumber\":\"{invoiceNumber}\",\"cardNumber\":\"4111111111111111\",\"cardHolderName\":\"Donation Test\"}}]"
+        });
+        var sender = new Mock<IWebMsgSenderService>();
+        sender.Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync(() => responses.Dequeue());
+        var coursePayments = new Mock<ICoursePaymentService>();
+        var service = CreateService(
+            repository.Object,
+            sender.Object,
+            coursePaymentService: coursePayments.Object,
+            cardBinLookupService: binLookup.Object,
+            paymentContexts: paymentContexts.Object,
+            donationPayments: donations.Object);
+
+        var result = await service.SyncInvoicePaymentByInvoiceId(invoiceId);
+
+        Assert.True(result.Success);
+        Assert.NotNull(storedDonation);
+        Assert.Equal(campaignId, storedDonation!.CampaignId);
+        Assert.Equal(userId, storedDonation.UserId);
+        Assert.Equal(helcimTransactionId, storedDonation.HelcimTransactionId);
+        Assert.Equal(25m, storedDonation.Amount);
+        Assert.Equal(25m, storedDonation.NetAmount);
+        Assert.Equal("Visa", storedDonation.CardCompany);
+        Assert.Equal("Debit", storedDonation.CardFundingType);
+        Assert.True(storedDonation.CardFundingTypeKnown);
+        Assert.Equal("1111", storedDonation.LastFourDigits);
+        coursePayments.Verify(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()), Times.Never);
     }
 
     [Fact]
@@ -3588,7 +3688,8 @@ public class HelcimTransactionServiceTests
         IHelcimCardTokenProtector? cardTokenProtector = null,
         IHelcimPaymentAttemptRepository? paymentAttempts = null,
         IHelcimCheckoutContextRepository? checkoutContexts = null,
-        IHelcimPaymentContextRepository? paymentContexts = null)
+        IHelcimPaymentContextRepository? paymentContexts = null,
+        IDonationPaymentRepository? donationPayments = null)
     {
         studentCourseTransactionService ??= CreateStudentCourseTransactionService().Object;
         courseService ??= CreateCourseService().Object;
@@ -3606,7 +3707,8 @@ public class HelcimTransactionServiceTests
             cardTokenProtector,
             paymentAttempts,
             checkoutContexts,
-            paymentContexts);
+            paymentContexts,
+            donationPayments);
     }
 
     private static Mock<ICardBinLookupService> CreateCardBinLookupService()
