@@ -168,14 +168,7 @@ namespace Helcim.Implementation.Services
                 ["amount"] = 0m,
                 ["currency"] = "CAD",
                 // A profile vault stores reusable card tokens only. Bank-account collection is not part of this endpoint.
-                ["paymentMethod"] = "cc",
-                ["HelcimDigitalWalletRequest"] = 0,
-                ["invoiceRequest"] = new JObject
-                {
-                    ["invoiceNumber"] = invoiceNumber,
-                    ["type"] = "INVOICE",
-                    ["notes"] = "Maktab profile saved-card verification"
-                }
+                ["paymentMethod"] = "cc"
             };
 
             var payload = new JsonMessageData
@@ -195,6 +188,8 @@ namespace Helcim.Implementation.Services
                 throw new InvalidOperationException("Helcim saved-card verification returned an empty response.");
             }
 
+            ThrowIfHelcimErrorResponse(responseJson, HttpMethod.Post, payload.ExternalEndpoint);
+
             var responseReceived = JsonConvert.DeserializeObject<HelcimPayInitialize>(responseJson)
                 ?? throw new InvalidOperationException("Unable to deserialize Helcim saved-card verification response.");
             if (string.IsNullOrWhiteSpace(responseReceived.CheckoutToken))
@@ -202,7 +197,7 @@ namespace Helcim.Implementation.Services
                 throw new InvalidOperationException("Helcim saved-card verification did not return a checkout token.");
             }
 
-            // Persist only after Helcim has issued a usable checkout session. The invoice prefix identifies this as a non-course flow.
+            // Persist only after Helcim has issued a usable checkout session. This reference identifies the checkout context as non-course.
             await _checkoutContexts.Save(new HelcimCheckoutContext
             {
                 InvoiceNumber = invoiceNumber,

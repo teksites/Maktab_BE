@@ -176,8 +176,7 @@ public class HelcimTransactionServiceTests
         Assert.Equal("verify", payload["paymentType"]!.Value<string>());
         Assert.Equal(0m, payload["amount"]!.Value<decimal>());
         Assert.Equal("cc", payload["paymentMethod"]!.Value<string>());
-        Assert.Equal(0, payload["HelcimDigitalWalletRequest"]!.Value<int>());
-        Assert.Matches("^INV-CARD-VERIFY-\\d{14}-[a-f0-9]{32}$", payload["invoiceRequest"]!["invoiceNumber"]!.Value<string>());
+        Assert.Null(payload["invoiceRequest"]);
         contexts.Verify(context => context.Save(It.Is<HelcimCheckoutContext>(saved =>
             saved.UserId == userId
             && saved.FamilyId == familyId
