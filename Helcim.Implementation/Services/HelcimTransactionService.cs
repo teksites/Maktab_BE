@@ -2910,6 +2910,10 @@ namespace Helcim.Implementation.Services
                 CardHolderName = cardTransaction.CardHolderName ?? string.Empty,
                 SourceHelcimTransactionId = cardTransaction.TransactionId
             }).ConfigureAwait(false);
+
+            // The short-lived context contains only the correlation data needed to vault this card.
+            // Remove it after a successful insert or duplicate refresh so it cannot be reused.
+            await _checkoutContexts.Delete(invoice.InvoiceNumber).ConfigureAwait(false);
         }
 
         private static bool IsProfileSavedCardVerification(string? invoiceNumber)

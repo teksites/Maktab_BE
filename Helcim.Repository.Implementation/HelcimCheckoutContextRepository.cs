@@ -25,4 +25,13 @@ public sealed class HelcimCheckoutContextRepository : DbRepository, IHelcimCheck
         if (!await reader.ReadAsync()) return null;
         return new HelcimCheckoutContext { InvoiceNumber = ReadDbFieldString(reader, "InvoiceNumber"), UserId = ReadDbFieldGuid(reader, "UserId"), FamilyId = ReadDbFieldNullableGuid(reader, "FamilyId") ?? Guid.Empty, SaveCardInfo = ReadDbFieldBool(reader, "SaveCardInfo") };
     }
+
+    public async Task Delete(string invoiceNumber)
+    {
+        using var connection = await Database.CreateAndOpenConnectionAsync();
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM helcim_checkout_context WHERE InvoiceNumber = @Invoice";
+        command.AddParameter("@Invoice", invoiceNumber);
+        await command.ExecuteNonQueryAsync();
+    }
 }
