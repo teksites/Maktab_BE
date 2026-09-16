@@ -10,6 +10,7 @@ using MaktabDataContracts.Enums.Helcim;
 using MaktabDataContracts.Requests.Course;
 using MaktabDataContracts.Requests.Helcim;
 using MaktabDataContracts.Responses.Course;
+using MaktabDataContracts.Responses.DonationCampaign;
 using MaktabDataContracts.Responses.Helcim;
 using MaktabDataContracts.Responses.Transactions;
 using Moq;
@@ -201,6 +202,63 @@ public class HelcimTransactionServiceTests
         studentTransactions.Verify(service => service.GetTransaction(It.IsAny<Guid>()), Times.Never);
         studentTransactions.Verify(service => service.GetTransactionByPaymentCode(It.IsAny<string>()), Times.Never);
         courseService.Verify(service => service.GetHelcimTerminalId(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InitializePaymentForSession_DonationRequiresAnActiveCampaignPresetWhenCustomAmountsAreDisabled()
+    {
+        var campaignId = Guid.NewGuid();
+        var campaigns = new Mock<IDonationCampaignRepository>();
+        campaigns.Setup(repository => repository.Get(campaignId))
+            .ReturnsAsync(new DonationCampaignResponse
+            {
+                CampaignId = campaignId,
+                IsActive = true,
+                AllowCustomAmount = false,
+                PresetAmounts = new[] { new DonationCampaignPresetAmountResponse { Amount = 25m, DisplayOrder = 1 } }
+            });
+        var sender = new Mock<IWebMsgSenderService>();
+        var service = CreateService(new Mock<IHelcimTransactionRepository>().Object, sender.Object, donationCampaigns: campaigns.Object);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() => service.InitializePaymentForSession(new InitiatePaymentRequest
+        {
+            Amount = 26,
+            PaymentType = PaymentInitiationType.Donation,
+            CampaignId = campaignId
+        }, Guid.Empty, Guid.Empty));
+
+        Assert.Contains("preset", exception.Message, StringComparison.OrdinalIgnoreCase);
+        sender.Verify(instance => instance.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Post), Times.Never);
+    }
+
+    [Fact]
+    public async Task InitializePaymentForSession_DonationAllowsACurrentCampaignPreset()
+    {
+        var campaignId = Guid.NewGuid();
+        var campaigns = new Mock<IDonationCampaignRepository>();
+        campaigns.Setup(repository => repository.Get(campaignId))
+            .ReturnsAsync(new DonationCampaignResponse
+            {
+                CampaignId = campaignId,
+                IsActive = true,
+                AllowCustomAmount = false,
+                StartDate = DateTime.UtcNow.Date.AddDays(-1),
+                EndDate = DateTime.UtcNow.Date.AddDays(1),
+                PresetAmounts = new[] { new DonationCampaignPresetAmountResponse { Amount = 25m, DisplayOrder = 1 } }
+            });
+        var sender = new Mock<IWebMsgSenderService>();
+        sender.Setup(instance => instance.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Post))
+            .ReturnsAsync("{\"checkoutToken\":\"campaign_checkout\"}");
+        var service = CreateService(new Mock<IHelcimTransactionRepository>().Object, sender.Object, donationCampaigns: campaigns.Object);
+
+        var response = await service.InitializePaymentForSession(new InitiatePaymentRequest
+        {
+            Amount = 25,
+            PaymentType = PaymentInitiationType.Donation,
+            CampaignId = campaignId
+        }, Guid.Empty, Guid.Empty);
+
+        Assert.Equal("campaign_checkout", response.CheckoutToken);
     }
 
     [Fact]
@@ -3692,7 +3750,8 @@ public class HelcimTransactionServiceTests
         IHelcimPaymentAttemptRepository? paymentAttempts = null,
         IHelcimCheckoutContextRepository? checkoutContexts = null,
         IHelcimPaymentContextRepository? paymentContexts = null,
-        IDonationPaymentRepository? donationPayments = null)
+        IDonationPaymentRepository? donationPayments = null,
+        IDonationCampaignRepository? donationCampaigns = null)
     {
         studentCourseTransactionService ??= CreateStudentCourseTransactionService().Object;
         courseService ??= CreateCourseService().Object;
@@ -3711,7 +3770,8 @@ public class HelcimTransactionServiceTests
             paymentAttempts,
             checkoutContexts,
             paymentContexts,
-            donationPayments);
+            donationPayments,
+            donationCampaigns);
     }
 
     private static Mock<ICardBinLookupService> CreateCardBinLookupService()
