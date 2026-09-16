@@ -85,6 +85,33 @@ public sealed class HelcimSavedCardsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Starts a $0 Helcim verification checkout to add a card to the signed-in user's profile.
+    /// This is intentionally separate from a course payment and has no request body.
+    /// </summary>
+    [ApiAuthorize]
+    [HttpPost("initialize-verification")]
+    public async Task<ActionResult<HelcimPayInitializeResponse>> InitializeVerification()
+    {
+        try
+        {
+            var session = await GetSession();
+            return Ok(await _transactions.InitializeSavedCardVerification(session.UserId, session.FamilyId));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { error = exception.Message, code = "saved_card_verification_not_available" });
+        }
+        catch (HelcimRequestException exception)
+        {
+            return StatusCode(exception.IsUpstreamFailure ? 502 : 400, new
+            {
+                error = exception.Message,
+                code = exception.IsUpstreamFailure ? "helcim_unavailable" : "helcim_verification_rejected"
+            });
+        }
+    }
+
     private async Task<SessionAccessContext> GetSession()
     {
         if (!Request.Headers.TryGetValue("Session_Info", out var value) || !Guid.TryParse(value, out var sessionId))

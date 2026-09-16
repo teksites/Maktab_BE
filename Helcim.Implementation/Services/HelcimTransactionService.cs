@@ -40,6 +40,7 @@ namespace Helcim.Implementation.Services
         private const int AchStatusClearingDeclined = 4;
         private const int AchStatusBatchOpen = 1;
         private const int AchStatusBatchClosed = 2;
+        private const string SavedCardVerificationInvoicePrefix = "INV-CARD-VERIFY-";
 
         private readonly IHelcimTransactionRepository _repository;
         private readonly IHelcimClientConfiguration _clientConfiguration;
@@ -146,6 +147,71 @@ namespace Helcim.Implementation.Services
             };
 
             return response;
+        }
+
+        public async Task<HelcimPayInitializeResponse> InitializeSavedCardVerification(Guid userId, Guid familyId)
+        {
+            if (userId == Guid.Empty)
+            {
+                throw new UnauthorizedAccessException("An active user session is required to save a payment card.");
+            }
+
+            if (_checkoutContexts == null || _cardVault == null || _cardTokenProtector == null)
+            {
+                throw new InvalidOperationException("Saved-card verification is not configured.");
+            }
+
+            var invoiceNumber = BuildSavedCardVerificationInvoiceNumber();
+            var helcimRequestPayload = new JObject
+            {
+                ["paymentType"] = "verify",
+                ["amount"] = 0m,
+                ["currency"] = "CAD",
+                // A profile vault stores reusable card tokens only. Bank-account collection is not part of this endpoint.
+                ["paymentMethod"] = "cc",
+                ["HelcimDigitalWalletRequest"] = 0,
+                ["invoiceRequest"] = new JObject
+                {
+                    ["invoiceNumber"] = invoiceNumber,
+                    ["type"] = "INVOICE",
+                    ["notes"] = "Maktab profile saved-card verification"
+                }
+            };
+
+            var payload = new JsonMessageData
+            {
+                ExternalEndpoint = BuildVersionedEndpoint(_clientConfiguration.RelativeUrl),
+                Payload = new StringContent(helcimRequestPayload.ToString(Formatting.None), Encoding.UTF8, "application/json"),
+                Headers = new Dictionary<string, string>
+                {
+                    ["accept"] = "application/json",
+                    ["api-token"] = _clientConfiguration.ApiToken
+                }
+            };
+
+            var responseJson = await _senderService.SendMessage(payload, _clientConfiguration, HttpMethod.Post).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(responseJson))
+            {
+                throw new InvalidOperationException("Helcim saved-card verification returned an empty response.");
+            }
+
+            var responseReceived = JsonConvert.DeserializeObject<HelcimPayInitialize>(responseJson)
+                ?? throw new InvalidOperationException("Unable to deserialize Helcim saved-card verification response.");
+            if (string.IsNullOrWhiteSpace(responseReceived.CheckoutToken))
+            {
+                throw new InvalidOperationException("Helcim saved-card verification did not return a checkout token.");
+            }
+
+            // Persist only after Helcim has issued a usable checkout session. The invoice prefix identifies this as a non-course flow.
+            await _checkoutContexts.Save(new HelcimCheckoutContext
+            {
+                InvoiceNumber = invoiceNumber,
+                UserId = userId,
+                FamilyId = familyId,
+                SaveCardInfo = true
+            }).ConfigureAwait(false);
+
+            return new HelcimPayInitializeResponse { CheckoutToken = responseReceived.CheckoutToken };
         }
 
         public async Task<SavedCardPaymentAttemptResponse> ChargeSavedCard(
@@ -1344,6 +1410,9 @@ namespace Helcim.Implementation.Services
             return $"INV-{normalizedPaymentCode}-{timestamp}-{latestSequence + 1}";
         }
 
+        private static string BuildSavedCardVerificationInvoiceNumber()
+            => $"{SavedCardVerificationInvoicePrefix}{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}";
+
         private async Task<int?> ResolveTerminalId(InitiatePaymentRequest request)
         {
             var transaction = await ResolveTransaction(request).ConfigureAwait(false);
@@ -2495,7 +2564,8 @@ namespace Helcim.Implementation.Services
             // (for example, a legacy reversal). Course-payment insertion is idempotent by
             // Helcim external transaction id, so safely reconcile the ledger first.
             var localPaymentApplied = false;
-            if (ShouldApplyCardPayment(invoice, cardTransaction))
+            if (!IsProfileSavedCardVerification(invoice.InvoiceNumber)
+                && ShouldApplyCardPayment(invoice, cardTransaction))
             {
                 localPaymentApplied = await ProcessPaidInvoiceAsync(invoice, cardTransaction, localTransaction).ConfigureAwait(false);
             }
@@ -2542,8 +2612,7 @@ namespace Helcim.Implementation.Services
             HelcimInvoiceResponse invoice,
             HelcimCardTransactionResponse cardTransaction)
         {
-            if (!ShouldApplyCardPayment(invoice, cardTransaction)
-                || string.IsNullOrWhiteSpace(invoice.InvoiceNumber)
+            if (string.IsNullOrWhiteSpace(invoice.InvoiceNumber)
                 || string.IsNullOrWhiteSpace(cardTransaction.CardToken))
             {
                 return;
@@ -2553,6 +2622,19 @@ namespace Helcim.Implementation.Services
                 ? null
                 : await _checkoutContexts.Get(invoice.InvoiceNumber).ConfigureAwait(false);
             if (context is not { SaveCardInfo: true } || context.UserId == Guid.Empty)
+            {
+                return;
+            }
+
+            var isProfileVerification = IsProfileSavedCardVerification(invoice.InvoiceNumber);
+            if (isProfileVerification)
+            {
+                if (cardTransaction.CardTransactionStatus != HelcimCardTransactionStatus.Approved)
+                {
+                    return;
+                }
+            }
+            else if (!ShouldApplyCardPayment(invoice, cardTransaction))
             {
                 return;
             }
@@ -2584,6 +2666,10 @@ namespace Helcim.Implementation.Services
                 SourceHelcimTransactionId = cardTransaction.TransactionId
             }).ConfigureAwait(false);
         }
+
+        private static bool IsProfileSavedCardVerification(string? invoiceNumber)
+            => !string.IsNullOrWhiteSpace(invoiceNumber)
+                && invoiceNumber.StartsWith(SavedCardVerificationInvoicePrefix, StringComparison.OrdinalIgnoreCase);
 
         private async Task<HelcimPaymentCompletionResponse> SaveAchTransactionDetailsAsync(
             HelcimInvoiceResponse invoice,
