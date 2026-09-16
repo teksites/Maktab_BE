@@ -17,6 +17,9 @@ namespace Helcim.Registry
             services.AddScoped<IHelcimCardVaultRepository, HelcimCardVaultRepository>();
             services.AddScoped<IHelcimPaymentAttemptRepository, HelcimPaymentAttemptRepository>();
             services.AddScoped<IHelcimCheckoutContextRepository, HelcimCheckoutContextRepository>();
+            services.AddScoped<IHelcimPaymentContextRepository, HelcimPaymentContextRepository>();
+            services.AddScoped<IDonationPaymentRepository, DonationPaymentRepository>();
+            services.AddScoped<IDonationCampaignRepository, DonationCampaignRepository>();
             services.AddSingleton<IHelcimClientConfiguration, HelcimClientConfiguration>();
             services.AddSingleton<IHelcimCardVaultConfiguration, HelcimCardVaultConfiguration>();
             services.AddSingleton<IHelcimCardTokenProtector, HelcimCardTokenProtector>();
