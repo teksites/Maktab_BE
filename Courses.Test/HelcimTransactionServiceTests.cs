@@ -412,10 +412,16 @@ public class HelcimTransactionServiceTests
         attempts.Setup(service => service.GetByIdempotencyKey("key-1", userId)).ReturnsAsync((HelcimPaymentAttemptRecord?)null);
         attempts.Setup(service => service.Add(It.IsAny<HelcimPaymentAttemptRecord>())).Returns(Task.CompletedTask);
         attempts.Setup(service => service.UpdateResult(It.IsAny<Guid>(), It.IsAny<HelcimPaymentAttemptStatus>(), It.IsAny<int?>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+        var paymentContexts = new Mock<IHelcimPaymentContextRepository>();
+        HelcimPaymentContext? savedContext = null;
+        paymentContexts.Setup(contexts => contexts.Save(It.IsAny<HelcimPaymentContext>()))
+            .Callback<HelcimPaymentContext>(context => savedContext = context)
+            .Returns(Task.CompletedTask);
 
         var service = CreateService(repository.Object, sender.Object, courseService: courses.Object,
             studentCourseTransactionService: transactions.Object, cardVault: cards.Object,
-            cardTokenProtector: protector.Object, paymentAttempts: attempts.Object);
+            cardTokenProtector: protector.Object, paymentAttempts: attempts.Object,
+            paymentContexts: paymentContexts.Object);
         var result = await service.ChargeSavedCard(new ChargeSavedCardRequest
         {
             CardId = cardId, PaymentCode = "PAY001", TransactionId = transactionId, Amount = 50m, UserIp = "127.0.0.1", IdempotencyKey = "key-1"
@@ -427,6 +433,11 @@ public class HelcimTransactionServiceTests
         Assert.Equal("awaiting_confirmation", result.Status);
         Assert.Equal("key-1", posted!.Headers!["idempotency-key"]);
         Assert.Equal("https://api.helcim.com/v2/payment/purchase", posted.ExternalEndpoint);
+        Assert.NotNull(savedContext);
+        Assert.Equal(userId, savedContext!.UserId);
+        Assert.Equal(familyId, savedContext.FamilyId);
+        var providerPayload = JObject.Parse(await posted.Payload!.ReadAsStringAsync());
+        Assert.Equal($"MKTCTX:{savedContext.PaymentContextId:D}", providerPayload["invoice"]!["notes"]!.Value<string>());
         attempts.Verify(service => service.Add(It.IsAny<HelcimPaymentAttemptRecord>()), Times.Once);
         attempts.Verify(service => service.UpdateResult(It.IsAny<Guid>(), HelcimPaymentAttemptStatus.ApprovedAwaitingConfirmation, 9001, null), Times.Once);
     }

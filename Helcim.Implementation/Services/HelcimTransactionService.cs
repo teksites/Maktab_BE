@@ -322,6 +322,24 @@ namespace Helcim.Implementation.Services
 
             try
             {
+                HelcimPaymentContext? paymentContext = null;
+                if (_paymentContexts != null)
+                {
+                    paymentContext = new HelcimPaymentContext
+                    {
+                        PaymentContextId = Guid.NewGuid(),
+                        InvoiceNumber = invoiceNumber,
+                        PaymentCode = transaction.PaymentCode,
+                        MaktabTransactionId = transaction.StudentCourseTransactionId,
+                        PaymentType = PaymentInitiationType.Course,
+                        UserId = userId,
+                        FamilyId = familyId,
+                        SaveCardInfo = false,
+                        Amount = request.Amount
+                    };
+                    await _paymentContexts.Save(paymentContext).ConfigureAwait(false);
+                }
+
                 var terminalId = await ResolveTerminalId(initializeRequest).ConfigureAwait(false);
                 ValidateTerminalId(terminalId);
                 var token = _cardTokenProtector.Unprotect(new ProtectedHelcimCardToken
@@ -334,7 +352,13 @@ namespace Helcim.Implementation.Services
                 var responseJson = await SendJsonRequest(
                     BuildVersionedEndpoint("/payment/purchase"),
                     HttpMethod.Post,
-                    BuildSavedCardPurchasePayload(initializeRequest, invoiceNumber, request.Amount, token, terminalId),
+                    BuildSavedCardPurchasePayload(
+                        initializeRequest,
+                        invoiceNumber,
+                        request.Amount,
+                        token,
+                        terminalId,
+                        paymentContext == null ? null : BuildPaymentContextNote(paymentContext.PaymentContextId)),
                     new Dictionary<string, string> { ["idempotency-key"] = attempt.IdempotencyKey }).ConfigureAwait(false);
                 var providerResponse = JObject.Parse(responseJson);
                 var status = providerResponse.Value<string>("status");
@@ -1681,12 +1705,13 @@ namespace Helcim.Implementation.Services
             string invoiceNumber,
             decimal amount,
             string cardToken,
-            int? terminalId)
+            int? terminalId,
+            string? paymentContextNote = null)
         {
             var invoice = new JObject
             {
                 ["invoiceNumber"] = invoiceNumber,
-                ["notes"] = request.PaymentCode,
+                ["notes"] = paymentContextNote ?? request.PaymentCode,
                 ["type"] = "INVOICE",
                 ["lineItems"] = new JArray(new JObject
                 {
