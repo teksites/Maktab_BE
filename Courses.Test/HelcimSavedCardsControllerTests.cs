@@ -74,6 +74,28 @@ public class HelcimSavedCardsControllerTests
         service.Verify(instance => instance.InitializeSavedCardVerification(userId, familyId), Times.Once);
     }
 
+    [Fact]
+    public async Task CompleteVerification_UsesAuthenticatedUserAndNeverAcceptsUserOwnershipFromTheRequest()
+    {
+        var sessionId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var request = new CompleteSavedCardVerificationRequest
+        {
+            CheckoutToken = "verify_checkout_token",
+            HelcimTransactionId = 54951592
+        };
+        var service = new Mock<IHelcimTransactionService>();
+        var access = new Mock<IDataAccessVerificationService>();
+        access.Setup(instance => instance.GetSessionAccessContext(sessionId))
+            .ReturnsAsync(new SessionAccessContext { UserId = userId, FamilyId = Guid.NewGuid() });
+        var controller = CreateController(service.Object, access.Object, sessionId);
+
+        var result = await controller.CompleteVerification(request);
+
+        Assert.IsType<NoContentResult>(result);
+        service.Verify(instance => instance.CompleteSavedCardVerification(request, userId), Times.Once);
+    }
+
     private static HelcimSavedCardsController CreateController(
         IHelcimTransactionService service,
         IDataAccessVerificationService access,

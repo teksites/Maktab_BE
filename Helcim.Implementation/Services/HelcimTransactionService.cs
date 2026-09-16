@@ -260,12 +260,41 @@ namespace Helcim.Implementation.Services
             await _checkoutContexts.Save(new HelcimCheckoutContext
             {
                 InvoiceNumber = invoiceNumber,
+                CheckoutToken = responseReceived.CheckoutToken,
                 UserId = userId,
                 FamilyId = familyId,
                 SaveCardInfo = true
             }).ConfigureAwait(false);
 
             return new HelcimPayInitializeResponse { CheckoutToken = responseReceived.CheckoutToken };
+        }
+
+        public async Task CompleteSavedCardVerification(CompleteSavedCardVerificationRequest request, Guid userId)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            if (userId == Guid.Empty || request.HelcimTransactionId <= 0 || string.IsNullOrWhiteSpace(request.CheckoutToken))
+                throw new ArgumentException("A signed-in user, checkout token, and Helcim transaction id are required.");
+            if (_checkoutContexts == null || _cardVault == null || _cardTokenProtector == null)
+                throw new InvalidOperationException("Saved-card verification is not configured.");
+
+            var context = await _checkoutContexts.GetByCheckoutToken(request.CheckoutToken.Trim()).ConfigureAwait(false);
+            if (context is null || context.UserId != userId || !context.SaveCardInfo)
+                throw new KeyNotFoundException("Saved-card verification checkout was not found or has expired.");
+
+            var lookup = await TryGetCardTransactionById(request.HelcimTransactionId, requireInvoiceNumber: false).ConfigureAwait(false);
+            var transaction = lookup?.Transaction;
+            if (transaction == null
+                || transaction.Type != HelcimCardTransactionType.Verify
+                || transaction.CardTransactionStatus != HelcimCardTransactionStatus.Approved
+                || transaction.Amount != 0m
+                || string.IsNullOrWhiteSpace(transaction.CardToken))
+            {
+                throw new InvalidOperationException("Helcim did not return an approved zero-dollar card verification.");
+            }
+
+            await SaveCardForCheckoutContextAsync(context, transaction).ConfigureAwait(false);
+            await SaveSavedCardVerificationTransactionAsync(context, lookup!.TransactionRaw, transaction).ConfigureAwait(false);
+            await _checkoutContexts.Deactivate(context.InvoiceNumber).ConfigureAwait(false);
         }
 
         public async Task<SavedCardPaymentAttemptResponse> ChargeSavedCard(
@@ -2889,12 +2918,20 @@ namespace Helcim.Implementation.Services
                 return;
             }
 
-            if (_cardVault == null || _cardTokenProtector == null)
-            {
-                throw new InvalidOperationException("Saved-card storage is not configured.");
-            }
+            await SaveCardForCheckoutContextAsync(context, cardTransaction).ConfigureAwait(false);
 
-            var token = _cardTokenProtector.Protect(cardTransaction.CardToken);
+            // Retain an audit trail but prevent a completed checkout context from being reused.
+            await _checkoutContexts.Deactivate(invoice.InvoiceNumber).ConfigureAwait(false);
+        }
+
+        private async Task SaveCardForCheckoutContextAsync(
+            HelcimCheckoutContext context,
+            HelcimCardTransactionResponse cardTransaction)
+        {
+            if (_cardVault == null || _cardTokenProtector == null)
+                throw new InvalidOperationException("Saved-card storage is not configured.");
+
+            var token = _cardTokenProtector.Protect(cardTransaction.CardToken!);
             var details = await _cardBinLookupService
                 .GetDisplayDetailsAsync(cardTransaction.CardType, cardTransaction.CardNumber)
                 .ConfigureAwait(false);
@@ -2915,9 +2952,53 @@ namespace Helcim.Implementation.Services
                 CardHolderName = cardTransaction.CardHolderName ?? string.Empty,
                 SourceHelcimTransactionId = cardTransaction.TransactionId
             }).ConfigureAwait(false);
+        }
 
-            // Retain an audit trail but prevent a completed checkout context from being reused.
-            await _checkoutContexts.Deactivate(invoice.InvoiceNumber).ConfigureAwait(false);
+        private async Task SaveSavedCardVerificationTransactionAsync(
+            HelcimCheckoutContext context,
+            string transactionRaw,
+            HelcimCardTransactionResponse transaction)
+        {
+            var existing = await GetStoredTransactionsByIdAsync(transaction.TransactionId).ConfigureAwait(false);
+            var raw = JObject.Parse(transactionRaw);
+            (raw["transaction"] as JObject ?? raw)["cardToken"] = "[redacted]";
+            var details = new AddHelcimTransactionDetails
+            {
+                PaymentCode = string.Empty,
+                MaktabTransactionId = Guid.Empty,
+                FamilyId = Guid.Empty,
+                InvoiceId = 0,
+                InvoiceNumber = string.Empty,
+                InvoiceToken = string.Empty,
+                CustomerId = 0,
+                CustomerCode = transaction.CustomerCode,
+                TransactionId = transaction.TransactionId,
+                CardBatchId = transaction.CardBatchId,
+                User = transaction.User,
+                ApprovalCode = transaction.ApprovalCode,
+                // The reusable token is retained only in encrypted form in helcim_saved_card.
+                CardToken = string.Empty,
+                CardNumber = transaction.CardNumber,
+                CardHolderName = transaction.CardHolderName,
+                CardType = transaction.CardType,
+                AvsResponse = transaction.AvsResponse,
+                CvvResponse = transaction.CvvResponse,
+                Warning = transaction.Warning,
+                Amount = 0m,
+                AmountPaid = 0m,
+                Currency = transaction.Currency,
+                InvoiceStatus = HelcimInvoiceStatus.Completed,
+                CardTransactionStatus = transaction.CardTransactionStatus,
+                InvoiceType = HelcimInvoiceType.Invoice,
+                CardTransactionType = HelcimCardTransactionType.Verify,
+                CreatedAt = transaction.DateCreated,
+                UpdatedOn = DateTime.UtcNow,
+                DatePaid = null,
+                IsActive = true,
+                RawResponse = $"{{\"checkoutContext\":\"{context.InvoiceNumber}\"}}",
+                TransactionResponse = raw.ToString(Formatting.None)
+            };
+            await SaveTransactionDetailsAsync(details, existing.Any()).ConfigureAwait(false);
         }
 
         private static bool IsProfileSavedCardVerification(string? invoiceNumber)

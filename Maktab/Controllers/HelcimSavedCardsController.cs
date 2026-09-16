@@ -112,6 +112,33 @@ public sealed class HelcimSavedCardsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Completes the $0 HelcimPay.js verification. The server fetches the transaction from Helcim,
+    /// stores the encrypted card token, and never creates a course or donation payment.
+    /// </summary>
+    [ApiAuthorize]
+    [HttpPost("complete-verification")]
+    public async Task<IActionResult> CompleteVerification(CompleteSavedCardVerificationRequest request)
+    {
+        try
+        {
+            await _transactions.CompleteSavedCardVerification(request, (await GetSession()).UserId);
+            return NoContent();
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { error = exception.Message, code = "saved_card_verification_not_found" });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { error = exception.Message, code = "invalid_saved_card_verification_request" });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { error = exception.Message, code = "saved_card_verification_rejected" });
+        }
+    }
+
     private async Task<SessionAccessContext> GetSession()
     {
         if (!Request.Headers.TryGetValue("Session_Info", out var value) || !Guid.TryParse(value, out var sessionId))
