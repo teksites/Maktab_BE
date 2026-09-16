@@ -124,6 +124,64 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
+    public async Task InitializePaymentForSession_PersistsPayerContextAndUsesOnlyItsReferenceInHelcimNotes()
+    {
+        var repository = new Mock<IHelcimTransactionRepository>();
+        repository.Setup(repo => repo.GetByMaktabTransactionId(It.IsAny<Guid>()))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+        repository.Setup(repo => repo.GetByPaymentCode("PAY001"))
+            .ReturnsAsync(new List<HelcimTransactionResponse>());
+        var sender = new Mock<IWebMsgSenderService>();
+        JsonMessageData? capturedPayload = null;
+        sender.Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Post))
+            .Callback<JsonMessageData, InternalContracts.IClientConfiguration, HttpMethod>((payload, _, _) => capturedPayload = payload)
+            .ReturnsAsync("{\"checkoutToken\":\"chk_context\"}");
+        var paymentContexts = new Mock<IHelcimPaymentContextRepository>();
+        HelcimPaymentContext? savedContext = null;
+        paymentContexts.Setup(contexts => contexts.Save(It.IsAny<HelcimPaymentContext>()))
+            .Callback<HelcimPaymentContext>(context => savedContext = context)
+            .Returns(Task.CompletedTask);
+        var userId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var transactionId = Guid.NewGuid();
+        var service = CreateService(repository.Object, sender.Object, paymentContexts: paymentContexts.Object);
+
+        await service.InitializePaymentForSession(new InitiatePaymentRequest
+        {
+            PaymentCode = "PAY001",
+            TransactionId = transactionId,
+            Amount = 99,
+            UserIp = "127.0.0.1"
+        }, userId, familyId);
+
+        Assert.NotNull(savedContext);
+        Assert.Equal(userId, savedContext!.UserId);
+        Assert.Equal(familyId, savedContext.FamilyId);
+        Assert.Equal(transactionId, savedContext.MaktabTransactionId);
+        Assert.Equal(PaymentInitiationType.Course, savedContext.PaymentType);
+        var payload = JObject.Parse(await capturedPayload!.Payload!.ReadAsStringAsync());
+        Assert.Equal($"MKTCTX:{savedContext.PaymentContextId:D}", payload["invoiceRequest"]!["notes"]!.Value<string>());
+    }
+
+    [Fact]
+    public async Task InitializePaymentForSession_RejectsDonationBeforeCallingHelcimUntilDonationLedgerExists()
+    {
+        var sender = new Mock<IWebMsgSenderService>();
+        var paymentContexts = new Mock<IHelcimPaymentContextRepository>();
+        var service = CreateService(new Mock<IHelcimTransactionRepository>().Object, sender.Object, paymentContexts: paymentContexts.Object);
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => service.InitializePaymentForSession(new InitiatePaymentRequest
+        {
+            Amount = 25,
+            PaymentType = PaymentInitiationType.Donation,
+            CampaignId = Guid.NewGuid()
+        }, Guid.NewGuid(), Guid.Empty));
+
+        sender.Verify(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Post), Times.Never);
+        paymentContexts.Verify(contexts => contexts.Save(It.IsAny<HelcimPaymentContext>()), Times.Never);
+    }
+
+    [Fact]
     public async Task InitializePaymentForSession_WhenHelcimInitializationFails_DoesNotPersistCheckoutContext()
     {
         var repository = new Mock<IHelcimTransactionRepository>();
@@ -3518,7 +3576,8 @@ public class HelcimTransactionServiceTests
         IHelcimCardVaultRepository? cardVault = null,
         IHelcimCardTokenProtector? cardTokenProtector = null,
         IHelcimPaymentAttemptRepository? paymentAttempts = null,
-        IHelcimCheckoutContextRepository? checkoutContexts = null)
+        IHelcimCheckoutContextRepository? checkoutContexts = null,
+        IHelcimPaymentContextRepository? paymentContexts = null)
     {
         studentCourseTransactionService ??= CreateStudentCourseTransactionService().Object;
         courseService ??= CreateCourseService().Object;
@@ -3535,7 +3594,8 @@ public class HelcimTransactionServiceTests
             cardVault,
             cardTokenProtector,
             paymentAttempts,
-            checkoutContexts);
+            checkoutContexts,
+            paymentContexts);
     }
 
     private static Mock<ICardBinLookupService> CreateCardBinLookupService()
