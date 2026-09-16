@@ -22,4 +22,5 @@ public interface IHelcimPaymentContextRepository
     Task<HelcimPaymentContext?> GetByInvoiceNumber(string invoiceNumber);
     Task<HelcimPaymentContext?> GetByPaymentContextId(Guid paymentContextId);
     Task<HelcimPaymentContext?> GetByPaymentCode(string paymentCode);
+    Task Deactivate(Guid paymentContextId);
 }

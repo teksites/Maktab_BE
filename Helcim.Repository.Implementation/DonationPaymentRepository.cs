@@ -16,12 +16,12 @@ public sealed class DonationPaymentRepository : DbRepository, IDonationPaymentRe
             (DonationPaymentId, PaymentContextId, CampaignId, UserId, HelcimTransactionId, HelcimInvoiceId,
              HelcimInvoiceNumber, PaymentCode, Amount, NetAmount, Currency, InvoiceStatus, TransactionStatus,
              TransactionType, CardCompany, CardFundingType, CardFundingTypeKnown, LastFourDigits,
-             CardHolderName, CardType, PaidAt)
+             CardHolderName, CardType, PaidAt, IsActive)
             VALUES
             (@DonationPaymentId, @PaymentContextId, @CampaignId, @UserId, @HelcimTransactionId, @HelcimInvoiceId,
              @HelcimInvoiceNumber, @PaymentCode, @Amount, @NetAmount, @Currency, @InvoiceStatus, @TransactionStatus,
              @TransactionType, @CardCompany, @CardFundingType, @CardFundingTypeKnown, @LastFourDigits,
-             @CardHolderName, @CardType, @PaidAt)
+             @CardHolderName, @CardType, @PaidAt, @IsActive)
             ON DUPLICATE KEY UPDATE
              PaymentContextId = VALUES(PaymentContextId), CampaignId = VALUES(CampaignId), UserId = VALUES(UserId),
              HelcimInvoiceId = VALUES(HelcimInvoiceId), HelcimInvoiceNumber = VALUES(HelcimInvoiceNumber),
@@ -30,7 +30,7 @@ public sealed class DonationPaymentRepository : DbRepository, IDonationPaymentRe
              TransactionType = VALUES(TransactionType), CardCompany = VALUES(CardCompany),
              CardFundingType = VALUES(CardFundingType), CardFundingTypeKnown = VALUES(CardFundingTypeKnown),
              LastFourDigits = VALUES(LastFourDigits), CardHolderName = VALUES(CardHolderName), CardType = VALUES(CardType),
-             PaidAt = VALUES(PaidAt)";
+             PaidAt = VALUES(PaidAt), IsActive = VALUES(IsActive)";
         command.AddParameter("@DonationPaymentId", payment.DonationPaymentId.ToByteArray());
         command.AddParameter("@PaymentContextId", payment.PaymentContextId.ToByteArray());
         command.AddParameter("@CampaignId", payment.CampaignId.ToByteArray());
@@ -52,6 +52,7 @@ public sealed class DonationPaymentRepository : DbRepository, IDonationPaymentRe
         command.AddParameter("@CardHolderName", payment.CardHolderName);
         command.AddParameter("@CardType", payment.CardType);
         command.AddParameter("@PaidAt", payment.PaidAt);
+        command.AddParameter("@IsActive", payment.IsActive);
         await command.ExecuteNonQueryAsync();
     }
 }

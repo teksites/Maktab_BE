@@ -26,6 +26,7 @@ public sealed class DonationPaymentRecord
     public string CardHolderName { get; init; } = string.Empty;
     public string CardType { get; init; } = string.Empty;
     public DateTime? PaidAt { get; init; }
+    public bool IsActive { get; init; } = true;
 }
 
 public interface IDonationPaymentRepository

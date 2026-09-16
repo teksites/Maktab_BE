@@ -12,5 +12,5 @@ public interface IHelcimCheckoutContextRepository
 {
     Task Save(HelcimCheckoutContext context);
     Task<HelcimCheckoutContext?> Get(string invoiceNumber);
-    Task Delete(string invoiceNumber);
+    Task Deactivate(string invoiceNumber);
 }

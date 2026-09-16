@@ -365,7 +365,7 @@ public class HelcimTransactionServiceTests
             FamilyId = familyId,
             SaveCardInfo = true
         });
-        contexts.Setup(service => service.Delete(invoiceNumber)).Returns(Task.CompletedTask);
+        contexts.Setup(service => service.Deactivate(invoiceNumber)).Returns(Task.CompletedTask);
         var protector = new Mock<IHelcimCardTokenProtector>();
         protector.Setup(service => service.Protect("profile-token")).Returns(new ProtectedHelcimCardToken
         {
@@ -391,7 +391,7 @@ public class HelcimTransactionServiceTests
             && card.FamilyId == familyId
             && card.TokenHash == "profile-token-hash"
             && card.SourceHelcimTransactionId == helcimTransactionId)), Times.Once);
-        contexts.Verify(service => service.Delete(invoiceNumber), Times.Once);
+        contexts.Verify(service => service.Deactivate(invoiceNumber), Times.Once);
         coursePayments.Verify(service => service.TryAddPayment(It.IsAny<AddCoursePayment>()), Times.Never);
     }
 
@@ -429,7 +429,7 @@ public class HelcimTransactionServiceTests
             FamilyId = familyId,
             SaveCardInfo = true
         });
-        contexts.Setup(service => service.Delete(invoiceNumber)).Returns(Task.CompletedTask);
+        contexts.Setup(service => service.Deactivate(invoiceNumber)).Returns(Task.CompletedTask);
         var protector = new Mock<IHelcimCardTokenProtector>();
         protector.Setup(service => service.Protect("helcim-token")).Returns(new ProtectedHelcimCardToken
         {

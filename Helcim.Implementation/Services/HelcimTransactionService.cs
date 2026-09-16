@@ -1400,6 +1400,7 @@ namespace Helcim.Implementation.Services
                     paymentType,
                     cardTransaction,
                     achTransaction).ConfigureAwait(false);
+                await _paymentContexts!.Deactivate(paymentContext.PaymentContextId).ConfigureAwait(false);
                 return true;
             }
 
@@ -1434,9 +1435,13 @@ namespace Helcim.Implementation.Services
             var paymentResult = await _coursePaymentService.TryAddPayment(addPayment).ConfigureAwait(false);
             if (!paymentResult.Created)
             {
+                if (paymentContext != null)
+                    await _paymentContexts!.Deactivate(paymentContext.PaymentContextId).ConfigureAwait(false);
                 return true;
             }
 
+            if (paymentContext != null)
+                await _paymentContexts!.Deactivate(paymentContext.PaymentContextId).ConfigureAwait(false);
             return true;
         }
 
@@ -2911,9 +2916,8 @@ namespace Helcim.Implementation.Services
                 SourceHelcimTransactionId = cardTransaction.TransactionId
             }).ConfigureAwait(false);
 
-            // The short-lived context contains only the correlation data needed to vault this card.
-            // Remove it after a successful insert or duplicate refresh so it cannot be reused.
-            await _checkoutContexts.Delete(invoice.InvoiceNumber).ConfigureAwait(false);
+            // Retain an audit trail but prevent a completed checkout context from being reused.
+            await _checkoutContexts.Deactivate(invoice.InvoiceNumber).ConfigureAwait(false);
         }
 
         private static bool IsProfileSavedCardVerification(string? invoiceNumber)

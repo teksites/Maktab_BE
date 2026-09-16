@@ -14,11 +14,11 @@ public sealed class HelcimPaymentContextRepository : DbRepository, IHelcimPaymen
         using var connection = await Database.CreateAndOpenConnectionAsync();
         using var command = connection.CreateCommand();
         command.CommandText = @"INSERT INTO helcim_payment_context
-            (PaymentContextId, InvoiceNumber, PaymentCode, MaktabTransactionId, PaymentType, CampaignId, UserId, FamilyId, SaveCardInfo, Amount)
-            VALUES (@ContextId, @Invoice, @PaymentCode, @TransactionId, @PaymentType, @CampaignId, @UserId, @FamilyId, @SaveCardInfo, @Amount)
+            (PaymentContextId, InvoiceNumber, PaymentCode, MaktabTransactionId, PaymentType, CampaignId, UserId, FamilyId, SaveCardInfo, Amount, IsActive)
+            VALUES (@ContextId, @Invoice, @PaymentCode, @TransactionId, @PaymentType, @CampaignId, @UserId, @FamilyId, @SaveCardInfo, @Amount, 1)
             ON DUPLICATE KEY UPDATE PaymentCode = VALUES(PaymentCode), MaktabTransactionId = VALUES(MaktabTransactionId),
                 PaymentType = VALUES(PaymentType), CampaignId = VALUES(CampaignId), UserId = VALUES(UserId), FamilyId = VALUES(FamilyId),
-                SaveCardInfo = VALUES(SaveCardInfo), Amount = VALUES(Amount)";
+                SaveCardInfo = VALUES(SaveCardInfo), Amount = VALUES(Amount), IsActive = 1";
         command.AddParameter("@ContextId", context.PaymentContextId.ToByteArray());
         command.AddParameter("@Invoice", context.InvoiceNumber);
         command.AddParameter("@PaymentCode", string.IsNullOrWhiteSpace(context.PaymentCode) ? null : context.PaymentCode);
@@ -76,5 +76,14 @@ public sealed class HelcimPaymentContextRepository : DbRepository, IHelcimPaymen
             SaveCardInfo = ReadDbFieldBool(reader, "SaveCardInfo"),
             Amount = reader.GetDecimal(reader.GetOrdinal("Amount"))
         };
+    }
+
+    public async Task Deactivate(Guid paymentContextId)
+    {
+        using var connection = await Database.CreateAndOpenConnectionAsync();
+        using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE helcim_payment_context SET IsActive=0, UpdatedOn=UTC_TIMESTAMP() WHERE PaymentContextId=@ContextId AND IsActive=1";
+        command.AddParameter("@ContextId", paymentContextId.ToByteArray());
+        await command.ExecuteNonQueryAsync();
     }
 }
