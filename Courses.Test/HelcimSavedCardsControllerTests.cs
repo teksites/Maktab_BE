@@ -53,6 +53,27 @@ public class HelcimSavedCardsControllerTests
         Assert.Contains("saved_card_or_transaction_not_found", notFound.Value!.ToString());
     }
 
+    [Fact]
+    public async Task InitializeVerification_UsesAuthenticatedSessionAndReturnsCheckoutToken()
+    {
+        var sessionId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var service = new Mock<IHelcimTransactionService>();
+        service.Setup(instance => instance.InitializeSavedCardVerification(userId, familyId))
+            .ReturnsAsync(new HelcimPayInitializeResponse { CheckoutToken = "verify_checkout_token" });
+        var access = new Mock<IDataAccessVerificationService>();
+        access.Setup(instance => instance.GetSessionAccessContext(sessionId))
+            .ReturnsAsync(new SessionAccessContext { UserId = userId, FamilyId = familyId });
+        var controller = CreateController(service.Object, access.Object, sessionId);
+
+        var result = await controller.InitializeVerification();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal("verify_checkout_token", Assert.IsType<HelcimPayInitializeResponse>(ok.Value).CheckoutToken);
+        service.Verify(instance => instance.InitializeSavedCardVerification(userId, familyId), Times.Once);
+    }
+
     private static HelcimSavedCardsController CreateController(
         IHelcimTransactionService service,
         IDataAccessVerificationService access,
