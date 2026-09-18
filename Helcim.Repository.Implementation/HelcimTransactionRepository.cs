@@ -131,7 +131,7 @@ namespace Helcim.Repository.Implementation
             {
                 await cmd.ExecuteNonQueryAsync();
             }
-            catch (DbException ex) when (IsLegacyInvoicePrimaryKeyConflict(ex))
+            catch (DbException ex) when (IsLegacyInvoicePrimaryKeyConflict(ex, transactionDetails.InvoiceNumber))
             {
                 throw new InvalidOperationException(
                     $"Unable to save Helcim transaction {transactionDetails.TransactionId} for invoice '{transactionDetails.InvoiceNumber}'. " +
@@ -559,11 +559,13 @@ namespace Helcim.Repository.Implementation
             };
         }
 
-        private static bool IsLegacyInvoicePrimaryKeyConflict(DbException exception)
+        private static bool IsLegacyInvoicePrimaryKeyConflict(DbException exception, string? invoiceNumber)
         {
             var message = exception.Message ?? string.Empty;
             return message.Contains("Duplicate entry", StringComparison.OrdinalIgnoreCase)
-                && message.Contains("helcim_transaction.PRIMARY", StringComparison.OrdinalIgnoreCase);
+                && message.Contains("helcim_transaction.PRIMARY", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(invoiceNumber)
+                && message.Contains(invoiceNumber, StringComparison.OrdinalIgnoreCase);
         }
 
         private sealed class HelcimWebhookLogRow

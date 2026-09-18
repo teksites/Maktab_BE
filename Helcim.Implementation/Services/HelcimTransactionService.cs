@@ -542,12 +542,12 @@ namespace Helcim.Implementation.Services
                     null);
             }
 
-            await _repository.Add(transactionDetails).ConfigureAwait(false);
+            var duplicateDetected = await SaveTransactionDetailsAsync(transactionDetails, updateExisting: false).ConfigureAwait(false);
 
             return new HelcimPaymentCompletionResponse
             {
                 Success = true,
-                Duplicate = false,
+                Duplicate = duplicateDetected,
                 InvoiceId = invoice.InvoiceId,
                 TransactionId = transactionId,
                 InvoiceNumber = invoiceNumber,

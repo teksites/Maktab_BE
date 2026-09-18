@@ -1222,6 +1222,60 @@ public class HelcimTransactionServiceTests
     }
 
     [Fact]
+    public async Task CompleteHelcimPayPayment_WhenAnotherProcessorSavesTransaction_ReturnsDuplicate()
+    {
+        const int transactionId = 1021;
+        const string invoiceNumber = "INV000021";
+        var repository = new Mock<IHelcimTransactionRepository>();
+        var insertedByAnotherProcessor = false;
+        repository
+            .Setup(repo => repo.GetByTransactionId(transactionId))
+            .ReturnsAsync(() => insertedByAnotherProcessor
+                ? new List<HelcimTransactionResponse>
+                {
+                    new() { TransactionId = transactionId, InvoiceNumber = invoiceNumber }
+                }
+                : new List<HelcimTransactionResponse>());
+        repository
+            .Setup(repo => repo.Add(It.IsAny<AddHelcimTransactionDetails>()))
+            .Callback(() => insertedByAnotherProcessor = true)
+            .ThrowsAsync(new InvalidOperationException("Duplicate transaction insert"));
+
+        var sender = new Mock<IWebMsgSenderService>();
+        var responses = new Queue<string>(new[]
+        {
+            "[{\"invoiceId\":63677016,\"invoiceNumber\":\"INV000021\",\"token\":\"ach-token\",\"notes\":\"ACHPAY\",\"status\":\"PAID\",\"customerId\":40499452,\"amount\":100.00,\"amountPaid\":100.00,\"currency\":\"CAD\",\"type\":\"INVOICE\",\"lineItems\":[{\"sku\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\"quantity\":1,\"price\":100.00,\"total\":100.00}]}]",
+            "{\"transaction\":{\"id\":1021,\"statusAuth\":\"PENDING\",\"statusClearing\":\"OPENED\",\"batchId\":5221,\"type\":\"WITHDRAWAL\",\"amount\":100.00}}"
+        });
+        sender
+            .Setup(service => service.SendMessage(It.IsAny<JsonMessageData>(), It.IsAny<IHelcimClientConfiguration>(), HttpMethod.Get))
+            .ReturnsAsync(() => responses.Dequeue());
+
+        var studentCourseTransactionService = new Mock<IStudentCourseTransactionService>();
+        studentCourseTransactionService
+            .Setup(service => service.GetTransactionByPaymentCode("ACHPAY"))
+            .ReturnsAsync(new StudentCourseTransactionResponse
+            {
+                StudentCourseTransactionId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                FamilyId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                PaymentCode = "ACHPAY"
+            });
+
+        var service = CreateService(repository.Object, sender.Object, studentCourseTransactionService: studentCourseTransactionService.Object);
+        using var jsonDocument = JsonDocument.Parse("{\"transactionId\":\"1021\",\"invoiceNumber\":\"INV000021\",\"amount\":\"100.00\",\"batchId\":\"5221\",\"currency\":\"CAD\",\"statusAuth\":\"PENDING\",\"statusClearing\":\"OPENED\",\"type\":\"WITHDRAWAL\"}");
+
+        var result = await service.CompleteHelcimPayPayment(new CompleteHelcimPayPaymentRequest
+        {
+            RawDataResponse = jsonDocument.RootElement.Clone()
+        });
+
+        Assert.True(result.Success);
+        Assert.True(result.Duplicate);
+        Assert.Equal(transactionId, result.TransactionId);
+        repository.Verify(repo => repo.Add(It.IsAny<AddHelcimTransactionDetails>()), Times.Once);
+    }
+
+    [Fact]
     public async Task SyncInvoicePaymentByInvoiceId_ForCardInvoice_FetchesCardTransactionAndSavesPayment()
     {
         var invoiceId = 63677012;
