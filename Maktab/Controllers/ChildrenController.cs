@@ -150,7 +150,7 @@ namespace Maktab.Controllers
             return Ok(profile);
         }
 
-        [ApiAuthorize(false, false, UserRoleType.Assistant)]
+        [ApiAuthorize(false, false, UserRoleType.Normal)]
         [HttpPut("children/{childId:guid}/educational-profile")]
         [EnableCors("corspolicy")]
         public async Task<ActionResult<ChildEducationalProfileResponse>> UpsertChildEducationalProfile(Guid childId, UpsertChildEducationalProfileRequest request)
