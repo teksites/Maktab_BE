@@ -13,78 +13,55 @@ namespace Courses.Test;
 public class ChildEducationalProfileServiceTests
 {
     [Fact]
-    public async Task UpsertChildEducationalProfile_WhenNormalUserAndCatalogNotProvided_UpsertsProfile()
+    public async Task UpsertChildEducationalProfile_WhenNormalUserAndCatalogNotProvided_StoresEachSurahAssessment()
     {
         var userId = Guid.NewGuid();
         var childId = Guid.NewGuid();
         var familyId = Guid.NewGuid();
-        IReadOnlyCollection<QuranSurah>? capturedSurahs = null;
-        SurahCompletionStatus? capturedStatus = null;
-        string? capturedRemarks = null;
+        IReadOnlyCollection<QuranSurahAssessmentRequest>? capturedAssessments = null;
+        var repository = CreateChildRepository(childId, familyId, false);
+        repository.Setup(repo => repo.UpsertChildEducationalProfile(childId, familyId, It.IsAny<IReadOnlyCollection<QuranSurahAssessmentRequest>>()))
+            .Callback<Guid, Guid, IReadOnlyCollection<QuranSurahAssessmentRequest>>((_, _, assessments) => capturedAssessments = assessments)
+            .ReturnsAsync(new ChildEducationalProfileResponse { ChildId = childId, FamilyId = familyId });
 
-        var repository = new Mock<IUserChildrenRepository>();
-        repository
-            .Setup(repo => repo.GetChild(childId))
-            .ReturnsAsync(new Child
-            {
-                ChildId = childId,
-                FamilyId = familyId,
-                HasSurahCatalogBeenProvided = false
-            });
-        repository
-            .Setup(repo => repo.UpsertChildEducationalProfile(childId, familyId, It.IsAny<IReadOnlyCollection<QuranSurah>>(), It.IsAny<SurahCompletionStatus>(), It.IsAny<string>()))
-            .Callback<Guid, Guid, IReadOnlyCollection<QuranSurah>, SurahCompletionStatus, string>((_, _, surahs, status, remarks) =>
-            {
-                capturedSurahs = surahs;
-                capturedStatus = status;
-                capturedRemarks = remarks;
-            })
-            .ReturnsAsync(new ChildEducationalProfileResponse
-            {
-                ChildId = childId,
-                FamilyId = familyId
-            });
-
-        var userService = new Mock<IUserService>();
-        userService
-            .Setup(service => service.GetUserInformation(userId))
-            .ReturnsAsync(new MaktabDataContracts.Responses.Users.UserInformationResponse
-            {
-                UserId = userId,
-                FamilyId = familyId
-            });
-
-        var dataAccess = new Mock<IDataAccessVerificationService>();
-        dataAccess
-            .Setup(service => service.HasElevatedAccess(UserRoleType.Normal))
-            .Returns(false);
-
-        var service = new ChildEducationalProfileService(
-            repository.Object,
-            userService.Object,
-            dataAccess.Object,
-            Mock.Of<ICourseStaffAssignmentService>(),
-            Mock.Of<IStudentCourseEnrollmentService>());
-
+        var service = CreateService(repository, CreateFamilyUserService(userId, familyId), CreateNormalDataAccess());
         var result = await service.UpsertChildEducationalProfile(userId, UserRoleType.Normal, childId, new UpsertChildEducationalProfileRequest
         {
             FamilyId = familyId,
-            CompletedSurahs = new List<QuranSurahSelectionRequest>
+            SurahAssessments = new List<QuranSurahAssessmentRequest>
             {
-                new() { Surah = QuranSurah.AlFatiha },
-                new() { Surah = QuranSurah.AlIkhlas },
-                new() { Surah = QuranSurah.AlFatiha }
-            },
-            SurahCompletionStatus = SurahCompletionStatus.PartiallyCompleted,
-            Remarks = "Needs guided revision."
+                new() { Surah = QuranSurah.AlFatiha, CompletionStatus = SurahCompletionStatus.Completed, Remarks = "Memorized." },
+                new() { Surah = QuranSurah.AlIkhlas, CompletionStatus = SurahCompletionStatus.PartiallyCompleted, Remarks = "Needs revision." }
+            }
         });
 
         Assert.NotNull(result);
-        Assert.NotNull(capturedSurahs);
-        Assert.Equal(new[] { QuranSurah.AlFatiha, QuranSurah.AlIkhlas }, capturedSurahs!.ToArray());
-        Assert.Equal(SurahCompletionStatus.PartiallyCompleted, capturedStatus);
-        Assert.Equal("Needs guided revision.", capturedRemarks);
-        repository.Verify(repo => repo.UpsertChildEducationalProfile(childId, familyId, It.IsAny<IReadOnlyCollection<QuranSurah>>(), It.IsAny<SurahCompletionStatus>(), It.IsAny<string>()), Times.Once);
+        Assert.NotNull(capturedAssessments);
+        Assert.Equal(2, capturedAssessments!.Count);
+        Assert.Equal(SurahCompletionStatus.Completed, capturedAssessments.Single(item => item.Surah == QuranSurah.AlFatiha).CompletionStatus);
+        Assert.Equal("Needs revision.", capturedAssessments.Single(item => item.Surah == QuranSurah.AlIkhlas).Remarks);
+    }
+
+    [Fact]
+    public async Task UpsertChildEducationalProfile_WhenSameSurahIsSubmittedTwice_RejectsBeforeRepositoryWrite()
+    {
+        var userId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var repository = CreateChildRepository(childId, familyId, false);
+        var service = CreateService(repository, CreateFamilyUserService(userId, familyId), CreateNormalDataAccess());
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.UpsertChildEducationalProfile(userId, UserRoleType.Normal, childId, new UpsertChildEducationalProfileRequest
+        {
+            FamilyId = familyId,
+            SurahAssessments = new List<QuranSurahAssessmentRequest>
+            {
+                new() { Surah = QuranSurah.AlFatiha, CompletionStatus = SurahCompletionStatus.Completed },
+                new() { Surah = QuranSurah.AlFatiha, CompletionStatus = SurahCompletionStatus.Incomplete }
+            }
+        }));
+
+        repository.Verify(repo => repo.UpsertChildEducationalProfile(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<QuranSurahAssessmentRequest>>()), Times.Never);
     }
 
     [Fact]
@@ -93,46 +70,13 @@ public class ChildEducationalProfileServiceTests
         var userId = Guid.NewGuid();
         var childId = Guid.NewGuid();
         var familyId = Guid.NewGuid();
+        var repository = CreateChildRepository(childId, familyId, true);
+        var service = CreateService(repository, CreateFamilyUserService(userId, familyId), CreateNormalDataAccess());
 
-        var repository = new Mock<IUserChildrenRepository>();
-        repository
-            .Setup(repo => repo.GetChild(childId))
-            .ReturnsAsync(new Child
-            {
-                ChildId = childId,
-                FamilyId = familyId,
-                HasSurahCatalogBeenProvided = true
-            });
-
-        var userService = new Mock<IUserService>();
-        userService
-            .Setup(service => service.GetUserInformation(userId))
-            .ReturnsAsync(new MaktabDataContracts.Responses.Users.UserInformationResponse
-            {
-                UserId = userId,
-                FamilyId = familyId
-            });
-
-        var dataAccess = new Mock<IDataAccessVerificationService>();
-        dataAccess
-            .Setup(service => service.HasElevatedAccess(UserRoleType.Normal))
-            .Returns(false);
-
-        var service = new ChildEducationalProfileService(
-            repository.Object,
-            userService.Object,
-            dataAccess.Object,
-            Mock.Of<ICourseStaffAssignmentService>(),
-            Mock.Of<IStudentCourseEnrollmentService>());
-
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            service.UpsertChildEducationalProfile(userId, UserRoleType.Normal, childId, new UpsertChildEducationalProfileRequest
-            {
-                FamilyId = familyId,
-                CompletedSurahs = new List<QuranSurahSelectionRequest>()
-            }));
-
-        repository.Verify(repo => repo.UpsertChildEducationalProfile(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<QuranSurah>>(), It.IsAny<SurahCompletionStatus>(), It.IsAny<string>()), Times.Never);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.UpsertChildEducationalProfile(userId, UserRoleType.Normal, childId, new UpsertChildEducationalProfileRequest
+        {
+            FamilyId = familyId
+        }));
     }
 
     [Fact]
@@ -141,71 +85,68 @@ public class ChildEducationalProfileServiceTests
         var userId = Guid.NewGuid();
         var childId = Guid.NewGuid();
         var familyId = Guid.NewGuid();
-
-        var repository = new Mock<IUserChildrenRepository>();
-        repository
-            .Setup(repo => repo.GetChild(childId))
-            .ReturnsAsync(new Child
-            {
-                ChildId = childId,
-                FamilyId = familyId,
-                HasSurahCatalogBeenProvided = true
-            });
-        repository
-            .Setup(repo => repo.UpsertChildEducationalProfile(childId, familyId, It.IsAny<IReadOnlyCollection<QuranSurah>>(), It.IsAny<SurahCompletionStatus>(), It.IsAny<string>()))
-            .ReturnsAsync(new ChildEducationalProfileResponse
-            {
-                ChildId = childId,
-                FamilyId = familyId
-            });
-
+        var repository = CreateChildRepository(childId, familyId, true);
+        repository.Setup(repo => repo.UpsertChildEducationalProfile(childId, familyId, It.IsAny<IReadOnlyCollection<QuranSurahAssessmentRequest>>()))
+            .ReturnsAsync(new ChildEducationalProfileResponse { ChildId = childId, FamilyId = familyId });
         var dataAccess = new Mock<IDataAccessVerificationService>();
-        dataAccess
-            .Setup(service => service.HasElevatedAccess(UserRoleType.SchoolAdmin))
-            .Returns(true);
-
-        var service = new ChildEducationalProfileService(
-            repository.Object,
-            Mock.Of<IUserService>(),
-            dataAccess.Object,
-            Mock.Of<ICourseStaffAssignmentService>(),
-            Mock.Of<IStudentCourseEnrollmentService>());
+        dataAccess.Setup(service => service.HasElevatedAccess(UserRoleType.SchoolAdmin)).Returns(true);
+        var service = CreateService(repository, new Mock<IUserService>(), dataAccess);
 
         var result = await service.UpsertChildEducationalProfile(userId, UserRoleType.SchoolAdmin, childId, new UpsertChildEducationalProfileRequest
         {
             FamilyId = familyId,
-            CompletedSurahs = new List<QuranSurahSelectionRequest>
+            SurahAssessments = new List<QuranSurahAssessmentRequest>
             {
-                new() { Surah = QuranSurah.AnNas }
+                new() { Surah = QuranSurah.AnNas, CompletionStatus = SurahCompletionStatus.Incomplete, Remarks = "Assessment pending." }
             }
         });
 
         Assert.NotNull(result);
-        repository.Verify(repo => repo.UpsertChildEducationalProfile(childId, familyId, It.IsAny<IReadOnlyCollection<QuranSurah>>(), It.IsAny<SurahCompletionStatus>(), It.IsAny<string>()), Times.Once);
+        repository.Verify(repo => repo.UpsertChildEducationalProfile(childId, familyId, It.IsAny<IReadOnlyCollection<QuranSurahAssessmentRequest>>()), Times.Once);
     }
 
     [Fact]
-    public async Task UpsertChildEducationalProfile_WhenRemarksExceedLimit_RejectsBeforeRepositoryWrite()
+    public async Task UpsertChildEducationalProfile_WhenOneSurahRemarkExceedsLimit_RejectsBeforeRepositoryWrite()
     {
         var userId = Guid.NewGuid();
         var childId = Guid.NewGuid();
         var familyId = Guid.NewGuid();
-        var repository = new Mock<IUserChildrenRepository>();
-        repository.Setup(repo => repo.GetChild(childId)).ReturnsAsync(new Child { ChildId = childId, FamilyId = familyId });
-
-        var userService = new Mock<IUserService>();
-        userService.Setup(service => service.GetUserInformation(userId)).ReturnsAsync(new MaktabDataContracts.Responses.Users.UserInformationResponse { UserId = userId, FamilyId = familyId });
-        var dataAccess = new Mock<IDataAccessVerificationService>();
-        dataAccess.Setup(service => service.HasElevatedAccess(UserRoleType.Normal)).Returns(false);
-
-        var service = new ChildEducationalProfileService(repository.Object, userService.Object, dataAccess.Object, Mock.Of<ICourseStaffAssignmentService>(), Mock.Of<IStudentCourseEnrollmentService>());
+        var repository = CreateChildRepository(childId, familyId, false);
+        var service = CreateService(repository, CreateFamilyUserService(userId, familyId), CreateNormalDataAccess());
 
         await Assert.ThrowsAsync<ArgumentException>(() => service.UpsertChildEducationalProfile(userId, UserRoleType.Normal, childId, new UpsertChildEducationalProfileRequest
         {
             FamilyId = familyId,
-            Remarks = new string('a', 501)
+            SurahAssessments = new List<QuranSurahAssessmentRequest>
+            {
+                new() { Surah = QuranSurah.AlFatiha, Remarks = new string('a', 501) }
+            }
         }));
 
-        repository.Verify(repo => repo.UpsertChildEducationalProfile(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<QuranSurah>>(), It.IsAny<SurahCompletionStatus>(), It.IsAny<string>()), Times.Never);
+        repository.Verify(repo => repo.UpsertChildEducationalProfile(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<QuranSurahAssessmentRequest>>()), Times.Never);
+    }
+
+    private static ChildEducationalProfileService CreateService(Mock<IUserChildrenRepository> repository, Mock<IUserService> userService, Mock<IDataAccessVerificationService> dataAccess)
+        => new(repository.Object, userService.Object, dataAccess.Object, Mock.Of<ICourseStaffAssignmentService>(), Mock.Of<IStudentCourseEnrollmentService>());
+
+    private static Mock<IUserChildrenRepository> CreateChildRepository(Guid childId, Guid familyId, bool catalogProvided)
+    {
+        var repository = new Mock<IUserChildrenRepository>();
+        repository.Setup(repo => repo.GetChild(childId)).ReturnsAsync(new Child { ChildId = childId, FamilyId = familyId, HasSurahCatalogBeenProvided = catalogProvided });
+        return repository;
+    }
+
+    private static Mock<IUserService> CreateFamilyUserService(Guid userId, Guid familyId)
+    {
+        var userService = new Mock<IUserService>();
+        userService.Setup(service => service.GetUserInformation(userId)).ReturnsAsync(new MaktabDataContracts.Responses.Users.UserInformationResponse { UserId = userId, FamilyId = familyId });
+        return userService;
+    }
+
+    private static Mock<IDataAccessVerificationService> CreateNormalDataAccess()
+    {
+        var dataAccess = new Mock<IDataAccessVerificationService>();
+        dataAccess.Setup(service => service.HasElevatedAccess(UserRoleType.Normal)).Returns(false);
+        return dataAccess;
     }
 }
