@@ -58,6 +58,7 @@ namespace Helcim.Implementation.Services
         private readonly IHelcimPaymentContextRepository? _paymentContexts;
         private readonly IDonationPaymentRepository? _donationPayments;
         private readonly IDonationCampaignRepository? _donationCampaigns;
+        private readonly IUserPaymentGatewayRepository? _userPaymentGateways;
 
         public HelcimTransactionService(
             IHelcimTransactionRepository repository,
@@ -74,7 +75,8 @@ namespace Helcim.Implementation.Services
             IHelcimCheckoutContextRepository? checkoutContexts = null,
             IHelcimPaymentContextRepository? paymentContexts = null,
             IDonationPaymentRepository? donationPayments = null,
-            IDonationCampaignRepository? donationCampaigns = null)
+            IDonationCampaignRepository? donationCampaigns = null,
+            IUserPaymentGatewayRepository? userPaymentGateways = null)
         {
             _repository = repository;
             _clientConfiguration = clientConfiguration;
@@ -91,6 +93,7 @@ namespace Helcim.Implementation.Services
             _paymentContexts = paymentContexts;
             _donationPayments = donationPayments;
             _donationCampaigns = donationCampaigns;
+            _userPaymentGateways = userPaymentGateways;
         }
 
         public async Task<HelcimPayInitializeResponse> InitializePayment(InitiatePaymentRequest request)
@@ -162,11 +165,13 @@ namespace Helcim.Implementation.Services
                 await _paymentContexts.Save(paymentContext).ConfigureAwait(false);
             }
 
+            var customerCode = await EnsureHelcimCustomerCodeAsync(userId).ConfigureAwait(false);
             var helcimRequestPayload = BuildInitializePaymentPayload(
                 request,
                 invoiceNumber,
                 amount,
                 terminalId,
+                customerCode,
                 paymentContext == null ? null : BuildPaymentContextNote(paymentContext.PaymentContextId));
 
             var payload = new JsonMessageData
@@ -250,13 +255,17 @@ namespace Helcim.Implementation.Services
             }
 
             var invoiceNumber = BuildSavedCardVerificationInvoiceNumber();
+            var customerCode = await EnsureHelcimCustomerCodeAsync(userId).ConfigureAwait(false);
             var helcimRequestPayload = new JObject
             {
                 ["paymentType"] = "verify",
                 ["amount"] = 0m,
                 ["currency"] = "CAD",
                 // A profile vault stores reusable card tokens only. Bank-account collection is not part of this endpoint.
-                ["paymentMethod"] = "cc"
+                ["paymentMethod"] = "cc",
+                ["customerCode"] = customerCode,
+                ["setAsDefaultPaymentMethod"] = 1,
+                ["hideExistingPaymentDetails"] = 1
             };
 
             var payload = new JsonMessageData
@@ -427,6 +436,7 @@ namespace Helcim.Implementation.Services
                     Tag = card.TokenTag,
                     Hash = card.TokenHash
                 });
+                var customerCode = await EnsureHelcimCustomerCodeAsync(userId).ConfigureAwait(false);
                 var responseJson = await SendJsonRequest(
                     BuildVersionedEndpoint("/payment/purchase"),
                     HttpMethod.Post,
@@ -436,6 +446,7 @@ namespace Helcim.Implementation.Services
                         request.Amount,
                         token,
                         terminalId,
+                        customerCode,
                         paymentContext == null ? null : BuildPaymentContextNote(paymentContext.PaymentContextId)),
                     new Dictionary<string, string> { ["idempotency-key"] = attempt.IdempotencyKey }).ConfigureAwait(false);
                 var providerResponse = JObject.Parse(responseJson);
@@ -1341,17 +1352,21 @@ namespace Helcim.Implementation.Services
                 HelcimPaymentCompletionResponse? result = null;
                 if (transactionId.HasValue)
                 {
-                    var cardTransactionLookup = await TryGetCardTransactionById(transactionId.Value).ConfigureAwait(false);
+                    var cardTransactionLookup = await TryGetCardTransactionById(transactionId.Value, requireInvoiceNumber: false).ConfigureAwait(false);
                     if (cardTransactionLookup != null)
                     {
-                        var invoice = await GetInvoiceByInvoiceNumber(cardTransactionLookup.Transaction.InvoiceNumber ?? invoiceNumber ?? string.Empty).ConfigureAwait(false);
-                        var localTransaction = await ResolveLocalTransactionAsync(invoice, transactionId.Value).ConfigureAwait(false);
-                        result = await SaveCardTransactionDetailsAsync(
-                            invoice,
-                            localTransaction,
-                            cardTransactionLookup.TransactionRaw,
-                            cardTransactionLookup.Transaction,
-                            rawBody).ConfigureAwait(false);
+                        result = await SaveUninvoicedCardVerificationAsync(cardTransactionLookup).ConfigureAwait(false);
+                        if (result == null)
+                        {
+                            var invoice = await GetInvoiceByInvoiceNumber(cardTransactionLookup.Transaction.InvoiceNumber ?? invoiceNumber ?? string.Empty).ConfigureAwait(false);
+                            var localTransaction = await ResolveLocalTransactionAsync(invoice, transactionId.Value).ConfigureAwait(false);
+                            result = await SaveCardTransactionDetailsAsync(
+                                invoice,
+                                localTransaction,
+                                cardTransactionLookup.TransactionRaw,
+                                cardTransactionLookup.Transaction,
+                                rawBody).ConfigureAwait(false);
+                        }
                     }
                     else
                     {
@@ -1663,6 +1678,66 @@ namespace Helcim.Implementation.Services
         private static string BuildPaymentContextNote(Guid paymentContextId)
             => $"{PaymentContextNotePrefix}{paymentContextId:D}";
 
+        private async Task<string?> EnsureHelcimCustomerCodeAsync(Guid userId)
+        {
+            // Anonymous donation checkout intentionally has no reusable provider identity.
+            if (userId == Guid.Empty || _userPaymentGateways == null)
+            {
+                return null;
+            }
+
+            var existing = await _userPaymentGateways
+                .GetActive(userId, PaymentGatewayTypes.Helcim).ConfigureAwait(false);
+            if (existing != null)
+            {
+                return existing.UserPaymentGatewayCode;
+            }
+
+            var user = await _userPaymentGateways.GetUserProfile(userId).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("The active user profile could not be found for Helcim customer creation.");
+            var customerCode = $"MKT-USER-{userId:N}";
+            var contactName = $"{user.FirstName} {user.LastName}".Trim();
+            if (string.IsNullOrWhiteSpace(contactName))
+            {
+                contactName = user.Email;
+            }
+            if (string.IsNullOrWhiteSpace(contactName))
+            {
+                throw new InvalidOperationException("A name or email is required to create a Helcim customer.");
+            }
+
+            var responseJson = await SendJsonRequest(
+                BuildVersionedEndpoint("/customers"),
+                HttpMethod.Post,
+                new JObject
+                {
+                    ["customerCode"] = customerCode,
+                    ["contactName"] = contactName,
+                    ["cellPhone"] = string.IsNullOrWhiteSpace(user.Phone) ? null : user.Phone
+                }).ConfigureAwait(false);
+            var response = JToken.Parse(responseJson);
+            var customer = response["customer"] as JObject ?? response as JObject
+                ?? throw new InvalidOperationException("Helcim customer creation returned an invalid response.");
+            var externalCustomerId = customer.Value<string>("customerId")
+                ?? customer.Value<string>("id");
+            var returnedCustomerCode = customer.Value<string>("customerCode");
+            if (string.IsNullOrWhiteSpace(returnedCustomerCode))
+            {
+                throw new InvalidOperationException("Helcim customer creation did not return a customer code.");
+            }
+
+            await _userPaymentGateways.Save(new UserPaymentGatewayRecord
+            {
+                UserPaymentGatewayId = Guid.NewGuid(),
+                UserId = userId,
+                PaymentGatewayType = PaymentGatewayTypes.Helcim,
+                UserPaymentGatewayCode = returnedCustomerCode,
+                ExternalCustomerId = externalCustomerId,
+                IsActive = true
+            }).ConfigureAwait(false);
+            return returnedCustomerCode;
+        }
+
         private async Task<HelcimPaymentContext?> GetPaymentContextAsync(HelcimInvoiceResponse invoice)
         {
             if (_paymentContexts == null)
@@ -1769,6 +1844,7 @@ namespace Helcim.Implementation.Services
             string invoiceNumber,
             decimal amount,
             int? terminalId,
+            string? customerCode,
             string? paymentContextNote = null)
         {
             var initializeRequest = new HelcimPayInitializeRequest
@@ -1810,6 +1886,11 @@ namespace Helcim.Implementation.Services
                 ["paymentMethod"] = JToken.FromObject(HelcimPaymentMethod.CreditCardOrAch, HelcimJsonSerializer),
                 ["HelcimDigitalWalletRequest"] = JToken.FromObject(1, HelcimJsonSerializer)
             };
+
+            if (!string.IsNullOrWhiteSpace(customerCode))
+            {
+                payload["customerCode"] = customerCode;
+            }
 
             if (serializedRequest.TryGetValue("terminalId", out var terminalIdToken))
             {
@@ -1887,6 +1968,7 @@ namespace Helcim.Implementation.Services
             decimal amount,
             string cardToken,
             int? terminalId,
+            string? customerCode,
             string? paymentContextNote = null)
         {
             var invoice = new JObject
@@ -1912,6 +1994,8 @@ namespace Helcim.Implementation.Services
                 ["cardData"] = new JObject { ["cardToken"] = cardToken },
                 ["invoice"] = invoice
             };
+            if (!string.IsNullOrWhiteSpace(customerCode))
+                payload["customerCode"] = customerCode;
             if (terminalId.HasValue)
             {
                 payload["terminalId"] = terminalId.Value;
@@ -2950,7 +3034,7 @@ namespace Helcim.Implementation.Services
             await SaveCardForCheckoutContextAsync(context, cardTransaction).ConfigureAwait(false);
 
             // Retain an audit trail but prevent a completed checkout context from being reused.
-            await _checkoutContexts.Deactivate(invoice.InvoiceNumber).ConfigureAwait(false);
+            await _checkoutContexts!.Deactivate(invoice.InvoiceNumber).ConfigureAwait(false);
         }
 
         private async Task SaveCardForCheckoutContextAsync(
@@ -2961,12 +3045,22 @@ namespace Helcim.Implementation.Services
                 throw new InvalidOperationException("Saved-card storage is not configured.");
 
             var token = _cardTokenProtector.Protect(cardTransaction.CardToken!);
+            var cardNumberDigits = new string((cardTransaction.CardNumber ?? string.Empty).Where(char.IsDigit).ToArray());
+            if (cardNumberDigits.Length < 10 || string.IsNullOrWhiteSpace(cardTransaction.CardType))
+            {
+                throw new InvalidOperationException(
+                    "Helcim card verification did not return valid BIN and last-four card information.");
+            }
+
             var details = await _cardBinLookupService
                 .GetDisplayDetailsAsync(cardTransaction.CardType, cardTransaction.CardNumber)
                 .ConfigureAwait(false);
-            var cardNumberDigits = new string((cardTransaction.CardNumber ?? string.Empty).Where(char.IsDigit).ToArray());
+            if (string.IsNullOrWhiteSpace(details.CardCompany))
+            {
+                throw new InvalidOperationException("Helcim card verification returned an unsupported card BIN.");
+            }
 
-            await _cardVault.AddIfMissing(new HelcimSavedCardRecord
+            await _cardVault.SaveOrReplace(new HelcimSavedCardRecord
             {
                 CardId = Guid.NewGuid(),
                 UserId = context.UserId,
@@ -2975,6 +3069,7 @@ namespace Helcim.Implementation.Services
                 TokenNonce = token.Nonce,
                 TokenTag = token.Tag,
                 TokenHash = token.Hash,
+                CardFingerprint = _cardTokenProtector.CreateCardFingerprint(cardTransaction.CardNumber ?? string.Empty),
                 CardCompany = details.CardCompany,
                 CardFundingType = details.CardFundingType,
                 LastFourDigits = cardNumberDigits.Length >= 4 ? cardNumberDigits[^4..] : cardNumberDigits,
@@ -3028,6 +3123,45 @@ namespace Helcim.Implementation.Services
                 TransactionResponse = raw.ToString(Formatting.None)
             };
             await SaveTransactionDetailsAsync(details, existing.Any()).ConfigureAwait(false);
+        }
+
+        private async Task<HelcimPaymentCompletionResponse?> SaveUninvoicedCardVerificationAsync(
+            CardTransactionLookup lookup)
+        {
+            var transaction = lookup.Transaction;
+            var customerCode = transaction.CustomerCode;
+            if (transaction.Type != HelcimCardTransactionType.Verify
+                || transaction.CardTransactionStatus != HelcimCardTransactionStatus.Approved
+                || transaction.Amount != 0m
+                || string.IsNullOrWhiteSpace(transaction.CardToken)
+                || string.IsNullOrWhiteSpace(customerCode)
+                || _userPaymentGateways == null)
+            {
+                return null;
+            }
+
+            var gatewayUser = await _userPaymentGateways
+                .GetActiveByCode(PaymentGatewayTypes.Helcim, customerCode).ConfigureAwait(false);
+            if (gatewayUser == null)
+            {
+                return null;
+            }
+
+            var context = new HelcimCheckoutContext
+            {
+                // Verify transactions do not always have an invoice in Helcim. This is an audit-only local reference.
+                InvoiceNumber = $"HELCIM-VERIFY-{transaction.TransactionId}",
+                UserId = gatewayUser.UserId,
+                SaveCardInfo = true
+            };
+            await SaveCardForCheckoutContextAsync(context, transaction).ConfigureAwait(false);
+            await SaveSavedCardVerificationTransactionAsync(context, lookup.TransactionRaw, transaction).ConfigureAwait(false);
+            return new HelcimPaymentCompletionResponse
+            {
+                Success = true,
+                TransactionId = transaction.TransactionId,
+                PaymentFlow = "card-verification"
+            };
         }
 
         private static bool IsProfileSavedCardVerification(string? invoiceNumber)

@@ -52,9 +52,75 @@ public class StudentCourseAttendanceServiceTests
         Assert.Equal(enrollmentId, result.Students[0].StudentCourseEnrollmentId);
         Assert.Equal(childId, result.Students[0].ChildId);
         Assert.Equal(familyId, result.Students[0].FamilyId);
-        Assert.Equal(AttendanceStatus.Unknown, result.Students[0].AttendanceStatus);
+        Assert.Equal(AttendanceStatus.Present, result.Students[0].AttendanceStatus);
         Assert.Equal(PickupContactType.Unknown, result.Students[0].PickupContactType);
         Assert.False(result.Students[0].IsActive);
+    }
+
+    [Fact]
+    public async Task UpsertStudentAttendance_DerivesStudentAndFamilyFromAssignedRoster()
+    {
+        var userId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var courseId = Guid.NewGuid();
+        var instituteId = Guid.NewGuid();
+        var enrollmentId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var attendanceDate = new DateTime(2026, 9, 18, 0, 0, 0, DateTimeKind.Utc);
+        var capturedRequest = default(UpsertCourseGroupAttendanceRequest);
+
+        var repository = new Mock<IStudentCourseAttendanceRepository>();
+        repository
+            .SetupSequence(repo => repo.GetCourseGroupAttendance(groupId, attendanceDate, null))
+            .ReturnsAsync(new List<StudentCourseAttendanceResponse>())
+            .ReturnsAsync(new List<StudentCourseAttendanceResponse>
+            {
+                new()
+                {
+                    StudentCourseAttendanceId = Guid.NewGuid(),
+                    StudentCourseEnrollmentId = enrollmentId,
+                    ChildId = childId,
+                    FamilyId = familyId,
+                    AttendanceStatus = AttendanceStatus.Present,
+                    PickupContactType = PickupContactType.Unknown,
+                    IsActive = true,
+                    RecordedByUserId = userId,
+                    CreatedAt = attendanceDate,
+                    UpdatedOn = attendanceDate
+                }
+            });
+        repository
+            .Setup(repo => repo.UpsertCourseGroupAttendance(It.IsAny<UpsertCourseGroupAttendanceRequest>()))
+            .Callback<UpsertCourseGroupAttendanceRequest>(request => capturedRequest = request)
+            .ReturnsAsync(new CourseGroupAttendanceResponse());
+
+        var courseStaffAssignmentService = new Mock<ICourseStaffAssignmentService>();
+        courseStaffAssignmentService
+            .Setup(service => service.GetAssignedCourseGroupRoster(userId, UserRoleType.SchoolTeacher, groupId))
+            .ReturnsAsync(CreateRoster(courseId, groupId, instituteId, enrollmentId, childId, familyId));
+
+        var service = CreateAttendanceService(repository, courseStaffAssignmentService);
+
+        var result = await service.UpsertStudentAttendance(userId, UserRoleType.SchoolTeacher, groupId, enrollmentId,
+            new UpsertStudentAttendanceRequest
+            {
+                CourseId = courseId,
+                InstituteId = instituteId,
+                AttendanceDate = attendanceDate,
+                AttendanceStatus = AttendanceStatus.Present,
+                Notes = "Present for class"
+            });
+
+        Assert.NotNull(capturedRequest);
+        var savedStudent = Assert.Single(capturedRequest!.Students);
+        Assert.Equal(enrollmentId, savedStudent.StudentCourseEnrollmentId);
+        Assert.Equal(childId, savedStudent.ChildId);
+        Assert.Equal(familyId, savedStudent.FamilyId);
+        Assert.Equal(AttendanceStatus.Present, savedStudent.AttendanceStatus);
+        Assert.True(savedStudent.IsActive);
+        Assert.Equal(enrollmentId, result.StudentCourseEnrollmentId);
+        Assert.Equal(AttendanceStatus.Present, result.AttendanceStatus);
     }
 
     [Fact]
@@ -445,8 +511,9 @@ public class StudentCourseAttendanceServiceTests
         Assert.Equal(2, sentEmail!.To.Count());
         Assert.Contains("student one", sentEmail.Subject, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("absent", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("cher parent", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("dear parent", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Assalaamu alaikum", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Cher parent", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Dear parent", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
         var schoolContact = Assert.Single(sentEmail.SchoolContacts);
         Assert.Equal("ICC Brossard", schoolContact.Name);
         Assert.Equal("schools@iccbrossard.com", schoolContact.Email);

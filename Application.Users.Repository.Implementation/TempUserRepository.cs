@@ -37,7 +37,7 @@ namespace Application.Users.Repository.Implementation
                     cmd.AddParameter("@createdAt", userInformation.CreatedAt);
                     cmd.AddParameter("@updatedOn", userInformation.CreatedAt);
                     cmd.AddParameter("@relationship", (int)userInformation.Relationship);
-                    cmd.AddParameter("@userRole", (int)userInformation.UserRole);
+                    cmd.AddParameter("@userRole", (long)userInformation.UserRole);
                     
                     if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
                     {
@@ -162,7 +162,7 @@ namespace Application.Users.Repository.Implementation
                     var isTempPassword = reader.GetBoolean(10);
                     var relationship = (Relationship)reader.GetInt32(11);
                     var familyId = reader.GetGuidFromByteArray(12);
-                    var userRole = (UserRoleType)reader.GetInt32(13);
+                    var userRole = (UserRoleType)reader.GetInt64(13);
 
                     return new UserInformation
                     {
@@ -247,7 +247,7 @@ namespace Application.Users.Repository.Implementation
                     cmd.AddParameter("@updatedOn", DateTime.UtcNow);
                     cmd.AddParameter("@isTempPassword", userInformation.IsTempPassword);
                     cmd.AddParameter("@relationship", (int)userInformation.Relationship);
-                    cmd.AddParameter("@userRole", (int)userInformation.UserRole);
+                    cmd.AddParameter("@userRole", (long)userInformation.UserRole);
 
                     if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
                     {
@@ -290,7 +290,7 @@ namespace Application.Users.Repository.Implementation
                         var UpdatedOn = reader.GetDateTime(9);
                         var isTempPassword = reader.GetBoolean(10);
                         var relationship = (Relationship)reader.GetInt32(11);
-                        var userRole = (UserRoleType)reader.GetInt32(12);
+                        var userRole = (UserRoleType)reader.GetInt64(12);
                         var familyId = reader.GetGuidFromByteArray(13);
 
                         results.Add(new UserInformation
@@ -350,7 +350,7 @@ namespace Application.Users.Repository.Implementation
                         var updatedOn = reader.GetDateTime(9);
                         var isTempPassword = reader.GetBoolean(10);
                         var relationship = (Relationship)reader.GetInt32(11);
-                        var userRole = (UserRoleType)reader.GetInt32(12);
+                        var userRole = (UserRoleType)reader.GetInt64(12);
                         var tempFamilyId = reader.GetGuidFromByteArray(13);
 
                         results.Add(new UserInformation
@@ -417,7 +417,7 @@ namespace Application.Users.Repository.Implementation
                     var isTempPassword = reader.GetBoolean(7);
                     var relationship = (Relationship)reader.GetInt32(8);
                     var familyId = reader.GetGuidFromByteArray(9);
-                    var userRole = (UserRoleType)reader.GetInt32(10);
+                    var userRole = (UserRoleType)reader.GetInt64(10);
 
                     return new UserInformation
                     {

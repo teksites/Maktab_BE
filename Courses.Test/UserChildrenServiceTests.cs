@@ -146,6 +146,44 @@ public class UserChildrenServiceTests
     }
 
     [Fact]
+    public async Task GetUserChilds_WhenViewerAndPartnerAreLinkedUsers_ReturnsSelfAndSpouseDisplayTypes()
+    {
+        var familyId = Guid.NewGuid();
+        var motherUserId = Guid.NewGuid();
+        var fatherUserId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var mother = CreateChild(familyId, "Mother", UserType.Self);
+        mother.ChildId = motherUserId;
+        var father = CreateChild(familyId, "Father", UserType.Self);
+        father.ChildId = fatherUserId;
+        var child = CreateChild(familyId, "Child", UserType.Child);
+        child.ChildId = childId;
+
+        var repository = new Mock<IUserChildrenRepository>();
+        repository
+            .Setup(repo => repo.GetFamilyChildren(familyId))
+            .ReturnsAsync(new[] { mother, father, child });
+        repository
+            .Setup(repo => repo.GetFamilyUserRelationships(familyId))
+            .ReturnsAsync(new Dictionary<Guid, Relationship>
+            {
+                [motherUserId] = Relationship.Mother,
+                [fatherUserId] = Relationship.Father
+            });
+
+        var service = new UserChildrenService(Mock.Of<IConfiguration>(), repository.Object);
+
+        var motherView = (await service.GetUserChilds(familyId, viewerUserId: motherUserId)).ToList();
+        var fatherView = (await service.GetUserChilds(familyId, viewerUserId: fatherUserId)).ToList();
+
+        Assert.Equal(FamilyMemberDisplayType.Self, motherView.Single(item => item.Result.ChildId == motherUserId).Result.DisplayType);
+        Assert.Equal(FamilyMemberDisplayType.Spouse, motherView.Single(item => item.Result.ChildId == fatherUserId).Result.DisplayType);
+        Assert.Equal(FamilyMemberDisplayType.Child, motherView.Single(item => item.Result.ChildId == childId).Result.DisplayType);
+        Assert.Equal(FamilyMemberDisplayType.Spouse, fatherView.Single(item => item.Result.ChildId == motherUserId).Result.DisplayType);
+        Assert.Equal(FamilyMemberDisplayType.Self, fatherView.Single(item => item.Result.ChildId == fatherUserId).Result.DisplayType);
+    }
+
+    [Fact]
     public async Task GetChild_MapsSurahCatalogFlagIntoResponse()
     {
         var childId = Guid.NewGuid();

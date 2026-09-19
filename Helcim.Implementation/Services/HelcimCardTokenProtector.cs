@@ -44,6 +44,17 @@ public sealed class HelcimCardTokenProtector : IHelcimCardTokenProtector
         return Encoding.UTF8.GetString(plaintext);
     }
 
+    public string CreateCardFingerprint(string cardNumber)
+    {
+        EnsureEnabled();
+        var digits = new string((cardNumber ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (digits.Length < 10)
+            throw new ArgumentException("Helcim must return the card first-six and last-four digits.", nameof(cardNumber));
+
+        // HMAC prevents the stored identity from being useful outside this card vault.
+        return Convert.ToHexString(HMACSHA256.HashData(_configuration.EncryptionKey, Encoding.UTF8.GetBytes(digits)));
+    }
+
     private void EnsureEnabled()
     {
         if (!_configuration.Enabled)

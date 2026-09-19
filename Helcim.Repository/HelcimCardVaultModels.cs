@@ -9,6 +9,7 @@ public sealed class HelcimSavedCardRecord
     public byte[] TokenNonce { get; init; } = Array.Empty<byte>();
     public byte[] TokenTag { get; init; } = Array.Empty<byte>();
     public string TokenHash { get; init; } = string.Empty;
+    public string CardFingerprint { get; init; } = string.Empty;
     public string CardCompany { get; init; } = string.Empty;
     public string CardFundingType { get; init; } = "Unknown";
     public string LastFourDigits { get; init; } = string.Empty;
@@ -24,7 +25,7 @@ public interface IHelcimCardVaultRepository
 {
     Task<IReadOnlyList<HelcimSavedCardRecord>> GetActiveCards(Guid userId);
     Task<HelcimSavedCardRecord?> GetActiveCard(Guid cardId, Guid userId);
-    Task<bool> AddIfMissing(HelcimSavedCardRecord card);
+    Task SaveOrReplace(HelcimSavedCardRecord card);
     Task SetDefault(Guid cardId, Guid userId);
     Task Deactivate(Guid cardId, Guid userId);
 }

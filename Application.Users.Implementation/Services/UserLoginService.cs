@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using MaktabDataContracts.Requests.Authentication;
 using MaktabDataContracts.Requests.Users;
 using MaktabDataContracts.Responses.Authentication;
+using MaktabDataContracts.Enums;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -108,12 +109,14 @@ namespace Users.Implementation.Services
             DateTime? twoFactorCodeExpiresOn = null;
             if (requiresTwoFactorVerification)
             {
+                var userRoles = await _userService.GetUserRoles(userInfo.UserId).ConfigureAwait(false);
                 twoFactorCodeExpiresOn = await CreateAndSendTwoFactorCodeAsync(
                     sessionInfo.SessionId,
                     userInfo.UserId,
                     userInfo.Email,
                     userInfo.FirstName,
-                    userInfo.LastName).ConfigureAwait(false);
+                    userInfo.LastName,
+                    userRoles).ConfigureAwait(false);
 
                 if (!twoFactorCodeExpiresOn.HasValue)
                 {
@@ -264,12 +267,14 @@ namespace Users.Implementation.Services
             }
 
             await _repository.DeactivateSessionTwoFactorCodes(sessionId).ConfigureAwait(false);
+            var userRoles = await _userService.GetUserRoles(userInfo.UserId).ConfigureAwait(false);
             var expiresOn = await CreateAndSendTwoFactorCodeAsync(
                 sessionId,
                 userInfo.UserId,
                 userInfo.Email,
                 userInfo.FirstName,
-                userInfo.LastName).ConfigureAwait(false);
+                userInfo.LastName,
+                userRoles).ConfigureAwait(false);
 
             if (!expiresOn.HasValue)
             {
@@ -332,7 +337,8 @@ namespace Users.Implementation.Services
             Guid userId,
             string email,
             string firstName,
-            string lastName)
+            string lastName,
+            UserRoleType userRoles)
         {
             if (string.IsNullOrWhiteSpace(email))
             {
@@ -341,7 +347,7 @@ namespace Users.Implementation.Services
 
             var code = GenerateRandomVerificationCode();
             var now = DateTime.UtcNow;
-            var expiresOn = now.AddMinutes(GetTwoFactorCodeExpiryMinutes());
+            var expiresOn = now.AddMinutes(GetTwoFactorCodeExpiryMinutes(userRoles));
 
             await _repository.DeactivateSessionTwoFactorCodes(sessionId).ConfigureAwait(false);
             await _repository.AddSessionTwoFactorCode(new AddSessionTwoFactorCode
@@ -394,12 +400,20 @@ namespace Users.Implementation.Services
             return (sessionState, userInfo, null);
         }
 
-        private int GetTwoFactorCodeExpiryMinutes()
+        private int GetTwoFactorCodeExpiryMinutes(UserRoleType userRoles)
         {
+            if (userRoles.HasFlag(UserRoleType.Admin) || userRoles.HasFlag(UserRoleType.SuperUser))
+            {
+                var adminSetting = _configuration["Authentication:AdminTwoFactorCodeExpiryMinutes"];
+                return int.TryParse(adminSetting, out var configuredAdminMinutes) && configuredAdminMinutes > 0
+                    ? configuredAdminMinutes
+                    : 480;
+            }
+
             var setting = _configuration["Authentication:TwoFactorCodeExpiryMinutes"];
             return int.TryParse(setting, out var configuredMinutes) && configuredMinutes > 0
                 ? configuredMinutes
-                : 10;
+                : 30;
         }
 
         private int GetTwoFactorMaxAttempts()

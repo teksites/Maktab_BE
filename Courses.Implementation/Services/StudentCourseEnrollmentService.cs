@@ -1170,11 +1170,10 @@ namespace Courses.Implementation.Services
 
             return (
                 "Mise a jour des inscriptions / Enrollment Update",
-                $"<p><strong>Cher parent,</strong></p>" +
+                $"<p><strong>Assalaamu alaikum,</strong></p>" +
                 $"<p>Voici les dernieres mises a jour pour les inscriptions de votre famille :</p>" +
                 $"<ul>{frenchItems}</ul>" +
                 $"<div>&nbsp;</div>" +
-                $"<p><strong>Dear parent,</strong></p>" +
                 $"<p>Here are the latest updates for your family's enrollments:</p>" +
                 $"<ul>{englishItems}</ul>" +
                 $"<div>&nbsp;</div>" +
@@ -1187,41 +1186,37 @@ namespace Courses.Implementation.Services
             {
                 EnrollmentStatus.Enrolled => (
                     EnrollmentConfirmationSubject,
-                    $"<p><strong>Chèr parent,</strong></p>" +
-                    $"<p>Merci d'avoir inscrit votre enfant au <strong>{notification.CourseNameFr}-</strong><strong>{notification.CourseGroupDetailsFr}</strong>. L'inscription sera complétée seulement après réception du paiement, conformément à la politique du {{school / camp}}. Veuillez vous connecter au portail et payer les frais d'inscription.</p>" +
+                    $"<p><strong>Assalaamu alaikum,</strong></p>" +
+                    $"<p>Merci d'avoir inscrit le participant au <strong>{notification.CourseNameFr}-</strong><strong>{notification.CourseGroupDetailsFr}</strong>. L'inscription sera complétée seulement après réception du paiement, conformément à la politique du {{school / camp}}. Veuillez vous connecter au portail et payer les frais d'inscription.</p>" +
                     $"<div>&nbsp;</div>" +
-                    $"<p><strong>Dear parent,</strong></p>" +
-                    $"<p>Thank you for enrolling your child in the <strong>{notification.CourseName}-</strong><strong>{notification.CourseGroupDetails}</strong>. Registration is only complete when payment is made based on the policy of the {{school / camp}}. Please login to the portal and pay the fee to register your child.</p>" +
+                    $"<p>Thank you for enrolling the participant in the <strong>{notification.CourseName}-</strong><strong>{notification.CourseGroupDetails}</strong>. Registration is only complete when payment is made based on the policy of the {{school / camp}}. Please login to the portal and pay the fee to register the participant.</p>" +
                     $"<div>&nbsp;</div>" +
                     $"<div>&nbsp;</div>" +
                     $"<div><strong>ICC Brossard School Registration Portal</strong></div>"),
                 EnrollmentStatus.Awaiting => (
                     $"{notification.CourseNameFr} Liste d'attente / {notification.CourseName} Waiting List",
-                    $"<p><strong>Cher parent,</strong></p>" +
-                    $"<p>Votre enfant {notification.ChildName} a été ajouté(e) à la liste d'attente pour le cours / l'activité <strong>{notification.CourseNameFr}</strong>{FormatGroupSuffix(notification.CourseGroupDetailsFr)}. Nous communiquerons avec vous lorsqu'une place se libérera ou lorsqu'une prochaine étape sera requise.</p>" +
+                    $"<p><strong>Assalaamu alaikum,</strong></p>" +
+                    $"<p>Le participant {notification.ChildName} a été ajouté(e) à la liste d'attente pour le cours / l'activité <strong>{notification.CourseNameFr}</strong>{FormatGroupSuffix(notification.CourseGroupDetailsFr)}. Nous communiquerons avec vous lorsqu'une place se libérera ou lorsqu'une prochaine étape sera requise.</p>" +
                     $"<div>&nbsp;</div>" +
-                    $"<p><strong>Dear parent,</strong></p>" +
-                    $"<p>Your child {notification.ChildName} has been added to the waiting list for the course / activity <strong>{notification.CourseName}</strong>{FormatGroupSuffix(notification.CourseGroupDetails)}. We will contact you if a seat becomes available or if any next step is required.</p>" +
+                    $"<p>The participant {notification.ChildName} has been added to the waiting list for the course / activity <strong>{notification.CourseName}</strong>{FormatGroupSuffix(notification.CourseGroupDetails)}. We will contact you if a seat becomes available or if any next step is required.</p>" +
                     $"<div>&nbsp;</div>" +
                     $"<div>&nbsp;</div>" +
                     $"<div><strong>ICC Brossard School / Activities Registration Portal - Portail de l'inscription écoles / activités</strong></div>"),
                 EnrollmentStatus.Registered => (
                     $"{notification.CourseNameFr} Confirmation d'inscription / {notification.CourseName} Registration Confirmation",
-                    $"<p><strong>Cher parent,</strong></p>" +
-                    $"<p>Votre enfant {notification.ChildName} est inscrit(e) au cours / à l'activité <strong>{notification.CourseNameFr}</strong>. Tous les frais sont réglés.</p>" +
+                    $"<p><strong>Assalaamu alaikum,</strong></p>" +
+                    $"<p>Le participant {notification.ChildName} est inscrit(e) au cours / à l'activité <strong>{notification.CourseNameFr}</strong>. Tous les frais sont réglés.</p>" +
                     $"<div>&nbsp;</div>" +
-                    $"<p><strong>Dear parent,</strong></p>" +
-                    $"<p>Your child {notification.ChildName} has been registered for the course / activity <strong>{notification.CourseName}</strong>. All fees are fully paid.</p>" +
+                    $"<p>The participant {notification.ChildName} has been registered for the course / activity <strong>{notification.CourseName}</strong>. All fees are fully paid.</p>" +
                     $"<div>&nbsp;</div>" +
                     $"<div>&nbsp;</div>" +
                     $"<div><strong>ICC Brossard School / Activities Registration Portal - Portail de l'inscription écoles / activités</strong></div>"),
                 EnrollmentStatus.Cancelled => (
                     "Annulation de l'inscription / Cancellation of Registration",
-                    $"<p><strong>Chèr parent,</strong></p>" +
-                    $"<p>L'inscription de votre enfant a été annulée à cause que les frais requis n'ayant pas été réglés dans les délais précédemment communiqués.</p>" +
+                    $"<p><strong>Assalaamu alaikum,</strong></p>" +
+                    $"<p>L'inscription du participant a été annulée.</p>" +
                     $"<div>&nbsp;</div>" +
-                    $"<p><strong>Dear parent,</strong></p>" +
-                    $"<p>Due to the required fees being unpaid by the deadline previously given, your child's registration has been cancelled.</p>" +
+                    $"<p>The participant's registration has been cancelled.</p>" +
                     $"<div>&nbsp;</div>" +
                     $"<div>&nbsp;</div>" +
                     $"<div><strong>ICC Brossard School Registration Portal</strong></div>"),
@@ -1247,15 +1242,16 @@ namespace Courses.Implementation.Services
                 : $"{courseNameFr} ({courseGroupDetailsFr})";
 
             var body =
-                $"<p>Votre enfant {childName} est inscrit au cours coranique de l'ecole <strong>{formattedCourseNameFr}</strong> et son statut est actuellement <strong>Inscrit</strong> et <strong>En attente</strong>.</p>" +
-                $"<p>Si votre enfant a deja frequente l'ecole, l'administration l'affectera au cours du meme jour que precedemment. Si le paiement complet a ete effectue, son inscription sera confirmee et son statut changera a <strong>Enregistre</strong>. Cela sera fait au cours des prochains jours.</p>" +
-                $"<p>Si vous souhaitez modifier le jour de cours de votre enfant, veuillez envoyer un courriel a l'administration de l'ecole a l'adresse <strong>rattel.ecole@gmail.com</strong>. Sous reserve des places disponibles, l'ecole fera de son mieux pour effectuer ce changement.</p>" +
-                $"<p>S'il s'agit de la premiere inscription de votre enfant a l'ecole, l'administration communiquera avec vous afin de finaliser le processus d'inscription et d'enregistrement.</p>" +
+                $"<p><strong>Assalaamu alaikum,</strong></p>" +
+                $"<p>Le participant {childName} est inscrit au cours coranique de l'ecole <strong>{formattedCourseNameFr}</strong> et son statut est actuellement <strong>Inscrit</strong> et <strong>En attente</strong>.</p>" +
+                $"<p>Si le participant a deja frequente l'ecole, l'administration l'affectera au cours du meme jour que precedemment. Si le paiement complet a ete effectue, son inscription sera confirmee et son statut changera a <strong>Enregistre</strong>. Cela sera fait au cours des prochains jours.</p>" +
+                $"<p>Si vous souhaitez modifier le jour de cours du participant, veuillez envoyer un courriel a l'administration de l'ecole a l'adresse <strong>rattel.ecole@gmail.com</strong>. Sous reserve des places disponibles, l'ecole fera de son mieux pour effectuer ce changement.</p>" +
+                $"<p>S'il s'agit de la premiere inscription du participant a l'ecole, l'administration communiquera avec vous afin de finaliser le processus d'inscription et d'enregistrement.</p>" +
                 $"<div>&nbsp;</div>" +
-                $"<p>Your child {childName} has been enrolled in the <strong>{formattedCourseName}</strong> and is currently in <strong>Enrolled</strong> and <strong>Waiting</strong> status.</p>" +
-                $"<p>If your child has previously attended the school, the administration will assign your child to the class on the same day as before. If full payment has been made, your child's registration will then be confirmed and the status will change to <strong>Registered</strong>. This will be done within the next few days.</p>" +
-                $"<p>If you would like to change your child's class day, please email the school administration at <strong>rattel.ecole@gmail.com</strong>. Subject to availability, the school will do its best to make the change.</p>" +
-                $"<p>If this is your child's first time enrolling at the school, the administration will contact you to finalize the enrollment and registration process.</p>" +
+                $"<p>The participant {childName} has been enrolled in the <strong>{formattedCourseName}</strong> and is currently in <strong>Enrolled</strong> and <strong>Waiting</strong> status.</p>" +
+                $"<p>If the participant has previously attended the school, the administration will assign the participant to the class on the same day as before. If full payment has been made, the participant's registration will then be confirmed and the status will change to <strong>Registered</strong>. This will be done within the next few days.</p>" +
+                $"<p>If you would like to change the participant's class day, please email the school administration at <strong>rattel.ecole@gmail.com</strong>. Subject to availability, the school will do its best to make the change.</p>" +
+                $"<p>If this is the participant's first time enrolling at the school, the administration will contact you to finalize the enrollment and registration process.</p>" +
                 $"<div>&nbsp;</div>" +
                 $"<div><strong>ICC Brossard School Registration Portal</strong></div>";
 

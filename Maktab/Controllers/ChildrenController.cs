@@ -46,7 +46,8 @@ namespace Maktab.Controllers
         [EnableCors("corspolicy")]
         public async Task<ActionResult<MaktabApiResult<ChildResponse>>> GetChild(Guid childId)
         {
-            var child = await _childrenService.GetChild(childId).ConfigureAwait(false);
+            var session = await GetRequiredSessionContext().ConfigureAwait(false);
+            var child = await _childrenService.GetChild(childId, session.UserId).ConfigureAwait(false);
             if (child?.Result == null)
             {
                 return NotFound();
@@ -63,9 +64,15 @@ namespace Maktab.Controllers
         [Authorize]
         [HttpGet("families/{familyId:guid}/children")]
         [EnableCors("corspolicy")]
-        public async Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid familyId, bool fetchAdults = false)
+        public async Task<ActionResult<IEnumerable<MaktabApiResult<ChildResponse>>>> GetUserChilds(Guid familyId, bool fetchAdults = false)
         {
-            return await _childrenService.GetUserChilds(familyId, fetchAdults).ConfigureAwait(false);
+            if (!await HasFamilyAccessAsync(familyId).ConfigureAwait(false))
+            {
+                return Forbid();
+            }
+
+            var session = await GetRequiredSessionContext().ConfigureAwait(false);
+            return Ok(await _childrenService.GetUserChilds(familyId, fetchAdults, session.UserId).ConfigureAwait(false));
         }
 
         [Authorize]

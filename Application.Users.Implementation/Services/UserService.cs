@@ -607,13 +607,11 @@ namespace Application.Users.Implementation
             switch (relationship)
             {
                 case Relationship.Mother:
-                    userType = UserType.Mother;
-                    return true;
                 case Relationship.Father:
-                    userType = UserType.Father;
-                    return true;
                 case Relationship.Guardian:
-                    userType = UserType.Guardian;
+                    // The linked child row mirrors the signed-up person, not their family role.
+                    // Their Mother/Father/Guardian relationship remains on user_info.
+                    userType = UserType.Self;
                     return true;
                 default:
                     userType = UserType.Child;

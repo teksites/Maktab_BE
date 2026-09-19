@@ -58,7 +58,7 @@ namespace Courses.Implementation.Services
                         ChildId = student.ChildId,
                         FamilyId = student.FamilyId,
                         ChildName = student.ChildName,
-                        AttendanceStatus = AttendanceStatus.Unknown,
+                        AttendanceStatus = AttendanceStatus.Present,
                         PickupContactType = PickupContactType.Unknown,
                         PickupDisplayName = string.Empty,
                         Notes = string.Empty,
@@ -90,6 +90,56 @@ namespace Courses.Implementation.Services
 
             var records = await _repository.GetAttendanceRecords(normalizedRequest).ConfigureAwait(false);
             return ApplyAttendanceFilter(records, normalizedRequest.Filter);
+        }
+
+        public async Task<StudentCourseAttendanceResponse> UpsertStudentAttendance(
+            Guid userId,
+            UserRoleType userRoles,
+            Guid courseEnrollmentGroupId,
+            Guid studentCourseEnrollmentId,
+            UpsertStudentAttendanceRequest request)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+
+            var roster = await _courseStaffAssignmentService
+                .GetAssignedCourseGroupRoster(userId, userRoles, courseEnrollmentGroupId)
+                .ConfigureAwait(false);
+            var rosterStudent = roster.Students.SingleOrDefault(student =>
+                student.StudentCourseEnrollmentId == studentCourseEnrollmentId);
+
+            if (rosterStudent == null)
+            {
+                throw new InvalidOperationException("The selected student enrollment does not belong to this course group.");
+            }
+
+            var groupAttendance = await UpsertCourseGroupAttendance(userId, userRoles, new UpsertCourseGroupAttendanceRequest
+            {
+                CourseId = request.CourseId,
+                CourseEnrollmentGroupId = courseEnrollmentGroupId,
+                InstituteId = request.InstituteId,
+                AttendanceDate = request.AttendanceDate,
+                Students = new List<UpsertStudentCourseAttendanceRequest>
+                {
+                    new()
+                    {
+                        StudentCourseAttendanceId = request.StudentCourseAttendanceId,
+                        StudentCourseEnrollmentId = rosterStudent.StudentCourseEnrollmentId,
+                        ChildId = rosterStudent.ChildId,
+                        FamilyId = rosterStudent.FamilyId,
+                        AttendanceStatus = request.AttendanceStatus,
+                        LateArrivalTime = request.LateArrivalTime,
+                        EarlyPickupTime = request.EarlyPickupTime,
+                        PickupContactType = request.PickupContactType,
+                        PickupUserId = request.PickupUserId,
+                        PickupOtherContactId = request.PickupOtherContactId,
+                        Notes = request.Notes ?? string.Empty,
+                        IsActive = true
+                    }
+                }
+            }).ConfigureAwait(false);
+
+            return groupAttendance.Students.Single(student =>
+                student.StudentCourseEnrollmentId == studentCourseEnrollmentId);
         }
 
         public async Task<AttendanceReportResponse> GetFamilyAttendanceReport(Guid familyId, GetAttendanceReportRequest request)
@@ -503,11 +553,10 @@ namespace Courses.Implementation.Services
 
             return (
                 $"Presence update for {student.ChildName} / Mise a jour de presence pour {student.ChildName}",
-                $"<p><strong>Cher parent,</strong></p>" +
+                $"<p><strong>Assalaamu alaikum,</strong></p>" +
                 $"<p>Nous souhaitons vous informer que <strong>{student.ChildName}</strong> a ete note comme <strong>{frenchStatus}</strong> le {attendanceDateLabel} pour le cours <strong>{(string.IsNullOrWhiteSpace(roster.CourseNameFr) ? roster.CourseName : roster.CourseNameFr)}</strong>{BuildGroupClause(frenchGroupLabel, true)}.</p>" +
                 frenchDetails +
                 $"<div>&nbsp;</div>" +
-                $"<p><strong>Dear parent,</strong></p>" +
                 $"<p>We would like to inform you that <strong>{student.ChildName}</strong> was marked as <strong>{englishStatus}</strong> on {attendanceDateLabel} for the course <strong>{(string.IsNullOrWhiteSpace(roster.CourseName) ? roster.CourseNameFr : roster.CourseName)}</strong>{BuildGroupClause(englishGroupLabel, false)}.</p>" +
                 englishDetails);
         }

@@ -4,6 +4,7 @@ public interface IHelcimCardTokenProtector
 {
     ProtectedHelcimCardToken Protect(string cardToken);
     string Unprotect(ProtectedHelcimCardToken protectedToken);
+    string CreateCardFingerprint(string cardNumber);
 }
 
 public sealed class ProtectedHelcimCardToken

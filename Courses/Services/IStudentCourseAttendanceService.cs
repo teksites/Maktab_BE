@@ -8,6 +8,12 @@ namespace Courses.Services
     {
         Task<CourseGroupAttendanceResponse> GetCourseGroupAttendance(Guid userId, UserRoleType userRoles, GetCourseGroupAttendanceRequest request);
         Task<CourseGroupAttendanceResponse> UpsertCourseGroupAttendance(Guid userId, UserRoleType userRoles, UpsertCourseGroupAttendanceRequest request);
+        Task<StudentCourseAttendanceResponse> UpsertStudentAttendance(
+            Guid userId,
+            UserRoleType userRoles,
+            Guid courseEnrollmentGroupId,
+            Guid studentCourseEnrollmentId,
+            UpsertStudentAttendanceRequest request);
         Task<IReadOnlyList<AttendanceRecordResponse>> GetFamilyAttendanceRecords(Guid familyId, GetAttendanceRecordsRequest request);
         Task<AttendanceReportResponse> GetFamilyAttendanceReport(Guid familyId, GetAttendanceReportRequest request);
         Task<IReadOnlyList<AttendanceRecordResponse>> GetStaffAttendanceRecords(Guid userId, UserRoleType userRoles, GetAttendanceRecordsRequest request);

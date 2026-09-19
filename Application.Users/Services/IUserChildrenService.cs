@@ -10,8 +10,8 @@ namespace Users.Services
         Task<MaktabApiResult<ChildResponse>> AddChild(AddChildRequest child);
         Task<MaktabApiResult<ChildResponse>> UpdateChild(UpdateChildRequest child);
         Task<bool> DeleteChild(Guid childId, bool ifHardDelete);
-        Task<MaktabApiResult<ChildResponse>> GetChild(Guid childId);
-        Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid userId, bool fetchAdults = false);
+        Task<MaktabApiResult<ChildResponse>> GetChild(Guid childId, Guid? viewerUserId = null);
+        Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid familyId, bool fetchAdults = false, Guid? viewerUserId = null);
         Task<bool> CheckIfChildExisit(UserChildToVerify child);
         Task<bool> DeleteUserChilds(Guid userId, bool ifHardDelete);
     }

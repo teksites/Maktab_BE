@@ -17,9 +17,9 @@ namespace Courses.Test;
 public class UserServiceTests
 {
     [Theory]
-    [InlineData(Relationship.Mother, UserType.Mother, Gender.Female)]
-    [InlineData(Relationship.Father, UserType.Father, Gender.Male)]
-    [InlineData(Relationship.Guardian, UserType.Guardian, Gender.Unknown)]
+    [InlineData(Relationship.Mother, UserType.Self, Gender.Female)]
+    [InlineData(Relationship.Father, UserType.Self, Gender.Male)]
+    [InlineData(Relationship.Guardian, UserType.Self, Gender.Unknown)]
     public async Task VerifyUserVerificationCodes_CreatesLinkedChildForSupportedRelationships(
         Relationship relationship,
         UserType expectedUserType,
@@ -211,7 +211,7 @@ public class UserServiceTests
                 "Updated",
                 "Guardian",
                 Gender.Unknown,
-                UserType.Guardian,
+                UserType.Self,
                 false))
             .ReturnsAsync(true);
 
@@ -250,7 +250,7 @@ public class UserServiceTests
             "Updated",
             "Guardian",
             Gender.Unknown,
-            UserType.Guardian,
+            UserType.Self,
             false), Times.Once);
     }
 

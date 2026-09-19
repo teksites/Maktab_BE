@@ -188,9 +188,8 @@ namespace Courses.Repository.Implementation
                 UserRoleType.SchoolTeacher |
                 UserRoleType.SchoolSupervisor |
                 UserRoleType.SchoolAdmin |
-                UserRoleType.SuperUser |
-                UserRoleType.Manager |
-                UserRoleType.Admin));
+                UserRoleType.Admin |
+                UserRoleType.SuperUser));
 
             if (request.OnlyActive)
             {
