@@ -29,6 +29,7 @@ namespace Application.Users.Implementation
         public async Task<bool> DeleteAddress(Guid addressId, bool ifHardDelete)
         {
             return await _repository.DeleteAddress(addressId, ifHardDelete).ConfigureAwait(false);
+            
         }
 
         public async Task<bool> DeleteAddressByConnectedId(Guid userId, bool ifHardDelete)
