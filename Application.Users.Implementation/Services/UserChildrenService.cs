@@ -220,10 +220,7 @@ namespace Application.Users.Implementation
         private static bool IsIncludedFamilyMemberUserType(UserType userType)
         {
             return userType == UserType.Child
-                || userType == UserType.Self
-                || userType == UserType.Mother
-                || userType == UserType.Father
-                || userType == UserType.Guardian;
+                || userType == UserType.Self;
         }
 
         private static FamilyMemberDisplayType GetDisplayType(
