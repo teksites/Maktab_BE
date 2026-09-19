@@ -20,6 +20,7 @@ public class UserServiceTests
     [InlineData(Relationship.Mother, UserType.Self, Gender.Female)]
     [InlineData(Relationship.Father, UserType.Self, Gender.Male)]
     [InlineData(Relationship.Guardian, UserType.Self, Gender.Unknown)]
+    [InlineData(Relationship.Self, UserType.Self, Gender.Unknown)]
     public async Task VerifyUserVerificationCodes_CreatesLinkedChildForSupportedRelationships(
         Relationship relationship,
         UserType expectedUserType,

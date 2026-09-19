@@ -385,7 +385,8 @@ namespace Courses.Implementation.Services
                 .Where(member =>
                     member.Relationship == Relationship.Mother ||
                     member.Relationship == Relationship.Father ||
-                    member.Relationship == Relationship.Guardian)
+                    member.Relationship == Relationship.Guardian ||
+                    member.Relationship == Relationship.Self)
                 .GroupBy(member => member.UserId)
                 .Select(group => group.First())
                 .Select(member => new AttendancePickupContactResponse

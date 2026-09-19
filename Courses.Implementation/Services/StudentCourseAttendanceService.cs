@@ -467,7 +467,8 @@ namespace Courses.Implementation.Services
                     !user.IfTempUser &&
                     (user.Relationship == Relationship.Mother ||
                      user.Relationship == Relationship.Father ||
-                     user.Relationship == Relationship.Guardian))
+                     user.Relationship == Relationship.Guardian ||
+                     user.Relationship == Relationship.Self))
                 .Select(user => user.Email?.Trim() ?? string.Empty)
                 .Where(emailAddress => !string.IsNullOrWhiteSpace(emailAddress))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
