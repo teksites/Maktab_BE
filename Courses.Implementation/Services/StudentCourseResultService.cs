@@ -109,7 +109,7 @@ namespace Courses.Implementation.Services
 
             var attendanceSummary = await _studentCourseAttendanceRepository.GetAttendanceSummary(courseId, childId).ConfigureAwait(false);
             var attendancePercentage = attendanceSummary.TotalRecords == 0
-                ? (decimal?)null
+                ? 100m
                 : Math.Round(attendanceSummary.PresentCount * 100m / attendanceSummary.TotalRecords, 2, MidpointRounding.AwayFromZero);
 
             return await _repository.Upsert(
@@ -163,7 +163,7 @@ namespace Courses.Implementation.Services
                 var hasAttendanceRecords = attendanceSummary.TotalRecords > 0;
                 var attendancePercentage = hasAttendanceRecords
                     ? Math.Round(attendanceSummary.PresentCount * 100m / attendanceSummary.TotalRecords, 2, MidpointRounding.AwayFromZero)
-                    : (decimal?)null;
+                    : 100m;
 
                 results.Add(new StudentCourseResultResponse
                 {

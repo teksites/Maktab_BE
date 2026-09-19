@@ -16,8 +16,14 @@ namespace Courses.Test;
 
 public class StudentCourseResultServiceTests
 {
-    [Fact]
-    public async Task UpsertCourseChildResult_CalculatesCourseLevelAttendancePercentageAndUsesCourseInstituteId()
+    [Theory]
+    [InlineData(4, 3, 75, true)]
+    [InlineData(0, 0, 100, false)]
+    public async Task UpsertCourseChildResult_CalculatesAttendancePercentageAndUsesCourseInstituteId(
+        int totalAttendanceRecords,
+        int nonAbsentAttendanceRecords,
+        decimal expectedAttendancePercentage,
+        bool expectedHasAttendanceRecords)
     {
         var userId = Guid.NewGuid();
         var childId = Guid.NewGuid();
@@ -59,8 +65,8 @@ public class StudentCourseResultServiceTests
                 FamilyId = familyId,
                 CourseId = courseId,
                 InstituteId = instituteId,
-                AttendancePercentage = 75m,
-                HasAttendanceRecords = true,
+                AttendancePercentage = expectedAttendancePercentage,
+                HasAttendanceRecords = expectedHasAttendanceRecords,
                 HasResult = true,
                 ResultStatus = StudentCourseResultStatus.Pass,
                 Remarks = "Excellent",
@@ -102,7 +108,7 @@ public class StudentCourseResultServiceTests
         var attendanceRepository = new Mock<IStudentCourseAttendanceRepository>();
         attendanceRepository
             .Setup(repo => repo.GetAttendanceSummary(courseId, childId))
-            .ReturnsAsync((4, 3));
+            .ReturnsAsync((totalAttendanceRecords, nonAbsentAttendanceRecords));
 
         var courseService = new Mock<ICourseService>();
         courseService
@@ -138,10 +144,10 @@ public class StudentCourseResultServiceTests
         Assert.Equal(childId, capturedChildId);
         Assert.Equal(courseId, capturedCourseId);
         Assert.Equal(instituteId, capturedInstituteId);
-        Assert.Equal(75m, capturedAttendancePercentage);
+        Assert.Equal(expectedAttendancePercentage, capturedAttendancePercentage);
         Assert.Null(capturedRemarks);
-        Assert.Equal(75m, result.AttendancePercentage);
-        Assert.True(result.HasAttendanceRecords);
+        Assert.Equal(expectedAttendancePercentage, result.AttendancePercentage);
+        Assert.Equal(expectedHasAttendanceRecords, result.HasAttendanceRecords);
     }
 
     [Fact]
