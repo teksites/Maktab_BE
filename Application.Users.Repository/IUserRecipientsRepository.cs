@@ -14,8 +14,14 @@ namespace Users.Repository
         Task<bool> DeleteFamilyChildren(Guid familyId, bool ifHardDelete = false);
         Task<Child> GetChild(Guid childId);
         Task<IEnumerable<Child>> GetFamilyChildren(Guid familyId);
+        Task<IReadOnlyDictionary<Guid, Relationship>> GetFamilyUserRelationships(Guid familyId);
         Task<bool> CheckIfChildExist(UserChildToVerify child);
         Task<ChildEducationalProfileResponse?> GetChildEducationalProfile(Guid childId);
-        Task<ChildEducationalProfileResponse> UpsertChildEducationalProfile(Guid childId, Guid familyId, IReadOnlyCollection<QuranSurah> completedSurahs);
+        Task<ChildEducationalProfileResponse> UpsertChildEducationalProfile(
+            Guid childId,
+            Guid familyId,
+            IReadOnlyCollection<QuranSurah> completedSurahs,
+            SurahCompletionStatus surahCompletionStatus,
+            string remarks);
     }
 }

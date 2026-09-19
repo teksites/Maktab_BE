@@ -419,7 +419,7 @@ public class StudentCourseResultServiceTests
     {
         var childService = new Mock<IUserChildrenService>();
         childService
-            .Setup(service => service.GetChild(childId))
+            .Setup(service => service.GetChild(childId, null))
             .ReturnsAsync(new MaktabApiResult<ChildResponse>
             {
                 Result = new ChildResponse

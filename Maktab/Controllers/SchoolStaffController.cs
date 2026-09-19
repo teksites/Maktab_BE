@@ -140,6 +140,25 @@ namespace Maktab.Controllers
             }).ConfigureAwait(false);
         }
 
+        [ApiAuthorize(false, false, UserRoleType.Assistant)]
+        [HttpPut("me/course-groups/{courseEnrollmentGroupId:guid}/attendance/students/{studentCourseEnrollmentId:guid}")]
+        public async Task<ActionResult<StudentCourseAttendanceResponse>> UpsertMyStudentAttendance(
+            Guid courseEnrollmentGroupId,
+            Guid studentCourseEnrollmentId,
+            UpsertStudentAttendanceRequest request)
+        {
+            return await Execute<StudentCourseAttendanceResponse>(async () =>
+            {
+                var session = await GetRequiredSessionContext().ConfigureAwait(false);
+                return Ok(await _studentCourseAttendanceService.UpsertStudentAttendance(
+                    session.UserId,
+                    session.UserRoles,
+                    courseEnrollmentGroupId,
+                    studentCourseEnrollmentId,
+                    request).ConfigureAwait(false));
+            }).ConfigureAwait(false);
+        }
+
         private async Task<ActionResult<T>> Execute<T>(Func<Task<ActionResult<T>>> action)
         {
             try

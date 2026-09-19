@@ -175,7 +175,7 @@ namespace Maktab.Attributes
                 return true;
             }
 
-            // Hierarchy: Normal < Assistant < SchoolTeacher < SchoolSupervisor < SchoolAdmin < SuperUser < Manager < Admin
+            // Hierarchy: Normal (Parent) < Assistant < SchoolTeacher < SchoolSupervisor < SchoolAdmin < Admin < SuperUser.
             static int RoleHierarchy(UserRoleType role) => role switch
             {
                 UserRoleType.Normal => 1,
@@ -183,9 +183,8 @@ namespace Maktab.Attributes
                 UserRoleType.SchoolTeacher => 3,
                 UserRoleType.SchoolSupervisor => 4,
                 UserRoleType.SchoolAdmin => 5,
-                UserRoleType.SuperUser => 6,
-                UserRoleType.Manager => 7,
-                UserRoleType.Admin => 8,
+                UserRoleType.Admin => 6,
+                UserRoleType.SuperUser => 7,
                 _ => 0
             };
 

@@ -268,6 +268,30 @@ namespace Application.Users.Repository.Implementation
             return results;
         }
 
+        public async Task<IReadOnlyDictionary<Guid, Relationship>> GetFamilyUserRelationships(Guid familyId)
+        {
+            var relationships = new Dictionary<Guid, Relationship>();
+            using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
+            using var cmd = conn.CreateCommand();
+
+            // Linked child rows are created only for verified users, so user_info is the source of truth here.
+            cmd.CommandText = @"
+                SELECT UserId, Relationship
+                FROM user_info
+                WHERE FamilyId = @FamilyId
+                  AND IsActive = TRUE";
+            cmd.AddParameter("@FamilyId", familyId.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                relationships[reader.GetGuidFromByteArray("UserId")] =
+                    (Relationship)reader.GetInt32("Relationship");
+            }
+
+            return relationships;
+        }
+
         public async Task<bool> CheckIfChildExist(UserChildToVerify child)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
@@ -291,7 +315,7 @@ namespace Application.Users.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-                SELECT ChildEducationalProfileId, ChildId, FamilyId, CompletedSurahsJson, IsActive, CreatedAt, UpdatedOn
+                SELECT ChildEducationalProfileId, ChildId, FamilyId, CompletedSurahsJson, SurahCompletionStatus, Remarks, IsActive, CreatedAt, UpdatedOn
                 FROM child_educational_profile
                 WHERE ChildId = @ChildId
                 LIMIT 1";
@@ -307,7 +331,12 @@ namespace Application.Users.Repository.Implementation
             return MapToChildEducationalProfile(reader);
         }
 
-        public async Task<ChildEducationalProfileResponse> UpsertChildEducationalProfile(Guid childId, Guid familyId, IReadOnlyCollection<QuranSurah> completedSurahs)
+        public async Task<ChildEducationalProfileResponse> UpsertChildEducationalProfile(
+            Guid childId,
+            Guid familyId,
+            IReadOnlyCollection<QuranSurah> completedSurahs,
+            SurahCompletionStatus surahCompletionStatus,
+            string remarks)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
             using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
@@ -319,12 +348,14 @@ namespace Application.Users.Repository.Implementation
 
             cmd.CommandText = @"
                 INSERT INTO child_educational_profile
-                (ChildEducationalProfileId, ChildId, FamilyId, CompletedSurahsJson, IsActive, CreatedAt, UpdatedOn)
+                (ChildEducationalProfileId, ChildId, FamilyId, CompletedSurahsJson, SurahCompletionStatus, Remarks, IsActive, CreatedAt, UpdatedOn)
                 VALUES
-                (@ChildEducationalProfileId, @ChildId, @FamilyId, @CompletedSurahsJson, @IsActive, @CreatedAt, @UpdatedOn)
+                (@ChildEducationalProfileId, @ChildId, @FamilyId, @CompletedSurahsJson, @SurahCompletionStatus, @Remarks, @IsActive, @CreatedAt, @UpdatedOn)
                 ON DUPLICATE KEY UPDATE
                     FamilyId = VALUES(FamilyId),
                     CompletedSurahsJson = VALUES(CompletedSurahsJson),
+                    SurahCompletionStatus = VALUES(SurahCompletionStatus),
+                    Remarks = VALUES(Remarks),
                     IsActive = VALUES(IsActive),
                     UpdatedOn = VALUES(UpdatedOn)";
 
@@ -332,6 +363,8 @@ namespace Application.Users.Repository.Implementation
             cmd.AddParameter("@ChildId", childId.ToByteArray());
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
             cmd.AddParameter("@CompletedSurahsJson", SerializeCompletedSurahs(completedSurahs));
+            cmd.AddParameter("@SurahCompletionStatus", (int)surahCompletionStatus);
+            cmd.AddParameter("@Remarks", remarks ?? string.Empty);
             cmd.AddParameter("@IsActive", true);
             cmd.AddParameter("@CreatedAt", now);
             cmd.AddParameter("@UpdatedOn", now);
@@ -393,6 +426,8 @@ namespace Application.Users.Repository.Implementation
                 ChildId = reader.GetGuidFromByteArray("ChildId"),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
                 CompletedSurahs = DeserializeCompletedSurahs(GetCompletedSurahsJson(reader)),
+                SurahCompletionStatus = (SurahCompletionStatus)reader.GetInt32("SurahCompletionStatus"),
+                Remarks = GetRemarks(reader),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn")
@@ -426,6 +461,12 @@ namespace Application.Users.Repository.Implementation
         {
             var ordinal = reader.GetOrdinal("CompletedSurahsJson");
             return reader.IsDBNull(ordinal) ? "[]" : reader.GetString(ordinal);
+        }
+
+        private static string GetRemarks(DbDataReader reader)
+        {
+            var ordinal = reader.GetOrdinal("Remarks");
+            return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
         }
 
         private static bool GetHasSurahCatalogBeenProvided(DbDataReader reader)

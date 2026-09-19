@@ -157,7 +157,7 @@ namespace Courses.Implementation.Services
 
             if (!StaffAssignmentRoleHelper.IsValidInstituteStaffRoleMask(staffRoles))
             {
-                throw new InvalidOperationException("Only Assistant, SchoolTeacher, SchoolSupervisor, SchoolAdmin, and Manager are allowed institute staff roles.");
+                throw new InvalidOperationException("Only Assistant, SchoolTeacher, SchoolSupervisor, and SchoolAdmin are allowed institute staff roles.");
             }
 
             var normalizedStartDate = StaffAssignmentRoleHelper.NormalizeUtc(startDate);

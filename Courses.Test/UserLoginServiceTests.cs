@@ -2,6 +2,7 @@ using Application.Users.Contracts;
 using Email;
 using Microsoft.Extensions.Configuration;
 using Moq;
+using MaktabDataContracts.Enums;
 using MaktabDataContracts.Requests.Authentication;
 using Users.Contracts;
 using Users.Implementation.Services;
@@ -102,6 +103,9 @@ public class UserLoginServiceTests
                 IfTempUser = false,
                 IsMultiFactorLoginEnabled = true
             });
+        userService
+            .Setup(service => service.GetUserRoles(userId))
+            .ReturnsAsync(UserRoleType.Normal);
 
         var sendEmailService = new Mock<ISendEmailService>();
         sendEmailService
@@ -111,6 +115,7 @@ public class UserLoginServiceTests
 
         var service = CreateService(repository, userService, sendEmailService);
 
+        var beforeAuthentication = DateTime.UtcNow;
         var response = await service.Authenticate("mfa-user", "Password123", "127.0.0.1");
 
         Assert.NotNull(response);
@@ -128,6 +133,7 @@ public class UserLoginServiceTests
         Assert.Equal("mfa@example.com", capturedCode.Email);
         Assert.True(capturedCode.IsActive);
         Assert.False(capturedCode.IsVerified);
+        Assert.InRange(capturedCode.ExpiresOn, beforeAuthentication.AddMinutes(30).AddSeconds(-1), DateTime.UtcNow.AddMinutes(30).AddSeconds(1));
 
         Assert.NotNull(capturedEmail);
         Assert.Equal("mfa@example.com", capturedEmail!.To);
@@ -333,7 +339,7 @@ public class UserLoginServiceTests
             {
                 ["JwtConfig:Key"] = "12345678901234567890123456789012",
                 ["JwtConfig:ExpiryMinutes"] = "60",
-                ["Authentication:TwoFactorCodeExpiryMinutes"] = "10",
+                ["Authentication:TwoFactorCodeExpiryMinutes"] = "30",
                 ["Authentication:TwoFactorMaxAttempts"] = "5"
             })
             .Build();

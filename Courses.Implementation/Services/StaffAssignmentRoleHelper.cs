@@ -8,8 +8,7 @@ namespace Courses.Implementation.Services
             UserRoleType.Assistant |
             UserRoleType.SchoolTeacher |
             UserRoleType.SchoolSupervisor |
-            UserRoleType.SchoolAdmin |
-            UserRoleType.Manager;
+            UserRoleType.SchoolAdmin;
 
         internal const UserRoleType AllowedCourseAssignmentRoles =
             UserRoleType.Assistant |
@@ -20,16 +19,14 @@ namespace Courses.Implementation.Services
             UserRoleType.SchoolTeacher |
             UserRoleType.SchoolSupervisor |
             UserRoleType.SchoolAdmin |
-            UserRoleType.SuperUser |
-            UserRoleType.Manager |
-            UserRoleType.Admin;
+            UserRoleType.Admin |
+            UserRoleType.SuperUser;
 
         internal const UserRoleType ElevatedAccessRoles =
             UserRoleType.SchoolSupervisor |
             UserRoleType.SchoolAdmin |
-            UserRoleType.SuperUser |
-            UserRoleType.Manager |
-            UserRoleType.Admin;
+            UserRoleType.Admin |
+            UserRoleType.SuperUser;
 
         internal static bool IsValidInstituteStaffRoleMask(UserRoleType roles)
             => roles != UserRoleType.None && (roles & ~AllowedInstituteStaffRoles) == UserRoleType.None;
@@ -97,9 +94,8 @@ namespace Courses.Implementation.Services
             UserRoleType.SchoolTeacher => 3,
             UserRoleType.SchoolSupervisor => 4,
             UserRoleType.SchoolAdmin => 5,
-            UserRoleType.SuperUser => 6,
-            UserRoleType.Manager => 7,
-            UserRoleType.Admin => 8,
+            UserRoleType.Admin => 6,
+            UserRoleType.SuperUser => 7,
             _ => 0
         };
     }

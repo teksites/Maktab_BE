@@ -72,8 +72,24 @@ namespace Application.Users.Implementation
                 .OrderBy(surah => (int)surah)
                 .ToList();
 
+            if (!Enum.IsDefined(typeof(SurahCompletionStatus), request.SurahCompletionStatus))
+            {
+                throw new ArgumentException("Surah completion status is invalid.", nameof(request));
+            }
+
+            var remarks = (request.Remarks ?? string.Empty).Trim();
+            if (remarks.Length > 500)
+            {
+                throw new ArgumentException("Surah remarks cannot exceed 500 characters.", nameof(request));
+            }
+
             return await _userChildrenRepository
-                .UpsertChildEducationalProfile(childId, child.FamilyId, completedSurahs)
+                .UpsertChildEducationalProfile(
+                    childId,
+                    child.FamilyId,
+                    completedSurahs,
+                    request.SurahCompletionStatus,
+                    remarks)
                 .ConfigureAwait(false);
         }
 

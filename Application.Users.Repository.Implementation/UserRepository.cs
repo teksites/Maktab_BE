@@ -205,7 +205,7 @@ namespace Application.Users.Repository.Implementation
                         var isTempPassword = reader.GetBoolean(11);
                         var familyId = reader.GetGuidFromByteArray(12);
                         var relationship = (Relationship)reader.GetInt32(13);
-                        var userRole = (UserRoleType)reader.GetInt32(14);
+                        var userRole = (UserRoleType)reader.GetInt64(14);
                         var isMultiFactorLoginEnabled = reader.GetBoolean(15);
 
                         results.Add(new UserInformation
@@ -331,7 +331,7 @@ FROM
                         IsTempPassword = reader.GetBoolean(11),
                         FamilyId = reader.GetGuidFromByteArray(12),
                         Relationship = (Relationship)reader.GetInt32(13),
-                        UserRole = (UserRoleType)reader.GetInt32(14),
+                        UserRole = (UserRoleType)reader.GetInt64(14),
                         IfTempUser = reader.GetBoolean(15),
                         IsMultiFactorLoginEnabled = reader.GetBoolean(16)
                     });
@@ -434,7 +434,7 @@ FROM
                     var isTempPassword = reader.GetBoolean(11);
                     var familyId = reader.GetGuidFromByteArray(12);
                     var relationship = (Relationship)reader.GetInt32(13);
-                    var userRole = (UserRoleType)reader.GetInt32(14);
+                    var userRole = (UserRoleType)reader.GetInt64(14);
                     var isMultiFactorLoginEnabled = reader.GetBoolean(15);
 
                     return new UserInformation
@@ -554,7 +554,7 @@ FROM
                     cmd.AddParameter("@isAdmin", userInformation.IsAdmin);
                     cmd.AddParameter("@isTempPassword", userInformation.IsTempPassword);
                     cmd.AddParameter("@relationship", (int)userInformation.Relationship);
-                    cmd.AddParameter("@userRole", (int)userInformation.UserRole);
+                    cmd.AddParameter("@userRole", (long)userInformation.UserRole);
                     cmd.AddParameter("@isMultiFactorLoginEnabled", userInformation.IsMultiFactorLoginEnabled);
 
                     if (await cmd.ExecuteNonQueryAsync().ConfigureAwait(false) > 0)
@@ -623,7 +623,7 @@ FROM
                     var storedPasswordHash = reader.GetString(8); // index of Password
                     var familyId = reader.GetGuidFromByteArray(9);
                     var relationship = (Relationship)reader.GetInt32(10);
-                    var userRole = (UserRoleType)reader.GetInt32(11);
+                    var userRole = (UserRoleType)reader.GetInt64(11);
                     var isMultiFactorLoginEnabled = reader.GetBoolean(12);
 
                     // 3. If password check is requested, verify hash
@@ -669,7 +669,7 @@ FROM
                         return UserRoleType.None;
                     }
 
-                    var userRole = (UserRoleType) reader.GetInt32(0);
+                    var userRole = (UserRoleType)reader.GetInt64(0);
                     return userRole;
                 }
             }

@@ -6,6 +6,10 @@ namespace Helcim.Services
     public interface IHelcimTransactionService
     {
         Task<HelcimPayInitializeResponse> InitializePayment(InitiatePaymentRequest request);
+        Task<HelcimPayInitializeResponse> InitializePaymentForSession(InitiatePaymentRequest request, Guid userId, Guid familyId);
+        Task<HelcimPayInitializeResponse> InitializeSavedCardVerification(Guid userId, Guid familyId);
+        Task CompleteSavedCardVerification(CompleteSavedCardVerificationRequest request, Guid userId);
+        Task<SavedCardPaymentAttemptResponse> ChargeSavedCard(ChargeSavedCardRequest request, Guid userId, Guid familyId);
         Task<HelcimPaymentCompletionResponse> CompleteHelcimPayPayment(CompleteHelcimPayPaymentRequest request);
         Task<HelcimPaymentCompletionResponse> SyncInvoicePaymentByInvoiceId(int invoiceId);
         Task<HelcimPaymentCompletionResponse> SyncInvoicePayment(string invoiceReference);

@@ -76,14 +76,23 @@ namespace Application.Users.Implementation
             return await _repository.DeleteFamilyChildren(userId, ifHardDelete).ConfigureAwait(false);
         }
 
-        public async Task<MaktabApiResult<ChildResponse>> GetChild(Guid childId)
+        public async Task<MaktabApiResult<ChildResponse>> GetChild(Guid childId, Guid? viewerUserId = null)
         {
-            return MapToChildResponse(await _repository.GetChild(childId).ConfigureAwait(false));
+            var child = await _repository.GetChild(childId).ConfigureAwait(false);
+            if (child == null)
+            {
+                return null;
+            }
+
+            var relationships = viewerUserId.HasValue
+                ? await _repository.GetFamilyUserRelationships(child.FamilyId).ConfigureAwait(false)
+                : null;
+            return MapToChildResponse(child, viewerUserId, relationships);
         }
 
-        public async Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid userId, bool fetchAdults = false)
+        public async Task<IEnumerable<MaktabApiResult<ChildResponse>>> GetUserChilds(Guid familyId, bool fetchAdults = false, Guid? viewerUserId = null)
         {
-            var children = await _repository.GetFamilyChildren(userId).ConfigureAwait(false);
+            var children = await _repository.GetFamilyChildren(familyId).ConfigureAwait(false);
             if (!fetchAdults)
             {
                 children = children
@@ -91,7 +100,10 @@ namespace Application.Users.Implementation
                     .ToList();
             }
 
-            return children.Select(MapToChildResponse).ToList();
+            var relationships = viewerUserId.HasValue
+                ? await _repository.GetFamilyUserRelationships(familyId).ConfigureAwait(false)
+                : null;
+            return children.Select(child => MapToChildResponse(child, viewerUserId, relationships)).ToList();
         }
 
         public async Task<MaktabApiResult<ChildResponse>> UpdateChild(UpdateChildRequest child)
@@ -134,7 +146,10 @@ namespace Application.Users.Implementation
             };
         }
 
-        private MaktabApiResult<ChildResponse> MapToChildResponse(Child child)
+        private MaktabApiResult<ChildResponse> MapToChildResponse(
+            Child child,
+            Guid? viewerUserId = null,
+            IReadOnlyDictionary<Guid, Relationship>? familyRelationships = null)
         {
             if (child == null)
             {
@@ -164,6 +179,7 @@ namespace Application.Users.Implementation
                 RegistrationNumber = child.RegistrationNumber,
                 Consent = child.Consent,
                 UserType = child.UserType,
+                DisplayType = GetDisplayType(child, viewerUserId, familyRelationships)
             };
 
             return new MaktabApiResult<ChildResponse>
@@ -204,9 +220,47 @@ namespace Application.Users.Implementation
         private static bool IsIncludedFamilyMemberUserType(UserType userType)
         {
             return userType == UserType.Child
+                || userType == UserType.Self
                 || userType == UserType.Mother
                 || userType == UserType.Father
                 || userType == UserType.Guardian;
+        }
+
+        private static FamilyMemberDisplayType GetDisplayType(
+            Child child,
+            Guid? viewerUserId,
+            IReadOnlyDictionary<Guid, Relationship>? familyRelationships)
+        {
+            if (child.UserType == UserType.Child)
+            {
+                return FamilyMemberDisplayType.Child;
+            }
+
+            if (!viewerUserId.HasValue || child.UserType != UserType.Self)
+            {
+                return FamilyMemberDisplayType.OtherAdult;
+            }
+
+            if (child.ChildId == viewerUserId.Value)
+            {
+                return FamilyMemberDisplayType.Self;
+            }
+
+            if (familyRelationships != null
+                && familyRelationships.TryGetValue(viewerUserId.Value, out var viewerRelationship)
+                && familyRelationships.TryGetValue(child.ChildId, out var memberRelationship)
+                && AreSpouses(viewerRelationship, memberRelationship))
+            {
+                return FamilyMemberDisplayType.Spouse;
+            }
+
+            return FamilyMemberDisplayType.OtherAdult;
+        }
+
+        private static bool AreSpouses(Relationship first, Relationship second)
+        {
+            return (first == Relationship.Mother && second == Relationship.Father)
+                || (first == Relationship.Father && second == Relationship.Mother);
         }
     }
 }

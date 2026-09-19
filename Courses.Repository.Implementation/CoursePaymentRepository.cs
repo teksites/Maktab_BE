@@ -35,6 +35,7 @@ namespace Courses.Repository.Implementation
                     CoursePaymentId,
                     StudentCourseTransactionId,
                     FamilyId,
+                    UserId,
                     AmountPaid,
                     Comments,
                     ExternalPaymentId,
@@ -49,6 +50,7 @@ namespace Courses.Repository.Implementation
                     @CoursePaymentId,
                     @StudentCourseTransactionId,
                     @FamilyId,
+                    @UserId,
                     @AmountPaid,
                     @Comments,
                     @ExternalPaymentId,
@@ -64,6 +66,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@CoursePaymentId", paymentId.ToByteArray());
             cmd.AddParameter("@StudentCourseTransactionId", payment.StudentCourseTransactionId.ToByteArray());
             cmd.AddParameter("@FamilyId", payment.FamilyId.ToByteArray());
+            cmd.AddParameter("@UserId", payment.UserId?.ToByteArray() ?? (object)DBNull.Value);
             cmd.AddParameter("@AmountPaid", payment.AmountPaid);
             cmd.AddParameter("@Comments", (object?)payment.Comments ?? DBNull.Value);
             cmd.AddParameter("@ExternalPaymentId", (object?)payment.ExternalPaymentId ?? DBNull.Value);
@@ -104,6 +107,7 @@ namespace Courses.Repository.Implementation
                 UPDATE course_payment
                 SET
                     AmountPaid  = @AmountPaid,
+                    UserId      = @UserId,
                     Comments    = @Comments,
                     ExternalPaymentId = @ExternalPaymentId,
                     PaymentType = @PaymentType,
@@ -114,6 +118,7 @@ namespace Courses.Repository.Implementation
 
             cmd.AddParameter("@CoursePaymentId", paymentId.ToByteArray());
             cmd.AddParameter("@AmountPaid", payment.AmountPaid);
+            cmd.AddParameter("@UserId", payment.UserId?.ToByteArray() ?? (object)DBNull.Value);
             cmd.AddParameter("@Comments", (object?)payment.Comments ?? DBNull.Value);
             cmd.AddParameter("@ExternalPaymentId", (object?)payment.ExternalPaymentId ?? DBNull.Value);
             cmd.AddParameter("@PaymentType", (int)normalizedPaymentType);
@@ -250,6 +255,7 @@ namespace Courses.Repository.Implementation
                 PaymentId = reader.GetGuidFromByteArray("CoursePaymentId"),
                 StudentCourseTransactionId = reader.GetGuidFromByteArray("StudentCourseTransactionId"),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
+                UserId = reader.GetNullableGuidFromByteArray("UserId"),
                 AmountPaid = reader.GetDecimal("AmountPaid"),
                 Comments = reader.GetNullableString("Comments"),
                 ExternalPaymentId = reader.GetNullableString("ExternalPaymentId"),

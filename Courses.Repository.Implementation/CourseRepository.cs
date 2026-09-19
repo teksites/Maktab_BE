@@ -33,14 +33,14 @@ namespace Courses.Repository.Implementation
                  CreatedAt, UpdatedOn, CanSelectMultipleEnrollmentGroups,
                  PolicyHyperLink, IsCourseCompleted, IsRegistrationOpened,
                  RegistrationStartDate, RegistrationEndDate, CourseSession, RegistrationFee, OfferDaycare,
-                 IsManualEnrollment, IsCourseHasPrequisite, IsCourseAnEvent)
+                 IsManualEnrollment, IsCourseHasPrequisite, IsAdultRestricted, IsCourseAnEvent)
                 VALUES
                 (@CourseId, @InstituteId, @Name, @NameFr, @Description, @DescriptionFr,
                  @Details, @DetailsFr, @StartDate, @EndDate, @IsActive,
                  @CreatedAt, @UpdatedOn, @CanSelectMultipleEnrollmentGroups,
                  @PolicyHyperLink, @IsCourseCompleted, @IsRegistrationOpened,
                  @RegistrationStartDate, @RegistrationEndDate, @CourseSession, @RegistrationFee,@OfferDaycare,
-                 @IsManualEnrollment, @IsCourseHasPrequisite, @IsCourseAnEvent)";
+                 @IsManualEnrollment, @IsCourseHasPrequisite, @IsAdultRestricted, @IsCourseAnEvent)";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
             cmd.AddParameter("@InstituteId", course.InstituteId.ToByteArray());
@@ -62,6 +62,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@OfferDaycare", course.OfferDaycare);
             cmd.AddParameter("@IsManualEnrollment", course.IsManualEnrollment);
             cmd.AddParameter("@IsCourseHasPrequisite", course.IsCourseHasPrequisite);
+            cmd.AddParameter("@IsAdultRestricted", course.IsAdultRestricted);
             cmd.AddParameter("@IsCourseAnEvent", course.IsCourseAnEvent);
 
             // ✅ FIX: DBNull-safe nullable DateTime parameters
@@ -72,6 +73,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@RegistrationFee", (int)course.RegistrationFee);
 
             await cmd.ExecuteNonQueryAsync();
+            await ReplaceCourseCustomRequirements(courseId, course.CustomRequirements);
             return await GetCourse(courseId) ?? throw new Exception("Failed to retrieve created course");
         }
 
@@ -233,7 +235,7 @@ namespace Courses.Repository.Implementation
                     RegistrationStartDate=@RegistrationStartDate, RegistrationEndDate=@RegistrationEndDate, CourseSession=@CourseSession, 
                     RegistrationFee=@RegistrationFee, OfferDaycare =@OfferDaycare,
                     IsManualEnrollment=@IsManualEnrollment, IsCourseHasPrequisite=@IsCourseHasPrequisite,
-                    IsCourseAnEvent=@IsCourseAnEvent
+                    IsAdultRestricted=@IsAdultRestricted, IsCourseAnEvent=@IsCourseAnEvent
                 WHERE CourseId=@CourseId";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
@@ -261,9 +263,16 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@OfferDaycare", course.OfferDaycare);
             cmd.AddParameter("@IsManualEnrollment", course.IsManualEnrollment);
             cmd.AddParameter("@IsCourseHasPrequisite", course.IsCourseHasPrequisite);
+            cmd.AddParameter("@IsAdultRestricted", course.IsAdultRestricted);
             cmd.AddParameter("@IsCourseAnEvent", course.IsCourseAnEvent);
 
-            return await cmd.ExecuteNonQueryAsync() > 0;
+            var updated = await cmd.ExecuteNonQueryAsync() > 0;
+            if (updated)
+            {
+                await ReplaceCourseCustomRequirements(courseId, course.CustomRequirements);
+            }
+
+            return updated;
         }
 
         // Delete course
@@ -338,6 +347,7 @@ namespace Courses.Repository.Implementation
                 IsCourseCompleted = reader.GetBoolean("IsCourseCompleted"),
                 IsCourseHasPrequisite = ReadBooleanColumn(reader, "IsCourseHasPrequisite"),
                 IsManualEnrollment = ReadBooleanColumn(reader, "IsManualEnrollment"),
+                IsAdultRestricted = ReadBooleanColumn(reader, "IsAdultRestricted"),
                 IsCourseAnEvent = ReadBooleanColumn(reader, "IsCourseAnEvent"),
                 IsRegistrationOpened = reader.GetBoolean("IsRegistrationOpened"),
                 RegistrationStartDate = registrationStart,
@@ -358,7 +368,85 @@ namespace Courses.Repository.Implementation
                                           .SelectMany(g => g.AcedemicGroups)
                                           .Distinct()
                                           .ToList();
+            course.CustomRequirements = await GetCourseCustomRequirements(courseId);
             return course;
+        }
+
+        private async Task<List<CourseCustomRequirements>> GetCourseCustomRequirements(Guid courseId)
+        {
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT RequirementType
+                FROM course_custom_requirements
+                WHERE CourseId = @CourseId
+                ORDER BY RequirementType";
+            cmd.AddParameter("@CourseId", courseId.ToByteArray());
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            var requirementColumn = FindColumn(reader, "RequirementType");
+            if (requirementColumn == null)
+            {
+                return new List<CourseCustomRequirements>();
+            }
+
+            var requirements = new List<CourseCustomRequirements>();
+            while (await reader.ReadAsync())
+            {
+                if (reader.IsDBNull(requirementColumn.Value))
+                {
+                    continue;
+                }
+
+                var requirement = (CourseCustomRequirements)Convert.ToInt32(reader.GetValue(requirementColumn.Value));
+                if (requirement != CourseCustomRequirements.None && Enum.IsDefined(requirement))
+                {
+                    requirements.Add(requirement);
+                }
+            }
+
+            return requirements;
+        }
+
+        private async Task ReplaceCourseCustomRequirements(
+            Guid courseId,
+            IEnumerable<CourseCustomRequirements>? requestedRequirements)
+        {
+            var requirements = NormalizeCustomRequirements(requestedRequirements);
+
+            using var conn = await Database.CreateAndOpenConnectionAsync();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM course_custom_requirements WHERE CourseId = @CourseId";
+            cmd.AddParameter("@CourseId", courseId.ToByteArray());
+            await cmd.ExecuteNonQueryAsync();
+
+            foreach (var requirement in requirements)
+            {
+                cmd.Parameters.Clear();
+                cmd.CommandText = @"
+                    INSERT INTO course_custom_requirements (CourseId, RequirementType, CreatedAt)
+                    VALUES (@CourseId, @RequirementType, @CreatedAt)";
+                cmd.AddParameter("@CourseId", courseId.ToByteArray());
+                cmd.AddParameter("@RequirementType", (int)requirement);
+                cmd.AddParameter("@CreatedAt", DateTime.UtcNow);
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        private static List<CourseCustomRequirements> NormalizeCustomRequirements(
+            IEnumerable<CourseCustomRequirements>? requestedRequirements)
+        {
+            var requirements = requestedRequirements?
+                .Where(requirement => requirement != CourseCustomRequirements.None)
+                .Distinct()
+                .ToList() ?? new List<CourseCustomRequirements>();
+
+            if (requirements.Any(requirement => !Enum.IsDefined(requirement)))
+            {
+                throw new ArgumentOutOfRangeException(nameof(requestedRequirements), "Unsupported course custom requirement.");
+            }
+
+            return requirements;
         }
 
         private const int NormalCourseTypeFlag = 1;

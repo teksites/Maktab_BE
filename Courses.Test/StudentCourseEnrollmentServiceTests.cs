@@ -18,6 +18,92 @@ namespace Courses.Test;
 public class StudentCourseEnrollmentServiceTests
 {
     [Fact]
+    public async Task AddEnrollment_WhenOnlyPriorEnrollmentWasSoftDeleted_ReusesFamilyCourseTransaction()
+    {
+        var courseId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var priorTransactionId = Guid.NewGuid();
+        var priorEnrollment = CreateEnrollment(childId, groupId, courseId, familyId, EnrollmentStatus.Enrolled);
+        priorEnrollment.IsActive = false;
+
+        var repository = new Mock<IStudentCourseEnrollmentRepository>();
+        repository
+            .Setup(repo => repo.GetCourseEnrollmentGroupInformation(groupId))
+            .ReturnsAsync(new CourseEnrollmentGroupInformationResponse
+            {
+                CourseEnrollmentGroupId = groupId,
+                CourseId = courseId,
+                MaxStudents = 20,
+                IfRegistrationOpen = true,
+                EnrollmentStatusCount = new Dictionary<EnrollmentStatus, int>()
+            });
+        repository
+            .Setup(repo => repo.AddEnrollment(It.IsAny<AddStudentCourseEnrollment>()))
+            .ReturnsAsync(new StudentCourseEnrollmentResponse
+            {
+                StudentCourseEnrollmentId = Guid.NewGuid(),
+                ChildId = childId,
+                FamilyId = familyId,
+                CourseId = courseId,
+                CourseEnrollmentGroupId = groupId,
+                EnrollmentStatus = EnrollmentStatus.Enrolled,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedOn = DateTime.UtcNow
+            });
+
+        var existingTransaction = new StudentCourseTransactionResponse
+        {
+            StudentCourseTransactionId = priorTransactionId,
+            FamilyId = familyId,
+            PaymentCode = "REUSE01",
+            TransactionStatus = TransactionStatus.AwaitingPayment,
+            RegistrationStatus = RegistrationStatus.Pending,
+            IsActive = true,
+            Enrollments = new List<StudentCourseEnrollmentResponse> { priorEnrollment }
+        };
+        var transactionService = new Mock<IStudentCourseTransactionService>();
+        transactionService
+            .Setup(service => service.GetCourseTransactionsByFamily(courseId, familyId))
+            .ReturnsAsync(new[] { existingTransaction });
+        transactionService
+            .Setup(service => service.AddEnrollmentsToTransaction(priorTransactionId, It.IsAny<Guid>()))
+            .ReturnsAsync(true);
+        transactionService
+            .Setup(service => service.UpdateTransaction(priorTransactionId, It.IsAny<AddStudentCourseTransaction>()))
+            .ReturnsAsync(true);
+
+        var courseService = new Mock<ICourseService>();
+        courseService
+            .Setup(service => service.GetCourse(courseId))
+            .ReturnsAsync(CreateCourse(courseId, groupId, 120));
+        var policyService = new Mock<IInstitutePolicyService>();
+        policyService
+            .Setup(service => service.GetAllPolicies(It.IsAny<Guid>()))
+            .ReturnsAsync(Array.Empty<InstitutePolicyResponse>());
+
+        var service = CreateEnrollmentService(
+            repository: repository,
+            transactionService: transactionService,
+            courseService: courseService,
+            policyService: policyService);
+
+        await service.AddEnrollment(new AddStudentCourseEnrollment
+        {
+            ChildId = childId,
+            FamilyId = familyId,
+            CourseId = courseId,
+            CourseEnrollmentGroupId = groupId,
+            ShouldTriggerEmail = false
+        });
+
+        transactionService.Verify(service => service.AddEnrollmentsToTransaction(priorTransactionId, It.IsAny<Guid>()), Times.Once);
+        transactionService.Verify(service => service.AddTransaction(It.IsAny<AddStudentCourseTransaction>()), Times.Never);
+    }
+
+    [Fact]
     public async Task AddEnrollment_SetsEnrollmentToAwaitingWhenGroupIsAlreadyFull()
     {
         var courseId = Guid.NewGuid();
@@ -2684,7 +2770,10 @@ public class StudentCourseEnrollmentServiceTests
         Assert.True(result);
         Assert.NotNull(sentEmail);
         Assert.Contains("Cancellation", sentEmail!.Subject, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("registration has been cancelled", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("The participant's registration has been cancelled.", sentEmail.Body, StringComparison.Ordinal);
+        Assert.Contains("L'inscription du participant a été annulée.", sentEmail.Body, StringComparison.Ordinal);
+        Assert.Contains("Assalaamu alaikum", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Dear parent", sentEmail.Body, StringComparison.OrdinalIgnoreCase);
         sendEmailService.Verify(service => service.SendBulkEmail(It.IsAny<MultiUserEmailData>()), Times.Once);
     }
 

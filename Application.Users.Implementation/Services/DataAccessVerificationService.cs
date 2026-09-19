@@ -49,11 +49,13 @@ namespace Application.Users.Implementation
 
         public bool HasElevatedAccess(UserRoleType userRoles)
         {
-            return userRoles.HasFlag(UserRoleType.Admin)
-                || userRoles.HasFlag(UserRoleType.SuperUser)
-                || userRoles.HasFlag(UserRoleType.Manager)
-                || userRoles.HasFlag(UserRoleType.SchoolAdmin)
-                || userRoles.HasFlag(UserRoleType.SchoolSupervisor);
+            const UserRoleType elevatedRoles =
+                UserRoleType.SchoolSupervisor |
+                UserRoleType.SchoolAdmin |
+                UserRoleType.Admin |
+                UserRoleType.SuperUser;
+
+            return (userRoles & elevatedRoles) != UserRoleType.None;
         }
 
         public DataAccessVerificationResult VerifyOwnership(SessionAccessContext sessionContext, IDictionary<string, object> actionArguments)
