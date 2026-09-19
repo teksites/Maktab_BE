@@ -1,3 +1,8 @@
+-- Existing-schema migration: results are stored once per child/course, not per enrollment.
+-- Temporarily disable safe updates because legacy rows may need deduplication and backfill.
+SET @previous_sql_safe_updates := @@SQL_SAFE_UPDATES;
+SET SQL_SAFE_UPDATES = 0;
+
 DELETE older
 FROM `maktab`.`student_course_results` older
 INNER JOIN `maktab`.`student_course_results` newer
@@ -70,8 +75,12 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+UPDATE `maktab`.`student_course_results`
+SET `AttendancePercentage` = 100.00
+WHERE `AttendancePercentage` IS NULL;
+
 ALTER TABLE `maktab`.`student_course_results`
-    MODIFY COLUMN `AttendancePercentage` DECIMAL(5,2) NULL;
+    MODIFY COLUMN `AttendancePercentage` DECIMAL(5,2) NOT NULL DEFAULT 100.00;
 
 SET @sql = IF (
     EXISTS (
@@ -175,8 +184,12 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+UPDATE `maktab_dev`.`student_course_results`
+SET `AttendancePercentage` = 100.00
+WHERE `AttendancePercentage` IS NULL;
+
 ALTER TABLE `maktab_dev`.`student_course_results`
-    MODIFY COLUMN `AttendancePercentage` DECIMAL(5,2) NULL;
+    MODIFY COLUMN `AttendancePercentage` DECIMAL(5,2) NOT NULL DEFAULT 100.00;
 
 SET @sql = IF (
     EXISTS (
@@ -207,3 +220,5 @@ SET @sql = IF (
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+SET SQL_SAFE_UPDATES = @previous_sql_safe_updates;
