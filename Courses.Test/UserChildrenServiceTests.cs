@@ -72,13 +72,13 @@ public class UserChildrenServiceTests
             OtherHealthConditions = string.Empty,
             AcedemicGroup = AcedemicGroupType.None,
             Consent = "yes",
-            UserType = UserType.Mother
+            UserType = UserType.Self
         });
 
         Assert.NotNull(capturedChild);
-        Assert.Equal(UserType.Mother, capturedChild!.UserType);
+        Assert.Equal(UserType.Self, capturedChild!.UserType);
         Assert.NotNull(result);
-        Assert.Equal(UserType.Mother, result!.Result.UserType);
+        Assert.Equal(UserType.Self, result!.Result.UserType);
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public class UserChildrenServiceTests
     }
 
     [Fact]
-    public async Task GetUserChilds_DefaultsToChildMotherFatherAndGuardian()
+    public async Task GetUserChilds_DefaultsToChildAndSelf()
     {
         var familyId = Guid.NewGuid();
         var repository = new Mock<IUserChildrenRepository>();
@@ -127,9 +127,9 @@ public class UserChildrenServiceTests
             .ReturnsAsync(new[]
             {
                 CreateChild(familyId, "Maryam", UserType.Child),
-                CreateChild(familyId, "Parent", UserType.Mother),
-                CreateChild(familyId, "Father", UserType.Father),
-                CreateChild(familyId, "Guardian", UserType.Guardian),
+                CreateChild(familyId, "Parent", UserType.Self),
+                CreateChild(familyId, "Spouse", UserType.Self),
+                CreateChild(familyId, "Guardian", UserType.Self),
                 CreateChild(familyId, "Other", (UserType)99)
             });
 
@@ -139,9 +139,7 @@ public class UserChildrenServiceTests
 
         Assert.Equal(4, result.Count);
         Assert.Contains(result, child => child.Result.UserType == UserType.Child);
-        Assert.Contains(result, child => child.Result.UserType == UserType.Mother);
-        Assert.Contains(result, child => child.Result.UserType == UserType.Father);
-        Assert.Contains(result, child => child.Result.UserType == UserType.Guardian);
+        Assert.Equal(3, result.Count(child => child.Result.UserType == UserType.Self));
         Assert.DoesNotContain(result, child => (int)child.Result.UserType == 99);
     }
 
@@ -235,7 +233,7 @@ public class UserChildrenServiceTests
             FirstName = "Implicit",
             LastName = "Mother",
             ArabicName = "Existing Arabic",
-            UserType = UserType.Mother,
+            UserType = UserType.Self,
             Gender = Gender.Female,
             AcedemicGroup = AcedemicGroupType.Adults,
             DateOfBirth = new DateTime(1900, 1, 1),
@@ -272,11 +270,11 @@ public class UserChildrenServiceTests
         Assert.NotNull(capturedChild);
         Assert.Equal("Updated Arabic", capturedChild!.ArabicName);
         Assert.Equal(new DateTime(1900, 1, 1), capturedChild.DateOfBirth);
-        Assert.Equal(UserType.Mother, capturedChild.UserType);
+        Assert.Equal(UserType.Self, capturedChild.UserType);
         Assert.Equal(Gender.Female, capturedChild.Gender);
         Assert.Equal(AcedemicGroupType.Adults, capturedChild.AcedemicGroup);
         Assert.NotNull(result);
-        Assert.Equal(UserType.Mother, result!.Result.UserType);
+        Assert.Equal(UserType.Self, result!.Result.UserType);
         Assert.Equal(new DateTime(1900, 1, 1), result.Result.DateOfBirth);
     }
 
@@ -347,8 +345,8 @@ public class UserChildrenServiceTests
             .ReturnsAsync(new[]
             {
                 CreateChild(familyId, "Maryam", UserType.Child),
-                CreateChild(familyId, "Parent", UserType.Father),
-                CreateChild(familyId, "Guardian", UserType.Guardian),
+                CreateChild(familyId, "Parent", UserType.Self),
+                CreateChild(familyId, "Guardian", UserType.Self),
                 CreateChild(familyId, "Other", (UserType)99)
             });
 
@@ -358,8 +356,7 @@ public class UserChildrenServiceTests
 
         Assert.Equal(3, result.Count);
         Assert.Contains(result, child => child.Result.UserType == UserType.Child);
-        Assert.Contains(result, child => child.Result.UserType == UserType.Father);
-        Assert.Contains(result, child => child.Result.UserType == UserType.Guardian);
+        Assert.Equal(2, result.Count(child => child.Result.UserType == UserType.Self));
         Assert.DoesNotContain(result, child => (int)child.Result.UserType == 99);
     }
 
@@ -373,8 +370,8 @@ public class UserChildrenServiceTests
             .ReturnsAsync(new[]
             {
                 CreateChild(familyId, "Maryam", UserType.Child),
-                CreateChild(familyId, "Parent", UserType.Mother),
-                CreateChild(familyId, "Guardian", UserType.Guardian),
+                CreateChild(familyId, "Parent", UserType.Self),
+                CreateChild(familyId, "Guardian", UserType.Self),
                 CreateChild(familyId, "Other", (UserType)99)
             });
 
@@ -384,8 +381,7 @@ public class UserChildrenServiceTests
 
         Assert.Equal(4, result.Count);
         Assert.Contains(result, child => child.Result.UserType == UserType.Child);
-        Assert.Contains(result, child => child.Result.UserType == UserType.Mother);
-        Assert.Contains(result, child => child.Result.UserType == UserType.Guardian);
+        Assert.Equal(2, result.Count(child => child.Result.UserType == UserType.Self));
         Assert.Contains(result, child => (int)child.Result.UserType == 99);
     }
 
