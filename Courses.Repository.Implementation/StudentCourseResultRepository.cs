@@ -50,7 +50,7 @@ namespace Courses.Repository.Implementation
             Guid instituteId,
             decimal? attendancePercentage,
             StudentCourseResultStatus resultStatus,
-            string remarks,
+            string? remarks,
             Guid recordedByUserId,
             bool isActive)
         {

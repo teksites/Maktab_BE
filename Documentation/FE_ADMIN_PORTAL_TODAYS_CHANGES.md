@@ -240,5 +240,5 @@ Handle `401` by returning to sign-in, `403` by hiding/locking the action with an
 - Each Surah's independent status and remarks can be read and saved by authorized staff.
 - Remarks cannot exceed 500 characters per Surah.
 - The attendance roster shows unsaved students as Present.
-- A staff member can save one student’s attendance without submitting other students.
+- A staff member can save one student’s attendance without submitting other students. Attendance `notes` and course-result `remarks` are optional; omit them when empty.
 - Re-enrollment reloads and preserves the existing transaction/payment-code relationship.

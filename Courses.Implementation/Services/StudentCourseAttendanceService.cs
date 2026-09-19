@@ -132,7 +132,7 @@ namespace Courses.Implementation.Services
                         PickupContactType = request.PickupContactType,
                         PickupUserId = request.PickupUserId,
                         PickupOtherContactId = request.PickupOtherContactId,
-                        Notes = request.Notes ?? string.Empty,
+                        Notes = request.Notes,
                         IsActive = true
                     }
                 }
@@ -327,7 +327,6 @@ namespace Courses.Implementation.Services
             student.EarlyPickupTime = student.EarlyPickupTime.HasValue
                 ? NormalizeDateTime(student.EarlyPickupTime.Value)
                 : null;
-            student.Notes ??= string.Empty;
         }
 
         private static DateTime NormalizeDateTime(DateTime value)
