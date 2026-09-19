@@ -193,13 +193,13 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 SELECT
                     COUNT(*) AS TotalRecords,
-                    SUM(CASE WHEN AttendanceStatus = @PresentStatus THEN 1 ELSE 0 END) AS PresentCount
+                    SUM(CASE WHEN AttendanceStatus <> @AbsentStatus THEN 1 ELSE 0 END) AS PresentCount
                 FROM student_course_attendance
                 WHERE StudentCourseEnrollmentId = @StudentCourseEnrollmentId
                   AND IsActive = TRUE";
 
             cmd.AddParameter("@StudentCourseEnrollmentId", studentCourseEnrollmentId.ToByteArray());
-            cmd.AddParameter("@PresentStatus", (int)AttendanceStatus.Present);
+            cmd.AddParameter("@AbsentStatus", (int)AttendanceStatus.Absent);
 
             using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
             if (!await reader.ReadAsync().ConfigureAwait(false))
@@ -220,7 +220,7 @@ namespace Courses.Repository.Implementation
             cmd.CommandText = @"
                 SELECT
                     COUNT(*) AS TotalRecords,
-                    SUM(CASE WHEN AttendanceStatus = @PresentStatus THEN 1 ELSE 0 END) AS PresentCount
+                    SUM(CASE WHEN AttendanceStatus <> @AbsentStatus THEN 1 ELSE 0 END) AS PresentCount
                 FROM student_course_attendance
                 WHERE CourseId = @CourseId
                   AND ChildId = @ChildId
@@ -228,7 +228,7 @@ namespace Courses.Repository.Implementation
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
             cmd.AddParameter("@ChildId", childId.ToByteArray());
-            cmd.AddParameter("@PresentStatus", (int)AttendanceStatus.Present);
+            cmd.AddParameter("@AbsentStatus", (int)AttendanceStatus.Absent);
 
             using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
             if (!await reader.ReadAsync().ConfigureAwait(false))
@@ -252,14 +252,14 @@ namespace Courses.Repository.Implementation
                 SELECT
                     ChildId,
                     COUNT(*) AS TotalRecords,
-                    SUM(CASE WHEN AttendanceStatus = @PresentStatus THEN 1 ELSE 0 END) AS PresentCount
+                    SUM(CASE WHEN AttendanceStatus <> @AbsentStatus THEN 1 ELSE 0 END) AS PresentCount
                 FROM student_course_attendance
                 WHERE CourseId = @CourseId
                   AND IsActive = TRUE
                 GROUP BY ChildId";
 
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
-            cmd.AddParameter("@PresentStatus", (int)AttendanceStatus.Present);
+            cmd.AddParameter("@AbsentStatus", (int)AttendanceStatus.Absent);
 
             using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
             while (await reader.ReadAsync().ConfigureAwait(false))

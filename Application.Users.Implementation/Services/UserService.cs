@@ -609,8 +609,9 @@ namespace Application.Users.Implementation
                 case Relationship.Mother:
                 case Relationship.Father:
                 case Relationship.Guardian:
+                case Relationship.Self:
                     // The linked child row mirrors the signed-up person, not their family role.
-                    // Their Mother/Father/Guardian relationship remains on user_info.
+                    // Their relationship remains on the user record.
                     userType = UserType.Self;
                     return true;
                 default:
@@ -803,7 +804,8 @@ namespace Application.Users.Implementation
         {
             return relationship == Relationship.Mother
                 || relationship == Relationship.Father
-                || relationship == Relationship.Guardian;
+                || relationship == Relationship.Guardian
+                || relationship == Relationship.Self;
         }
 
         private static FamilyInfo MapToFamilyInfo(UserInformation userInformation)

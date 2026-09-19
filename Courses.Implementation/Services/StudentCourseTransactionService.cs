@@ -198,7 +198,8 @@ namespace Courses.Implementation.Services
                 .Where(x => !x.IfTempUser &&
                             (x.Relationship == Relationship.Mother ||
                              x.Relationship == Relationship.Father ||
-                             x.Relationship == Relationship.Guardian))
+                             x.Relationship == Relationship.Guardian ||
+                             x.Relationship == Relationship.Self))
                 .Select(x => x.Email?.Trim() ?? string.Empty)
                 .Where(emailAddress => !string.IsNullOrWhiteSpace(emailAddress))
                 .Distinct(StringComparer.OrdinalIgnoreCase)

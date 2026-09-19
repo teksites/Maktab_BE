@@ -16,8 +16,14 @@ namespace Courses.Test;
 
 public class StudentCourseResultServiceTests
 {
-    [Fact]
-    public async Task UpsertCourseChildResult_CalculatesCourseLevelAttendancePercentageAndUsesCourseInstituteId()
+    [Theory]
+    [InlineData(4, 3, 75, true)]
+    [InlineData(0, 0, 100, false)]
+    public async Task UpsertCourseChildResult_CalculatesAttendancePercentageAndUsesCourseInstituteId(
+        int totalAttendanceRecords,
+        int nonAbsentAttendanceRecords,
+        decimal expectedAttendancePercentage,
+        bool expectedHasAttendanceRecords)
     {
         var userId = Guid.NewGuid();
         var childId = Guid.NewGuid();
@@ -29,6 +35,7 @@ public class StudentCourseResultServiceTests
         Guid capturedCourseId = Guid.Empty;
         Guid capturedInstituteId = Guid.Empty;
         decimal? capturedAttendancePercentage = null;
+        string? capturedRemarks = "not-captured";
 
         var repository = new Mock<IStudentCourseResultRepository>();
         repository
@@ -39,16 +46,17 @@ public class StudentCourseResultServiceTests
                 It.IsAny<Guid>(),
                 It.IsAny<decimal?>(),
                 It.IsAny<StudentCourseResultStatus>(),
-                It.IsAny<string>(),
+                It.IsAny<string?>(),
                 It.IsAny<Guid>(),
                 It.IsAny<bool>()))
-            .Callback<Guid, Guid, Guid, Guid, decimal?, StudentCourseResultStatus, string, Guid, bool>(
-                (childArg, _, courseArg, instituteArg, attendanceArg, _, _, _, _) =>
+            .Callback<Guid, Guid, Guid, Guid, decimal?, StudentCourseResultStatus, string?, Guid, bool>(
+                (childArg, _, courseArg, instituteArg, attendanceArg, _, remarksArg, _, _) =>
                 {
                     capturedChildId = childArg;
                     capturedCourseId = courseArg;
                     capturedInstituteId = instituteArg;
                     capturedAttendancePercentage = attendanceArg;
+                    capturedRemarks = remarksArg;
                 })
             .ReturnsAsync(new StudentCourseResultResponse
             {
@@ -57,8 +65,8 @@ public class StudentCourseResultServiceTests
                 FamilyId = familyId,
                 CourseId = courseId,
                 InstituteId = instituteId,
-                AttendancePercentage = 75m,
-                HasAttendanceRecords = true,
+                AttendancePercentage = expectedAttendancePercentage,
+                HasAttendanceRecords = expectedHasAttendanceRecords,
                 HasResult = true,
                 ResultStatus = StudentCourseResultStatus.Pass,
                 Remarks = "Excellent",
@@ -100,7 +108,7 @@ public class StudentCourseResultServiceTests
         var attendanceRepository = new Mock<IStudentCourseAttendanceRepository>();
         attendanceRepository
             .Setup(repo => repo.GetAttendanceSummary(courseId, childId))
-            .ReturnsAsync((4, 3));
+            .ReturnsAsync((totalAttendanceRecords, nonAbsentAttendanceRecords));
 
         var courseService = new Mock<ICourseService>();
         courseService
@@ -130,16 +138,16 @@ public class StudentCourseResultServiceTests
         var result = await service.UpsertCourseChildResult(userId, UserRoleType.SchoolAdmin, courseId, childId, new UpsertStudentCourseResultRequest
         {
             ResultStatus = StudentCourseResultStatus.Pass,
-            Remarks = "Excellent",
             IsActive = true
         });
 
         Assert.Equal(childId, capturedChildId);
         Assert.Equal(courseId, capturedCourseId);
         Assert.Equal(instituteId, capturedInstituteId);
-        Assert.Equal(75m, capturedAttendancePercentage);
-        Assert.Equal(75m, result.AttendancePercentage);
-        Assert.True(result.HasAttendanceRecords);
+        Assert.Equal(expectedAttendancePercentage, capturedAttendancePercentage);
+        Assert.Null(capturedRemarks);
+        Assert.Equal(expectedAttendancePercentage, result.AttendancePercentage);
+        Assert.Equal(expectedHasAttendanceRecords, result.HasAttendanceRecords);
     }
 
     [Fact]

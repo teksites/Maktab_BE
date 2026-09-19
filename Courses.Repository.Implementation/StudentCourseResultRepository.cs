@@ -82,7 +82,7 @@ namespace Courses.Repository.Implementation
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
             cmd.AddParameter("@CourseId", courseId.ToByteArray());
             cmd.AddParameter("@InstituteId", instituteId.ToByteArray());
-            cmd.AddParameter("@AttendancePercentage", (object?)attendancePercentage ?? DBNull.Value);
+            cmd.AddParameter("@AttendancePercentage", attendancePercentage ?? 100m);
             cmd.AddParameter("@ResultStatus", (int)resultStatus);
             cmd.AddParameter("@Remarks", string.IsNullOrWhiteSpace(remarks) ? DBNull.Value : remarks.Trim());
             cmd.AddParameter("@RecordedByUserId", recordedByUserId.ToByteArray());
