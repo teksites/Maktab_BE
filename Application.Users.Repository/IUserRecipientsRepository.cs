@@ -20,8 +20,6 @@ namespace Users.Repository
         Task<ChildEducationalProfileResponse> UpsertChildEducationalProfile(
             Guid childId,
             Guid familyId,
-            IReadOnlyCollection<QuranSurah> completedSurahs,
-            SurahCompletionStatus surahCompletionStatus,
-            string remarks);
+            IReadOnlyCollection<QuranSurahAssessmentRequest> surahAssessments);
     }
 }

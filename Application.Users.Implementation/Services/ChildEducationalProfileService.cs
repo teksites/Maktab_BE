@@ -65,32 +65,51 @@ namespace Application.Users.Implementation
                 throw new UnauthorizedAccessException("The surah catalog was already provided and can only be updated by school staff.");
             }
 
-            var completedSurahs = (request.CompletedSurahs ?? new List<QuranSurahSelectionRequest>())
-                .Select(item => item?.Surah ?? 0)
-                .Where(surah => Enum.IsDefined(typeof(QuranSurah), surah))
-                .Distinct()
-                .OrderBy(surah => (int)surah)
-                .ToList();
-
-            if (!Enum.IsDefined(typeof(SurahCompletionStatus), request.SurahCompletionStatus))
-            {
-                throw new ArgumentException("Surah completion status is invalid.", nameof(request));
-            }
-
-            var remarks = (request.Remarks ?? string.Empty).Trim();
-            if (remarks.Length > 500)
-            {
-                throw new ArgumentException("Surah remarks cannot exceed 500 characters.", nameof(request));
-            }
+            var surahAssessments = NormalizeSurahAssessments(request.SurahAssessments);
 
             return await _userChildrenRepository
                 .UpsertChildEducationalProfile(
                     childId,
                     child.FamilyId,
-                    completedSurahs,
-                    request.SurahCompletionStatus,
-                    remarks)
+                    surahAssessments)
                 .ConfigureAwait(false);
+        }
+
+        private static IReadOnlyCollection<QuranSurahAssessmentRequest> NormalizeSurahAssessments(
+            IEnumerable<QuranSurahAssessmentRequest>? assessments)
+        {
+            var normalized = (assessments ?? Enumerable.Empty<QuranSurahAssessmentRequest>())
+                .Where(item => item != null)
+                .Select(item => new QuranSurahAssessmentRequest
+                {
+                    Surah = item.Surah,
+                    CompletionStatus = item.CompletionStatus,
+                    Remarks = (item.Remarks ?? string.Empty).Trim()
+                })
+                .OrderBy(item => (int)item.Surah)
+                .ToList();
+
+            if (normalized.Any(item => !Enum.IsDefined(typeof(QuranSurah), item.Surah)))
+            {
+                throw new ArgumentException("Each assessment must contain a valid surah.", nameof(assessments));
+            }
+
+            if (normalized.GroupBy(item => item.Surah).Any(group => group.Count() > 1))
+            {
+                throw new ArgumentException("A surah can only be assessed once per profile.", nameof(assessments));
+            }
+
+            if (normalized.Any(item => !Enum.IsDefined(typeof(SurahCompletionStatus), item.CompletionStatus)))
+            {
+                throw new ArgumentException("Surah completion status is invalid.", nameof(assessments));
+            }
+
+            if (normalized.Any(item => item.Remarks.Length > 500))
+            {
+                throw new ArgumentException("Surah remarks cannot exceed 500 characters per surah.", nameof(assessments));
+            }
+
+            return normalized;
         }
 
         private async Task EnsureCanAccessChildProfile(Guid userId, UserRoleType userRoles, Guid childId, Guid familyId)

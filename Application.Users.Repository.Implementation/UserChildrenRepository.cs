@@ -315,28 +315,39 @@ namespace Application.Users.Repository.Implementation
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
-                SELECT ChildEducationalProfileId, ChildId, FamilyId, CompletedSurahsJson, SurahCompletionStatus, Remarks, IsActive, CreatedAt, UpdatedOn
+                SELECT ChildEducationalProfileId, ChildId, FamilyId, CompletedSurahsJson, IsActive, CreatedAt, UpdatedOn
                 FROM child_educational_profile
                 WHERE ChildId = @ChildId
                 LIMIT 1";
 
             cmd.AddParameter("@ChildId", childId.ToByteArray());
 
-            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            if (!await reader.ReadAsync().ConfigureAwait(false))
+            ChildEducationalProfileResponse profile;
+            string legacySurahsJson;
+            using (var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false))
             {
-                return null;
+                if (!await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    return null;
+                }
+
+                profile = MapToChildEducationalProfile(reader);
+                legacySurahsJson = GetCompletedSurahsJson(reader);
             }
 
-            return MapToChildEducationalProfile(reader);
+            profile.SurahAssessments = await GetSurahAssessments(conn, profile.ChildEducationalProfileId).ConfigureAwait(false);
+            if (profile.SurahAssessments.Count == 0)
+            {
+                profile.SurahAssessments = DeserializeLegacySurahAssessments(legacySurahsJson);
+            }
+
+            return profile;
         }
 
         public async Task<ChildEducationalProfileResponse> UpsertChildEducationalProfile(
             Guid childId,
             Guid familyId,
-            IReadOnlyCollection<QuranSurah> completedSurahs,
-            SurahCompletionStatus surahCompletionStatus,
-            string remarks)
+            IReadOnlyCollection<QuranSurahAssessmentRequest> surahAssessments)
         {
             using var conn = await Database.CreateAndOpenConnectionAsync().ConfigureAwait(false);
             using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
@@ -348,28 +359,69 @@ namespace Application.Users.Repository.Implementation
 
             cmd.CommandText = @"
                 INSERT INTO child_educational_profile
-                (ChildEducationalProfileId, ChildId, FamilyId, CompletedSurahsJson, SurahCompletionStatus, Remarks, IsActive, CreatedAt, UpdatedOn)
+                (ChildEducationalProfileId, ChildId, FamilyId, CompletedSurahsJson, IsActive, CreatedAt, UpdatedOn)
                 VALUES
-                (@ChildEducationalProfileId, @ChildId, @FamilyId, @CompletedSurahsJson, @SurahCompletionStatus, @Remarks, @IsActive, @CreatedAt, @UpdatedOn)
+                (@ChildEducationalProfileId, @ChildId, @FamilyId, @CompletedSurahsJson, @IsActive, @CreatedAt, @UpdatedOn)
                 ON DUPLICATE KEY UPDATE
                     FamilyId = VALUES(FamilyId),
                     CompletedSurahsJson = VALUES(CompletedSurahsJson),
-                    SurahCompletionStatus = VALUES(SurahCompletionStatus),
-                    Remarks = VALUES(Remarks),
                     IsActive = VALUES(IsActive),
                     UpdatedOn = VALUES(UpdatedOn)";
 
             cmd.AddParameter("@ChildEducationalProfileId", profileId.ToByteArray());
             cmd.AddParameter("@ChildId", childId.ToByteArray());
             cmd.AddParameter("@FamilyId", familyId.ToByteArray());
-            cmd.AddParameter("@CompletedSurahsJson", SerializeCompletedSurahs(completedSurahs));
-            cmd.AddParameter("@SurahCompletionStatus", (int)surahCompletionStatus);
-            cmd.AddParameter("@Remarks", remarks ?? string.Empty);
+            cmd.AddParameter("@CompletedSurahsJson", SerializeCompletedSurahs(surahAssessments));
             cmd.AddParameter("@IsActive", true);
             cmd.AddParameter("@CreatedAt", now);
             cmd.AddParameter("@UpdatedOn", now);
 
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+            cmd.Parameters.Clear();
+            cmd.CommandText = @"
+                SELECT ChildEducationalProfileId
+                FROM child_educational_profile
+                WHERE ChildId = @ChildId
+                LIMIT 1";
+            cmd.AddParameter("@ChildId", childId.ToByteArray());
+            var storedProfileId = new Guid((byte[])(await cmd.ExecuteScalarAsync().ConfigureAwait(false)
+                ?? throw new InvalidOperationException("Failed to resolve child educational profile.")));
+
+            cmd.Parameters.Clear();
+            cmd.CommandText = @"
+                UPDATE child_educational_profile_surah
+                SET IsActive = false,
+                    UpdatedOn = @UpdatedOn
+                WHERE ChildEducationalProfileId = @ChildEducationalProfileId
+                  AND IsActive = true";
+            cmd.AddParameter("@UpdatedOn", now);
+            cmd.AddParameter("@ChildEducationalProfileId", storedProfileId.ToByteArray());
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+            foreach (var assessment in surahAssessments)
+            {
+                cmd.Parameters.Clear();
+                cmd.CommandText = @"
+                    INSERT INTO child_educational_profile_surah
+                    (ChildEducationalProfileSurahId, ChildEducationalProfileId, Surah, CompletionStatus, Remarks, IsActive, CreatedAt, UpdatedOn)
+                    VALUES
+                    (@ChildEducationalProfileSurahId, @ChildEducationalProfileId, @Surah, @CompletionStatus, @Remarks, @IsActive, @CreatedAt, @UpdatedOn)
+                    ON DUPLICATE KEY UPDATE
+                        CompletionStatus = VALUES(CompletionStatus),
+                        Remarks = VALUES(Remarks),
+                        IsActive = VALUES(IsActive),
+                        UpdatedOn = VALUES(UpdatedOn)";
+                cmd.AddParameter("@ChildEducationalProfileSurahId", Guid.NewGuid().ToByteArray());
+                cmd.AddParameter("@ChildEducationalProfileId", storedProfileId.ToByteArray());
+                cmd.AddParameter("@Surah", (int)assessment.Surah);
+                cmd.AddParameter("@CompletionStatus", (int)assessment.CompletionStatus);
+                cmd.AddParameter("@Remarks", assessment.Remarks);
+                cmd.AddParameter("@IsActive", true);
+                cmd.AddParameter("@CreatedAt", now);
+                cmd.AddParameter("@UpdatedOn", now);
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
 
             cmd.Parameters.Clear();
             cmd.CommandText = @"
@@ -425,9 +477,6 @@ namespace Application.Users.Repository.Implementation
                 ChildEducationalProfileId = reader.GetGuidFromByteArray("ChildEducationalProfileId"),
                 ChildId = reader.GetGuidFromByteArray("ChildId"),
                 FamilyId = reader.GetGuidFromByteArray("FamilyId"),
-                CompletedSurahs = DeserializeCompletedSurahs(GetCompletedSurahsJson(reader)),
-                SurahCompletionStatus = (SurahCompletionStatus)reader.GetInt32("SurahCompletionStatus"),
-                Remarks = GetRemarks(reader),
                 IsActive = reader.GetBoolean("IsActive"),
                 CreatedAt = reader.GetDateTime("CreatedAt"),
                 UpdatedOn = reader.GetDateTime("UpdatedOn")
@@ -463,10 +512,62 @@ namespace Application.Users.Repository.Implementation
             return reader.IsDBNull(ordinal) ? "[]" : reader.GetString(ordinal);
         }
 
-        private static string GetRemarks(DbDataReader reader)
+        private static async Task<List<QuranSurahAssessmentResponse>> GetSurahAssessments(
+            DbConnection conn,
+            Guid childEducationalProfileId)
         {
-            var ordinal = reader.GetOrdinal("Remarks");
-            return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT Surah, CompletionStatus, Remarks, IsActive, CreatedAt, UpdatedOn
+                FROM child_educational_profile_surah
+                WHERE ChildEducationalProfileId = @ChildEducationalProfileId
+                  AND IsActive = true
+                ORDER BY Surah";
+            cmd.AddParameter("@ChildEducationalProfileId", childEducationalProfileId.ToByteArray());
+
+            var assessments = new List<QuranSurahAssessmentResponse>();
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var surah = (QuranSurah)reader.GetInt32("Surah");
+                if (!Enum.IsDefined(typeof(QuranSurah), surah))
+                {
+                    continue;
+                }
+
+                assessments.Add(CreateSurahAssessmentResponse(
+                    surah,
+                    (SurahCompletionStatus)reader.GetInt32("CompletionStatus"),
+                    reader.IsDBNull(reader.GetOrdinal("Remarks")) ? string.Empty : reader.GetString("Remarks"),
+                    reader.GetBoolean("IsActive"),
+                    reader.GetDateTime("CreatedAt"),
+                    reader.GetDateTime("UpdatedOn")));
+            }
+
+            return assessments;
+        }
+
+        private static QuranSurahAssessmentResponse CreateSurahAssessmentResponse(
+            QuranSurah surah,
+            SurahCompletionStatus completionStatus,
+            string remarks,
+            bool isActive,
+            DateTime createdAt,
+            DateTime updatedOn)
+        {
+            var option = QuranSurahCatalog.GetOption(surah);
+            return new QuranSurahAssessmentResponse
+            {
+                Surah = surah,
+                EnglishName = option.EnglishName,
+                ArabicName = option.ArabicName,
+                FrenchDescription = option.FrenchDescription,
+                CompletionStatus = completionStatus,
+                Remarks = remarks,
+                IsActive = isActive,
+                CreatedAt = createdAt,
+                UpdatedOn = updatedOn
+            };
         }
 
         private static bool GetHasSurahCatalogBeenProvided(DbDataReader reader)
@@ -475,10 +576,10 @@ namespace Application.Users.Repository.Implementation
             return !reader.IsDBNull(ordinal) && reader.GetBoolean(ordinal);
         }
 
-        private static string SerializeCompletedSurahs(IEnumerable<QuranSurah> completedSurahs)
+        private static string SerializeCompletedSurahs(IEnumerable<QuranSurahAssessmentRequest> surahAssessments)
         {
-            var normalizedSurahs = (completedSurahs ?? Enumerable.Empty<QuranSurah>())
-                .Where(surah => Enum.IsDefined(typeof(QuranSurah), surah))
+            var normalizedSurahs = (surahAssessments ?? Enumerable.Empty<QuranSurahAssessmentRequest>())
+                .Select(assessment => assessment.Surah)
                 .Distinct()
                 .OrderBy(surah => (int)surah)
                 .Select(surah => surah.ToString())
@@ -487,11 +588,11 @@ namespace Application.Users.Repository.Implementation
             return JsonSerializer.Serialize(normalizedSurahs);
         }
 
-        private static List<QuranSurahOptionResponse> DeserializeCompletedSurahs(string completedSurahsJson)
+        private static List<QuranSurahAssessmentResponse> DeserializeLegacySurahAssessments(string completedSurahsJson)
         {
             if (string.IsNullOrWhiteSpace(completedSurahsJson))
             {
-                return new List<QuranSurahOptionResponse>();
+                return new List<QuranSurahAssessmentResponse>();
             }
 
             try
@@ -502,12 +603,12 @@ namespace Application.Users.Repository.Implementation
                     .Select(name => Enum.Parse<QuranSurah>(name))
                     .Distinct()
                     .OrderBy(surah => (int)surah)
-                    .Select(QuranSurahCatalog.GetOption)
+                    .Select(surah => CreateSurahAssessmentResponse(surah, SurahCompletionStatus.Completed, string.Empty, true, DateTime.MinValue, DateTime.MinValue))
                     .ToList();
             }
             catch (JsonException)
             {
-                return new List<QuranSurahOptionResponse>();
+                return new List<QuranSurahAssessmentResponse>();
             }
         }
 

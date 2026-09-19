@@ -108,6 +108,7 @@ public class StudentCourseAttendanceServiceTests
                 CourseId = courseId,
                 InstituteId = instituteId,
                 AttendanceDate = attendanceDate,
+                StudentCourseAttendanceId = Guid.Empty,
                 AttendanceStatus = AttendanceStatus.Present,
                 Notes = "Present for class"
             });
@@ -115,6 +116,7 @@ public class StudentCourseAttendanceServiceTests
         Assert.NotNull(capturedRequest);
         var savedStudent = Assert.Single(capturedRequest!.Students);
         Assert.Equal(enrollmentId, savedStudent.StudentCourseEnrollmentId);
+        Assert.Equal(Guid.Empty, savedStudent.StudentCourseAttendanceId);
         Assert.Equal(childId, savedStudent.ChildId);
         Assert.Equal(familyId, savedStudent.FamilyId);
         Assert.Equal(AttendanceStatus.Present, savedStudent.AttendanceStatus);

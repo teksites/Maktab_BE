@@ -13,8 +13,8 @@ public sealed class HelcimCardVaultRepository : DbRepository, IHelcimCardVaultRe
         using var connection = await Database.CreateAndOpenConnectionAsync();
         using var command = connection.CreateCommand();
         command.CommandText = @"SELECT CardId, UserId, FamilyId, CardTokenCiphertext, CardTokenNonce, CardTokenTag, CardTokenHash,
-            CardCompany, CardFundingType, LastFourDigits, CardHolderName, ExpiryMonth, ExpiryYear, SourceHelcimTransactionId, IsDefault, CreatedAt
-            CardFingerprint, CardCompany, CardFundingType, LastFourDigits, CardHolderName, ExpiryMonth, ExpiryYear, SourceHelcimTransactionId, IsDefault, CreatedAt
+            CardFingerprint, CardCompany, CardFundingType, LastFourDigits, CardHolderName, ExpiryMonth, ExpiryYear,
+            SourceHelcimTransactionId, IsDefault, CreatedAt
             FROM helcim_saved_card WHERE UserId = @UserId AND IsActive = 1 ORDER BY IsDefault DESC, CreatedAt DESC";
         command.AddParameter("@UserId", userId.ToByteArray());
         var cards = new List<HelcimSavedCardRecord>();

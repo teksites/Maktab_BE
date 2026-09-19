@@ -286,9 +286,13 @@ namespace Courses.Repository.Implementation
 
                 foreach (var student in request.Students)
                 {
-                    var attendanceId = existingRows.TryGetValue(student.StudentCourseEnrollmentId, out var existingId)
+                    // A roster default has no persisted attendance row, so the client may send null or Guid.Empty.
+                    // Only a non-empty ID is usable; otherwise the server generates the primary key.
+                    var attendanceId = existingRows.TryGetValue(student.StudentCourseEnrollmentId, out var existingId) && existingId != Guid.Empty
                         ? existingId
-                        : student.StudentCourseAttendanceId.GetValueOrDefault(Guid.NewGuid());
+                        : student.StudentCourseAttendanceId is { } requestedId && requestedId != Guid.Empty
+                            ? requestedId
+                            : Guid.NewGuid();
 
                     using var cmd = conn.CreateCommand();
                     cmd.Transaction = tx;
@@ -302,6 +306,7 @@ namespace Courses.Repository.Implementation
                          @AttendanceDate, @AttendanceStatus, @LateArrivalTime, @EarlyPickupTime, @PickupContactType, @PickupUserId, @PickupOtherContactId,
                          @Notes, @RecordedByUserId, @IsActive, @CreatedAt, @UpdatedOn)
                         ON DUPLICATE KEY UPDATE
+                            StudentCourseAttendanceId = VALUES(StudentCourseAttendanceId),
                             CourseEnrollmentGroupId = VALUES(CourseEnrollmentGroupId),
                             CourseId = VALUES(CourseId),
                             InstituteId = VALUES(InstituteId),
