@@ -119,7 +119,7 @@ namespace Courses.Implementation.Services
                 course.InstituteId,
                 attendancePercentage,
                 request.ResultStatus,
-                request.Remarks ?? string.Empty,
+                request.Remarks,
                 userId,
                 request.IsActive).ConfigureAwait(false);
         }

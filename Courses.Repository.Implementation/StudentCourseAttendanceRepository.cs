@@ -337,7 +337,9 @@ namespace Courses.Repository.Implementation
                     cmd.AddParameter("@PickupContactType", (int)student.PickupContactType);
                     cmd.AddParameter("@PickupUserId", student.PickupUserId.HasValue ? student.PickupUserId.Value.ToByteArray() : DBNull.Value);
                     cmd.AddParameter("@PickupOtherContactId", student.PickupOtherContactId.HasValue ? student.PickupOtherContactId.Value.ToByteArray() : DBNull.Value);
-                    cmd.AddParameter("@Notes", student.Notes ?? string.Empty);
+                    cmd.AddParameter("@Notes", string.IsNullOrWhiteSpace(student.Notes)
+                        ? DBNull.Value
+                        : student.Notes.Trim());
                     cmd.AddParameter("@RecordedByUserId", request.RecordedByUserId.ToByteArray());
                     cmd.AddParameter("@IsActive", student.IsActive);
                     cmd.AddParameter("@CreatedAt", now);
